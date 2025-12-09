@@ -142,6 +142,7 @@ def main():
             
             # Fetch Live Tick from Bridge
             live_tick = bridge.get_tick()
+            verbose_log = False # Default to silent
             
             if live_tick and live_tick['last'] > 0:
                 # Validate Symbol

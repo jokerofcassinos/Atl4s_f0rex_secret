@@ -55,7 +55,7 @@ class ConsensusEngine:
             'w_div': 0.05,
             'w_kin': 0.15,    # Increased from 0.05 (Physics Priority)
             'w_fractal': 0.10, # Reduced from 0.15
-            'threshold': 25,  # Aggressive Base Threshold (was 40)
+            'threshold': 15,  # Aggressive Base Threshold (was 25)
             'chaos_threshold': 3.5 
         }
 
@@ -505,7 +505,7 @@ class ConsensusEngine:
 
 
         if regime == "TRENDING" and hurst > 0.6 and entropy < 2.5:
-            threshold = max(25, threshold - 15) # Cap at 25 (Very Aggressive)
+            threshold = max(10, threshold - 15) # Cap at 10 (Very Aggressive)
             logger.info(f"Adaptive Threshold: LOWERED to {threshold} (High Probability Regime)")
         
         decision = "WAIT"
