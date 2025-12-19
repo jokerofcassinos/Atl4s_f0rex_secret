@@ -150,10 +150,14 @@ def main():
             
             if len(df_m5) < 50: continue 
             
+            # A. Standard Matrix (Old Consensus)
+            # Suppress logs for this part unless needed
+            logging.getLogger("Atl4s-Consensus").setLevel(logging.WARNING) 
             try:
                 base_decision, base_score, details = consensus.deliberate(data_map, verbose=False)
             except:
                 base_score = 0
+            logging.getLogger("Atl4s-Consensus").setLevel(logging.INFO)
             
             smc_score = smc_engine.analyze(df_m5)
             reality_score, reality_state = third_eye.analyze_reality(df_m5)
@@ -178,8 +182,8 @@ def main():
             # 4. Smart Notification Logic (Clock Aligned)
             if is_report_time:
                 # Prepare Message Data
-                threshold_buy = 0.60 
-                threshold_sell = -0.60
+                threshold_buy = 0.50 
+                threshold_sell = -0.50
                 
                 direction = "EQUILIBRIUM"
                 if final_cortex_decision > threshold_buy: direction = "BUY"

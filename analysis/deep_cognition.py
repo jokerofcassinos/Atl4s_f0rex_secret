@@ -30,12 +30,14 @@ class DeepCognition:
         micro_metrics = self.micro.analyze()
         
         # 1. Base Instincts
-        w_trend = 0.20
+        # User Feedback: Trend was correct while Physics was too cautious.
+        # Adjustment: Boost Trend Weight to trust Technicals more.
+        w_trend = 0.35 
         w_vol = 0.1
-        w_pat = 0.20
+        w_pat = 0.15
         w_smc = 0.20
-        w_micro = 0.15 
-        w_phy = 0.15 # Physics
+        w_micro = 0.10 
+        w_phy = 0.10 # Reduced Physics weight to avoid over-caution
         
         # Micro Inputs
         micro_score = 0
