@@ -203,8 +203,17 @@ def main():
                 
                 future_pct = int(future_prob * 100) if direction == "BUY" else int((1-future_prob)*100)
                 
-                title = f"{direction} SIGNAL (Alpha: {final_cortex_decision:.2f})"
-                body = f"Size: {rec_lots} | FutureProb: {future_pct}% | State: {phy_state} | Time: {now_sp.strftime('%H:%M')}"
+                # Determine Tech Signal Label
+                tech_signal = "WAIT"
+                if base_score > 5: tech_signal = "BUY"
+                elif base_score < -5: tech_signal = "SELL"
+                
+                # Determine Alpha Signal Label
+                alpha_signal = direction # This is already BUY/SELL/EQUILIBRIUM/WAIT
+                
+                # Title: Tech: BUY | Alpha: WAIT
+                title = f"Tech: {tech_signal} ({base_score:.1f}) | Alpha: {alpha_signal} ({final_cortex_decision:.2f})"
+                body = f"Size: {rec_lots} | Future: {future_pct}% | Phys: {phy_state} | Time: {now_sp.strftime('%H:%M')}"
                 
                 notif_manager.send_notification(title, body, direction)
                 logger.info(f">>> REPORT SENT ({now_sp.strftime('%H:%M')}): {title} | {body}")
