@@ -13,7 +13,7 @@ class ScalpSwarm:
         self.last_trade_time = 0
         self.cooldown = config.SWARM_COOLDOWN
         
-    def process_tick(self, tick, df_m5, alpha_score, tech_score, phy_score, signal_dir):
+    def process_tick(self, tick, df_m5, alpha_score, tech_score, phy_score, velocity=0, signal_dir="WAIT"):
         """
         Analyzes the tick and context to decide if one of the 'Eyes' should fire.
         Returns: (Action: str, Reason: str, Price: float) or (None, None, None)
@@ -69,12 +69,23 @@ class ScalpSwarm:
         else:
             # Low Energy -> Trust the Chart (Tech/Retail)
             # Tech is passed as 'original_base_score' (Non-Inverted)
-            if abs(tech_score) > 5.0:
                 target_action = "BUY" if tech_score > 0 else "SELL"
                 mode_label = "Bait Scalp (Orderly)"
+
+        # --- VELOCITY GUARD (The 80% WinRate Filter) ---
+        # Don't buy if the knife is falling (Neg Vel). Don't sell if rocket (Pos Vel).
+        # We allow small counter-velocity for limit fills, but not momentum crashes.
+        if target_action == "BUY":
+            if velocity < -0.2: # Falling fast
+                target_action = None
+                # logger.debug(f"SWARM FILTER: Buy Rejected by Velocity Guard ({velocity:.2f})")
+        elif target_action == "SELL":
+            if velocity > 0.2: # Rising fast
+                target_action = None
+                # logger.debug(f"SWARM FILTER: Sell Rejected by Velocity Guard ({velocity:.2f})")
                 
         # --- Eye 1: The Hybrid Eye ---
-        # Execute if we have a target action from the active mode
+        # Execute if we have a target action from the active mode (and passed Guard)
         if target_action:
              action = target_action
              reason = f"Eye 1: {mode_label}"

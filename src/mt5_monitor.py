@@ -40,6 +40,40 @@ class MT5Monitor:
             'margin_free': info.margin_free
         }
 
+    def get_open_positions(self, symbol=None):
+        """
+        Retrieves all open positions.
+        Returns: List of dicts (Ticket, Type, Volume, Profit, OpenPrice, SL, TP)
+        """
+        if not self.connected: 
+             if not self._initialize(): return []
+             
+        try:
+            if symbol:
+                positions = mt5.positions_get(symbol=symbol)
+            else:
+                positions = mt5.positions_get()
+                
+            if positions is None:
+                return []
+                
+            results = []
+            for pos in positions:
+                results.append({
+                    'ticket': pos.ticket,
+                    'type': pos.type, # 0=Buy, 1=Sell
+                    'volume': pos.volume,
+                    'profit': pos.profit,
+                    'open_price': pos.price_open,
+                    'sl': pos.sl,
+                    'tp': pos.tp,
+                    'symbol': pos.symbol
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Error fetching positions: {e}")
+            return []
+
     def analyze_manual_performance(self, magic_number=0, days=30):
         """
         Analyzes trade history.

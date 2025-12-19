@@ -117,3 +117,32 @@ class TradeManager:
                 return entry_price - new_dist
         
         return base_tp
+
+    def check_hard_exit(self, position, hard_tp_amount, hard_sl_amount):
+        """
+        Instant Exit Logic (Virtual TP/SL).
+        Checks if floating profit/loss exceeds hard dollar thresholds.
+        Returns: Action Dict or None
+        """
+        profit = position['profit'] # Floating PnL in USD
+        
+        # 1. Virtual Take Profit (Active Grab)
+        # If profit >= 0.70 (or configured amount), Close Instantly.
+        if profit >= hard_tp_amount:
+             return {
+                "action": "CLOSE_FULL",
+                "ticket": position['ticket'],
+                "reason": f"Virtual TP Hit (${profit:.2f})"
+             }
+             
+        # 2. Virtual Stop Loss (Safety Net)
+        # If loss > 1.00 (negative profit < -1.00), Close Instantly.
+        # Note: profit is negative for loss.
+        # if profit <= -hard_sl_amount:
+        #      return {
+        #         "action": "CLOSE_FULL",
+        #         "ticket": position['ticket'],
+        #         "reason": f"Virtual SL Hit (${profit:.2f})"
+        #      }
+             
+        return None

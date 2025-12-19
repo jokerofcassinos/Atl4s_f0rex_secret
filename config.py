@@ -29,6 +29,7 @@ INVERT_TECHNICALS = True # Set to True to fade the retail trend (Buy becomes Sel
 
 # --- First Eye (Auto-Scalper) Settings ---
 ENABLE_FIRST_EYE = True
+ENABLE_SECOND_EYE = True # The Sniper
 SCALP_SL = 1.0 # Stop Loss ($1.00 Risk per 0.01)
 SCALP_TP = 0.7 # Take Profit ($0.70 Gain per 0.01)
 SCALP_LOTS = 0.01 # Fixed Lot Size

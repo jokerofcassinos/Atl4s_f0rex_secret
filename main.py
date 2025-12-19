@@ -23,6 +23,9 @@ from analysis.smart_money import SmartMoneyEngine
 from analysis.deep_cognition import DeepCognition
 from analysis.hyper_dimension import HyperDimension
 from analysis.scalper_swarm import ScalpSwarm
+from analysis.scalper_swarm import ScalpSwarm
+from analysis.second_eye import SecondEye
+from analysis.trade_manager import TradeManager
 
 # Setup Logging
 logging.basicConfig(
@@ -61,6 +64,8 @@ def main():
     deep_brain = DeepCognition()
     third_eye = HyperDimension()
     swarm = ScalpSwarm()
+    sniper = SecondEye()
+    trade_manager = TradeManager() # For Active Management
 
     # Dashboard Publisher
     context = zmq.Context()
@@ -179,6 +184,22 @@ def main():
                 live_tick=live_tick
             )
             
+            # --- ACTIVE PROFIT TAKER (Virtual TP) ---
+            # Checks every tick if any trade has hit the target ($0.70)
+            # This combats broker latency/spread issues.
+            open_positions = mt5_monitor.get_open_positions() 
+            if open_positions:
+                 for pos in open_positions:
+                     # Check Hard Exit
+                     exit_signal = trade_manager.check_hard_exit(pos, config.SCALP_TP, config.SCALP_SL)
+                     if exit_signal and exit_signal['action'] == "CLOSE_FULL":
+                         # Execute Immediate Close
+                         ticket = exit_signal['ticket']
+                         reason = exit_signal['reason']
+                         logger.info(f"⚡ INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
+                         bridge.send_command("CLOSE_TRADE", [str(ticket)])
+                         notif_manager.send_notification("INSTANT PROFIT", f"{reason}", "PROFIT")
+            
             # --- SCALP SWARM (High Frequency Tick Execution) ---
             # User Request: "Inverse of Inverse" -> Use Original Technical Score (The 'Retail' Score)
             if config.ENABLE_FIRST_EYE:
@@ -229,6 +250,47 @@ def main():
                     if resp == "SENT":
                         logger.info(f">>> SWARM SENT: {swarm_reason} | {cmd_type} (Int: {mt5_type}) @ {curr_price:.2f}")
                         notif_manager.send_notification("SWARM EXECUTION", f"{swarm_reason} | {cmd_type}", "TRADE")
+                        
+            # --- SECOND EYE (The Sniper) ---
+            if config.ENABLE_SECOND_EYE:
+                sniper_action, sniper_reason, sniper_lots = sniper.process_tick(
+                    tick=live_tick,
+                    df_m5=df_m5,
+                    alpha_score=final_cortex_decision,
+                    tech_score=original_base_score,
+                    orbit_energy=orbit_energy
+                )
+                
+                if sniper_action:
+                    # Execute Sniper Trade
+                    # Protocol: OPEN_TRADE|SYMBOL|TYPE(Int)|VOLUME|SL|TP
+                    mt5_type = 0 if sniper_action == "BUY" else 1
+                    curr_price = live_tick['last']
+                    
+                    # Sniper uses same Stop Distance as Swarm effectively, or maybe slightly wider?
+                    # Let's use Config SCALP_SL/TP for now but potentially wider eventually.
+                    # Using same hard stops for safety.
+                    
+                    if sniper_action == "BUY":
+                        sl_price = curr_price - config.SCALP_SL
+                        tp_price = curr_price + config.SCALP_TP
+                    else:
+                        sl_price = curr_price + config.SCALP_SL
+                        tp_price = curr_price - config.SCALP_TP
+                        
+                    params = [
+                        config.SYMBOL, 
+                        str(mt5_type), 
+                        str(sniper_lots), # Dynamic Lots
+                        f"{sl_price:.2f}", 
+                        f"{tp_price:.2f}"
+                    ]
+                    
+                    logger.info(f"SNIPER SIGNAL: {sniper_reason} | {sniper_action} | Lots: {sniper_lots} | Executing...")
+                    resp = bridge.send_command("OPEN_TRADE", params)
+                    if resp == "SENT":
+                        logger.info(f">>> SNIPER FIRED: {sniper_reason} | {sniper_action} @ {curr_price:.2f}")
+                        notif_manager.send_notification("SNIPER EXECUTION", f"{sniper_reason} | {sniper_lots} Lots", "TRADE")
             
             # 3. Account Awareness (MT5 Check)
             # Run every minute or on new candle to avoid spamming API
@@ -239,7 +301,7 @@ def main():
                 if acc_stats:
                     # Floating PnL is in acc_stats['profit']
                     pnl = acc_stats['profit']
-                    pnl_emoji = "🟢" if pnl > 0 else "🔴" if pnl < 0 else "⚪"
+                    pnl_emoji = "(+)" if pnl > 0 else "(-)" if pnl < 0 else "(=)"
                     logger.info(f"MONITOR: {pnl_emoji} Floating PnL: ${pnl:.2f} | Eq: {acc_stats['equity']:.2f}")
                     
                 last_log_print = time.time()
