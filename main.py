@@ -170,7 +170,7 @@ def main():
             smc_score = smc_engine.analyze(df_m5)
             reality_score, reality_state = third_eye.analyze_reality(df_m5)
             
-            final_cortex_decision, phy_state, future_prob, orbit_energy = deep_brain.consult_subconscious(
+            final_cortex_decision, phy_state, future_prob, orbit_energy, micro_velocity = deep_brain.consult_subconscious(
                 trend_score=base_score,
                 volatility_score=details.get('Vol', {}).get('score', 0) if 'details' in locals() else 0,
                 pattern_score=reality_score,
@@ -193,7 +193,8 @@ def main():
                     df_m5=df_m5,
                     alpha_score=final_cortex_decision, # SmartBrain (Inverted if active)
                     tech_score=original_base_score,    # Retail Technical (Non-Inverted)
-                    phy_score=orbit_energy,            # NEW: Physics Energy for Hybrid Switching
+                    phy_score=orbit_energy,            # Physics Energy for Hybrid Switching
+                    velocity=micro_velocity,           # NEW: Micro Velocity for Guard
                     signal_dir=swarm_tech_dir # (Unused in new logic but kept for sig info)
                 )
                 
