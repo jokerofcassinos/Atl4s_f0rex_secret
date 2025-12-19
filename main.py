@@ -6,6 +6,7 @@ import pytz
 import config
 import json
 import zmq
+import MetaTrader5 as mt5
 
 # Core Modules
 from data_loader import DataLoader
@@ -112,6 +113,16 @@ def main():
                 last_candle_minute = current_minute
                 logger.info(f"--- 5-MINUTE CYCLE TRIGGER: {now_sp.strftime('%H:%M:%S')} ---")
             
+            live_tick = mt5.symbol_info_tick(config.SYMBOL)
+
+            if live_tick is None:
+                 time.sleep(0.5)
+                 continue # Skip loop if no tick data
+                 
+            # Convert to dict for easier handling if it is an object
+            if hasattr(live_tick, '_asdict'):
+                live_tick = live_tick._asdict()
+
             if live_tick and live_tick['last'] > 0:
                 # Update Data Logic
                 if not df_m5.empty:
