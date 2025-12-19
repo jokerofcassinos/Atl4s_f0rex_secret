@@ -25,6 +25,7 @@ from analysis.hyper_dimension import HyperDimension
 from analysis.scalper_swarm import ScalpSwarm
 from analysis.scalper_swarm import ScalpSwarm
 from analysis.second_eye import SecondEye
+from analysis.fourth_eye import FourthEye
 from analysis.trade_manager import TradeManager
 
 # Setup Logging
@@ -65,6 +66,7 @@ def main():
     third_eye = HyperDimension()
     swarm = ScalpSwarm()
     sniper = SecondEye()
+    whale = FourthEye() # The Consensus Commander
     trade_manager = TradeManager() # For Active Management
 
     # Dashboard Publisher
@@ -222,14 +224,17 @@ def main():
                 if swarm_action:
                      # Execute Trade
                     cmd_type = swarm_action # "BUY" or "SELL"
-                    curr_price = swarm_price
+                    
+                    # Fix: Use ASK for BUY, BID for SELL to account for Spread
                     if cmd_type == "BUY":
-                        sl_price = curr_price - config.SCALP_SL
-                        tp_price = curr_price + config.SCALP_TP
+                        base_price = live_tick['ask'] # Entry at Ask
+                        sl_price = base_price - config.SCALP_SL
+                        tp_price = base_price + config.SCALP_TP
                         mt5_type = 0 # OP_BUY
                     else:
-                        sl_price = curr_price + config.SCALP_SL
-                        tp_price = curr_price - config.SCALP_TP
+                        base_price = live_tick['bid'] # Entry at Bid
+                        sl_price = base_price + config.SCALP_SL
+                        tp_price = base_price - config.SCALP_TP
                         mt5_type = 1 # OP_SELL
                         
                     # Protocol: OPEN_TRADE|SYMBOL|TYPE(Int)|VOLUME|SL|TP
@@ -272,11 +277,13 @@ def main():
                     # Using same hard stops for safety.
                     
                     if sniper_action == "BUY":
-                        sl_price = curr_price - config.SCALP_SL
-                        tp_price = curr_price + config.SCALP_TP
+                        base_price = live_tick['ask']
+                        sl_price = base_price - config.SCALP_SL
+                        tp_price = base_price + config.SCALP_TP
                     else:
-                        sl_price = curr_price + config.SCALP_SL
-                        tp_price = curr_price - config.SCALP_TP
+                        base_price = live_tick['bid']
+                        sl_price = base_price + config.SCALP_SL
+                        tp_price = base_price - config.SCALP_TP
                         
                     params = [
                         config.SYMBOL, 
@@ -291,6 +298,41 @@ def main():
                     if resp == "SENT":
                         logger.info(f">>> SNIPER FIRED: {sniper_reason} | {sniper_action} @ {curr_price:.2f}")
                         notif_manager.send_notification("SNIPER EXECUTION", f"{sniper_reason} | {sniper_lots} Lots", "TRADE")
+
+            # --- FOURTH EYE (The Whale) ---
+            if config.ENABLE_FOURTH_EYE:
+                whale_action, whale_reason, whale_lots = whale.process_tick(
+                     tick=live_tick,
+                     df_m5=df_m5,
+                     consensus_score=original_base_score # Use Retail Base Score which tracks Consensus
+                )
+                
+                if whale_action:
+                    # Execute Whale Trade
+                    mt5_type = 0 if whale_action == "BUY" else 1
+                    
+                    if whale_action == "BUY":
+                        base_price = live_tick['ask']
+                        sl_price = base_price - config.SCALP_SL
+                        tp_price = base_price + config.SCALP_TP
+                    else:
+                        base_price = live_tick['bid']
+                        sl_price = base_price + config.SCALP_SL
+                        tp_price = base_price - config.SCALP_TP
+                        
+                    params = [
+                        config.SYMBOL, 
+                        str(mt5_type), 
+                        str(whale_lots), 
+                        f"{sl_price:.2f}", 
+                        f"{tp_price:.2f}"
+                    ]
+                    
+                    logger.info(f"WHALE SIGNAL: {whale_reason} | {whale_action} | Lots: {whale_lots} | Executing...")
+                    resp = bridge.send_command("OPEN_TRADE", params)
+                    if resp == "SENT":
+                        logger.info(f">>> WHALE SURFACED: {whale_reason} | {whale_action} @ {base_price:.2f}")
+                        notif_manager.send_notification("WHALE EXECUTION", f"{whale_reason} | {whale_lots} Lots", "TRADE")
             
             # 3. Account Awareness (MT5 Check)
             # Run every minute or on new candle to avoid spamming API
