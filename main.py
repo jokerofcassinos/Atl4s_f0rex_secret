@@ -253,7 +253,7 @@ def main():
                     # Send correct command: OPEN_TRADE
                     resp = bridge.send_command("OPEN_TRADE", params)
                     if resp == "SENT":
-                        logger.info(f">>> SWARM SENT: {swarm_reason} | {cmd_type} (Int: {mt5_type}) @ {curr_price:.2f}")
+                        logger.info(f">>> SWARM SENT: {swarm_reason} | {cmd_type} (Int: {mt5_type}) @ {base_price:.2f}")
                         notif_manager.send_notification("SWARM EXECUTION", f"{swarm_reason} | {cmd_type}", "TRADE")
                         
             # --- SECOND EYE (The Sniper) ---
