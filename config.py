@@ -31,8 +31,8 @@ INVERT_TECHNICALS = True # Set to True to fade the retail trend (Buy becomes Sel
 ENABLE_FIRST_EYE = True
 ENABLE_SECOND_EYE = True # The Sniper
 ENABLE_FOURTH_EYE = True # The Whale (Consensus > 33)
-SCALP_SL = 1.0 # Stop Loss ($1.00 Risk per 0.01)
-SCALP_TP = 0.7 # Take Profit ($0.70 Gain per 0.01)
+SCALP_SL = 1.0 # Stop Loss ($1.00 USD Risk per 0.01)
+SCALP_TP = 0.70 # Take Profit ($0.70 USD Gain per 0.01)
 SCALP_LOTS = 0.01 # Fixed Lot Size
 
 # --- Swarm Settings ---
