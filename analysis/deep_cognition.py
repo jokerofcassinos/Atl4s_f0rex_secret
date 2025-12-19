@@ -110,12 +110,34 @@ class DeepCognition:
              # Future disagrees with Now -> Caution
              final_decision *= 0.6
              
+        # SUPER CONFLUENCE CHECK
+        # If Trend (Instinct), Future (Oracle), and Physics (Energy) all align
+        is_super_confluence = False
+        if abs(final_decision) > 0.4: # Only if we already have a signal
+            # Check alignment
+            trend_dir = np.sign(instinct_norm)
+            future_dir = np.sign(future_bias)
+            
+            # Physics Alignment: High Energy + Correct Direction implies support
+            # We use orbit_energy from kinematics (need to capture it)
+            # Since we calculate phy_score in step 1, we can use that sign
+            phy_dir = np.sign(phy_score)
+            
+            if trend_dir == future_dir == phy_dir:
+                # All 3 brains agree on direction
+                final_decision *= 1.2 # Boost confidence
+                final_decision = max(min(final_decision, 1.0), -1.0) # Cap at 1
+                is_super_confluence = True
+             
         # Detect Energy
         state_label = "NEUTRAL"
         if orbit_energy > 2.5:
             state_label = "HIGH_ENERGY"
         elif entropy_latest > 0.8: # Using entropy if defined
             state_label = "CHAOTIC"
+            
+        if is_super_confluence:
+            state_label += " [SUPER]"
              
         return final_decision, state_label, bullish_prob_future
 

@@ -22,6 +22,7 @@ from src.mt5_monitor import MT5Monitor
 from analysis.smart_money import SmartMoneyEngine
 from analysis.deep_cognition import DeepCognition
 from analysis.hyper_dimension import HyperDimension
+from analysis.scalper_swarm import ScalpSwarm
 
 # Setup Logging
 logging.basicConfig(
@@ -150,14 +151,17 @@ def main():
             
             if len(df_m5) < 50: continue 
             
-            # A. Standard Matrix (Old Consensus)
-            # Suppress logs for this part unless needed
-            logging.getLogger("Atl4s-Consensus").setLevel(logging.WARNING) 
             try:
                 base_decision, base_score, details = consensus.deliberate(data_map, verbose=False)
             except:
                 base_score = 0
             logging.getLogger("Atl4s-Consensus").setLevel(logging.INFO)
+            
+            # --- INVERSE MODE LOGIC ---
+            tech_label_suffix = ""
+            if config.INVERT_TECHNICALS:
+                base_score = -base_score # FLIP THE SIGNAL
+                tech_label_suffix = " (Inv)"
             
             smc_score = smc_engine.analyze(df_m5)
             reality_score, reality_state = third_eye.analyze_reality(df_m5)
@@ -211,12 +215,44 @@ def main():
                 # Determine Alpha Signal Label
                 alpha_signal = direction # This is already BUY/SELL/EQUILIBRIUM/WAIT
                 
-                # Title: Tech: BUY | Alpha: WAIT
-                title = f"Tech: {tech_signal} ({base_score:.1f}) | Alpha: {alpha_signal} ({final_cortex_decision:.2f})"
+                # Title: Tech (Inv): BUY | Alpha: WAIT
+                emoji = ""
+                if "[SUPER]" in phy_state: 
+                    emoji = " 🔥"
+                
+                title = f"Tech{tech_label_suffix}: {tech_signal} ({base_score:.1f}) | Alpha: {alpha_signal} ({final_cortex_decision:.2f}){emoji}"
                 body = f"Size: {rec_lots} | Future: {future_pct}% | Phys: {phy_state} | Time: {now_sp.strftime('%H:%M')}"
                 
                 notif_manager.send_notification(title, body, direction)
                 logger.info(f">>> REPORT SENT ({now_sp.strftime('%H:%M')}): {title} | {body}")
+                
+                # --- FIRST EYE (Auto-Scalper) ---
+                if config.ENABLE_FIRST_EYE and tech_signal in ["BUY", "SELL"]:
+                    # Execute Trade based on Technical Signal (which is already Inverted if config says so)
+                    cmd_type = "BUY" if tech_signal == "BUY" else "SELL"
+                    
+                    # Send Command: TRADE|ACTION|SYMBOL|SL|TP|VOLUME
+                    # Note: SL and TP here are distances, the EA/MT5 side needs to handle the calcs or we send absolute prices.
+                    # Assuming Bridge supports relative or we calculate absolute:
+                    # Let's calculate absolute prices to be safe/standard
+                    curr_price = live_tick['last']
+                    if cmd_type == "BUY":
+                        sl_price = curr_price - config.SCALP_SL
+                        tp_price = curr_price + config.SCALP_TP
+                    else:
+                        sl_price = curr_price + config.SCALP_SL
+                        tp_price = curr_price - config.SCALP_TP
+                        
+                    # Params: Symbol, Type, SL, TP, Volume
+                    params = [config.SYMBOL, cmd_type, f"{sl_price:.2f}", f"{tp_price:.2f}", f"{config.SCALP_LOTS}"]
+                    
+                    # Use bridge to send
+                    resp = bridge.send_command("TRADE", params)
+                    if resp == "SENT":
+                        logger.info(f"FIRST EYE: Scalp Order Sent ({cmd_type}) @ {curr_price} | TP: {tp_price:.2f} | SL: {sl_price:.2f}")
+                        notif_manager.send_notification("FIRST EYE EXECUTION", f"Auto-Scalp {cmd_type} Executed @ {curr_price}", "TRADE")
+                    else:
+                        logger.error("FIRST EYE: Failed to send trade command.")
 
             # Dashboard Pub (Live)
             try:

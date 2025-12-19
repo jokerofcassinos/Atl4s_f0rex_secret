@@ -25,6 +25,17 @@ TIMEFRAME = "M5"
 INITIAL_CAPITAL = 30.0
 RISK_PER_TRADE = 0.05  # 5% risk per trade (Reduced from 10% for survivability)
 LEVERAGE = 500  # Assumed leverage, adjust as needed
+INVERT_TECHNICALS = True # Set to True to fade the retail trend (Buy becomes Sell)
+
+# --- First Eye (Auto-Scalper) Settings ---
+ENABLE_FIRST_EYE = True
+SCALP_TP = 1.6 # Target Profit in Price Delta (~160 points)
+SCALP_SL = 1.6 # Stop Loss in Price Delta
+SCALP_LOTS = 0.01 # Fixed Lot Size
+
+# --- Swarm Settings ---
+SWARM_MAX_TRADES = 5
+SWARM_COOLDOWN = 10 # Seconds
 
 # --- ZeroMQ Settings ---
 # --- ZeroMQ Settings ---
