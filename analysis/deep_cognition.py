@@ -139,7 +139,8 @@ class DeepCognition:
         if is_super_confluence:
             state_label += " [SUPER]"
              
-        return final_decision, state_label, bullish_prob_future
+        # Return Decision, State Label, Future Prob AND Physics Energy (Orbit Energy) for Swarm
+        return final_decision, state_label, bullish_prob_future, orbit_energy
 
     def learn(self, df, outcome):
         features = self.memory.extract_features(df)

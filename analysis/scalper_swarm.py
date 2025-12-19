@@ -31,12 +31,15 @@ class ScalpSwarm:
 
         # 2. Constraints Check
         if self.trade_count >= self.max_trades:
+            # logger.debug(f"Swarm: Max Trades Reached ({self.trade_count})")
             return None, "Max Trades Reached", 0
             
         if current_time - self.last_trade_time < self.cooldown:
+            # logger.debug("Swarm: Cooldown Active")
             return None, "Cooldown", 0
             
         if signal_dir not in ["BUY", "SELL"]:
+            # logger.debug(f"Swarm: No Valid Direction ({signal_dir})")
             return None, "No Direction", 0
 
         # 3. Strategy Logic (The Eyes)
@@ -44,11 +47,37 @@ class ScalpSwarm:
         action = None
         reason = None
         
-        # --- Eye 1: The Alpha Strike (High Conviction) ---
-        # If Deep Cognition is very strong (>0.7) and Tech agrees
-        if abs(alpha_score) > 0.7 and np.sign(alpha_score) == np.sign(tech_score):
-             action = signal_dir
-             reason = "Eye 1: Alpha Strike"
+        # LOG INPUTS FOR DEBUGGING
+        logger.debug(f"SWARM DEBUG: Alpha={alpha_score:.2f} Tech={tech_score:.2f} Energy={phy_score:.2f} Dir={signal_dir}")
+        
+        # --- HYBRID SWARM LOGIC ---
+        # Mode A: "Bait Scalp" (Low Energy/Orderly) -> Follow Retail Tech (Ride the wave)
+        # Mode B: "Smart Predator" (High Energy/Chaos) -> Follow Alpha Brain (Fade the move/Inverse)
+        
+        is_chaotic = phy_score > 2.5 # High Energy Threshold
+        
+        # Determine Target Direction based on Regime
+        target_action = None
+        mode_label = ""
+        
+        if is_chaotic:
+            # High Energy -> Trust the Brain (Alpha)
+            # Alpha is already 'Inverted' if config says so.
+            if abs(alpha_score) > 0.4:
+                target_action = "BUY" if alpha_score > 0 else "SELL"
+                mode_label = "Smart Predator (Chaos)"
+        else:
+            # Low Energy -> Trust the Chart (Tech/Retail)
+            # Tech is passed as 'original_base_score' (Non-Inverted)
+            if abs(tech_score) > 5.0:
+                target_action = "BUY" if tech_score > 0 else "SELL"
+                mode_label = "Bait Scalp (Orderly)"
+                
+        # --- Eye 1: The Hybrid Eye ---
+        # Execute if we have a target action from the active mode
+        if target_action:
+             action = target_action
+             reason = f"Eye 1: {mode_label}"
              
         # --- Eye 2: Pullback Sniper (Better Price) ---
         # If signal is BUY but price is below Open (Discount)

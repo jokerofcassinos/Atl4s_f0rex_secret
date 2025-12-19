@@ -26,7 +26,7 @@ from analysis.scalper_swarm import ScalpSwarm
 
 # Setup Logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG, # Changed to DEBUG for Swarm Analysis
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("atl4s.log"),
@@ -170,7 +170,7 @@ def main():
             smc_score = smc_engine.analyze(df_m5)
             reality_score, reality_state = third_eye.analyze_reality(df_m5)
             
-            final_cortex_decision, phy_state, future_prob = deep_brain.consult_subconscious(
+            final_cortex_decision, phy_state, future_prob, orbit_energy = deep_brain.consult_subconscious(
                 trend_score=base_score,
                 volatility_score=details.get('Vol', {}).get('score', 0) if 'details' in locals() else 0,
                 pattern_score=reality_score,
@@ -193,36 +193,54 @@ def main():
                     df_m5=df_m5,
                     alpha_score=final_cortex_decision, # SmartBrain (Inverted if active)
                     tech_score=original_base_score,    # Retail Technical (Non-Inverted)
-                    phy_score=0, 
-                    signal_dir=swarm_tech_dir # Swarm follows Retail Trend for Eye 1
+                    phy_score=orbit_energy,            # NEW: Physics Energy for Hybrid Switching
+                    signal_dir=swarm_tech_dir # (Unused in new logic but kept for sig info)
                 )
                 
                 if swarm_action:
                      # Execute Trade
-                    cmd_type = swarm_action
+                    cmd_type = swarm_action # "BUY" or "SELL"
                     curr_price = swarm_price
                     if cmd_type == "BUY":
                         sl_price = curr_price - config.SCALP_SL
                         tp_price = curr_price + config.SCALP_TP
+                        mt5_type = 0 # OP_BUY
                     else:
                         sl_price = curr_price + config.SCALP_SL
                         tp_price = curr_price - config.SCALP_TP
+                        mt5_type = 1 # OP_SELL
                         
-                    params = [config.SYMBOL, cmd_type, f"{sl_price:.2f}", f"{tp_price:.2f}", f"{config.SCALP_LOTS}"]
+                    # Protocol: OPEN_TRADE|SYMBOL|TYPE(Int)|VOLUME|SL|TP
+                    # Note: Volume is index 3 in EA, SL is 4, TP is 5.
+                    params = [
+                        config.SYMBOL, 
+                        str(mt5_type), 
+                        str(config.SCALP_LOTS), 
+                        f"{sl_price:.2f}", 
+                        f"{tp_price:.2f}"
+                    ]
                     
                     # Log attempt
                     logger.info(f"SWARM SIGNAL: {swarm_reason} | {cmd_type} | Attempting Execution...")
-                    resp = bridge.send_command("TRADE", params)
+                    
+                    # Send correct command: OPEN_TRADE
+                    resp = bridge.send_command("OPEN_TRADE", params)
                     if resp == "SENT":
-                        logger.info(f">>> SWARM SENT: {swarm_reason} | {cmd_type} @ {curr_price:.2f}")
+                        logger.info(f">>> SWARM SENT: {swarm_reason} | {cmd_type} (Int: {mt5_type}) @ {curr_price:.2f}")
                         notif_manager.send_notification("SWARM EXECUTION", f"{swarm_reason} | {cmd_type}", "TRADE")
             
             # 3. Account Awareness (MT5 Check)
-            if time.time() - last_log_print > 60:
+            # Run every minute or on new candle to avoid spamming API
+            if time.time() - last_log_print > 10: # Check every 10s for PnL visibility
                 acc_stats = mt5_monitor.get_account_summary()
-                perf_stats = mt5_monitor.analyze_manual_performance()
+                # perf_stats = mt5_monitor.analyze_manual_performance() # Too heavy/slow for 10s loop?
+                
                 if acc_stats:
-                    logger.info(f"STATS | Bal: {acc_stats['balance']} | Man.WinRate: {perf_stats['accuracy_label']} | Net: {perf_stats['net']}")
+                    # Floating PnL is in acc_stats['profit']
+                    pnl = acc_stats['profit']
+                    pnl_emoji = "🟢" if pnl > 0 else "🔴" if pnl < 0 else "⚪"
+                    logger.info(f"MONITOR: {pnl_emoji} Floating PnL: ${pnl:.2f} | Eq: {acc_stats['equity']:.2f}")
+                    
                 last_log_print = time.time()
 
             # 4. Smart Notification Logic (Clock Aligned)
@@ -293,7 +311,9 @@ def main():
             except:
                 pass
                 
-            time.sleep(0.5)
+    
+            # Reduce Latency: Sleep significantly less to catch ticks
+            time.sleep(0.01)
 
     except KeyboardInterrupt:
         logger.info("Shutdown Signal.")

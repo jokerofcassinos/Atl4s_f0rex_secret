@@ -29,8 +29,8 @@ INVERT_TECHNICALS = True # Set to True to fade the retail trend (Buy becomes Sel
 
 # --- First Eye (Auto-Scalper) Settings ---
 ENABLE_FIRST_EYE = True
-SCALP_TP = 1.6 # Target Profit in Price Delta (~160 points)
-SCALP_SL = 1.6 # Stop Loss in Price Delta
+SCALP_SL = 1.0 # Stop Loss ($1.00 Risk per 0.01)
+SCALP_TP = 0.7 # Take Profit ($0.70 Gain per 0.01)
 SCALP_LOTS = 0.01 # Fixed Lot Size
 
 # --- Swarm Settings ---
