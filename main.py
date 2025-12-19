@@ -60,6 +60,7 @@ def main():
     smc_engine = SmartMoneyEngine()
     deep_brain = DeepCognition()
     third_eye = HyperDimension()
+    swarm = ScalpSwarm()
 
     # Dashboard Publisher
     context = zmq.Context()
@@ -158,10 +159,13 @@ def main():
             logging.getLogger("Atl4s-Consensus").setLevel(logging.INFO)
             
             # --- INVERSE MODE LOGIC ---
+            original_base_score = base_score # Backup for Scalper (Inverse of Inverse)
             tech_label_suffix = ""
             if config.INVERT_TECHNICALS:
                 base_score = -base_score # FLIP THE SIGNAL
                 tech_label_suffix = " (Inv)"
+            
+            # Scalp Swarm Logic removed from here (will be re-inserted after Deep Cognition)
             
             smc_score = smc_engine.analyze(df_m5)
             reality_score, reality_state = third_eye.analyze_reality(df_m5)
@@ -174,6 +178,44 @@ def main():
                 df_m5=df_m5,
                 live_tick=live_tick
             )
+            
+            # --- SCALP SWARM (High Frequency Tick Execution) ---
+            # User Request: "Inverse of Inverse" -> Use Original Technical Score (The 'Retail' Score)
+            if config.ENABLE_FIRST_EYE:
+                # Calculate Global Direction based on the Backup Score (Original)
+                # If Retail Tech says BUY -> Swarm should BUY (Normal Logic)
+                swarm_tech_dir = "WAIT"
+                if original_base_score > 5: swarm_tech_dir = "BUY"
+                elif original_base_score < -5: swarm_tech_dir = "SELL"
+                
+                swarm_action, swarm_reason, swarm_price = swarm.process_tick(
+                    tick=live_tick,
+                    df_m5=df_m5,
+                    alpha_score=final_cortex_decision, # SmartBrain (Inverted if active)
+                    tech_score=original_base_score,    # Retail Technical (Non-Inverted)
+                    phy_score=0, 
+                    signal_dir=swarm_tech_dir # Swarm follows Retail Trend for Eye 1
+                )
+                
+                if swarm_action:
+                     # Execute Trade
+                    cmd_type = swarm_action
+                    curr_price = swarm_price
+                    if cmd_type == "BUY":
+                        sl_price = curr_price - config.SCALP_SL
+                        tp_price = curr_price + config.SCALP_TP
+                    else:
+                        sl_price = curr_price + config.SCALP_SL
+                        tp_price = curr_price - config.SCALP_TP
+                        
+                    params = [config.SYMBOL, cmd_type, f"{sl_price:.2f}", f"{tp_price:.2f}", f"{config.SCALP_LOTS}"]
+                    
+                    # Log attempt
+                    logger.info(f"SWARM SIGNAL: {swarm_reason} | {cmd_type} | Attempting Execution...")
+                    resp = bridge.send_command("TRADE", params)
+                    if resp == "SENT":
+                        logger.info(f">>> SWARM SENT: {swarm_reason} | {cmd_type} @ {curr_price:.2f}")
+                        notif_manager.send_notification("SWARM EXECUTION", f"{swarm_reason} | {cmd_type}", "TRADE")
             
             # 3. Account Awareness (MT5 Check)
             if time.time() - last_log_print > 60:
@@ -226,33 +268,19 @@ def main():
                 notif_manager.send_notification(title, body, direction)
                 logger.info(f">>> REPORT SENT ({now_sp.strftime('%H:%M')}): {title} | {body}")
                 
-                # --- FIRST EYE (Auto-Scalper) ---
-                if config.ENABLE_FIRST_EYE and tech_signal in ["BUY", "SELL"]:
-                    # Execute Trade based on Technical Signal (which is already Inverted if config says so)
-                    cmd_type = "BUY" if tech_signal == "BUY" else "SELL"
-                    
-                    # Send Command: TRADE|ACTION|SYMBOL|SL|TP|VOLUME
-                    # Note: SL and TP here are distances, the EA/MT5 side needs to handle the calcs or we send absolute prices.
-                    # Assuming Bridge supports relative or we calculate absolute:
-                    # Let's calculate absolute prices to be safe/standard
-                    curr_price = live_tick['last']
-                    if cmd_type == "BUY":
-                        sl_price = curr_price - config.SCALP_SL
-                        tp_price = curr_price + config.SCALP_TP
-                    else:
-                        sl_price = curr_price + config.SCALP_SL
-                        tp_price = curr_price - config.SCALP_TP
-                        
-                    # Params: Symbol, Type, SL, TP, Volume
-                    params = [config.SYMBOL, cmd_type, f"{sl_price:.2f}", f"{tp_price:.2f}", f"{config.SCALP_LOTS}"]
-                    
-                    # Use bridge to send
-                    resp = bridge.send_command("TRADE", params)
-                    if resp == "SENT":
-                        logger.info(f"FIRST EYE: Scalp Order Sent ({cmd_type}) @ {curr_price} | TP: {tp_price:.2f} | SL: {sl_price:.2f}")
-                        notif_manager.send_notification("FIRST EYE EXECUTION", f"Auto-Scalp {cmd_type} Executed @ {curr_price}", "TRADE")
-                    else:
-                        logger.error("FIRST EYE: Failed to send trade command.")
+                # --- FIRST EYE / SCALP SWARM (Auto-Scalper) ---
+                # NOTE: Swarm is processed on EVERY TICK (see above), but we log here for visibility if needed.
+                # Actually, the user wants Swarm to run continuously.
+                # If we put it only here, it runs once every 5 mins.
+                # Ideally, we should remove this block and let the tick-level logic handle it.
+                # However, to be safe and ensure at least one check per 5 mins, we can leave a manual check or rely on the loop above.
+                # WAIT! I haven't inserted the loop above yet. I am replacing THIS block with the Tick Loop block?
+                # No, I should insert the tick loop block earlier in the code (around line 170) and REMOVE this block.
+                # But I cannot insert earlier without a separate edit.
+                # Strategy:
+                # 1. I will effectively DELETE this "Report Time" execution block.
+                # 2. I'll insert the real execution logic higher up in the next step.
+                pass # Swarm Logic moved to main loop for High Frequency Execution
 
             # Dashboard Pub (Live)
             try:
