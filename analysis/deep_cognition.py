@@ -83,23 +83,24 @@ class DeepCognition:
             # 0.5 -> 0, 1.0 -> 0.5 bias (Oracle should be supportive, not dominant)
             future_bias = (bullish_prob_future - 0.5) * 2 
             
-            # 3. Quantum Layer (Math Reality Check)
-            closes = df_m5['close']
-            entropy_latest = self.qm.calculate_entropy(closes, window=14).iloc[-1]
-            
-            # Penalty for Chaos
-            chaos_penalty = 1.0
-            if entropy_latest > 2.0: chaos_penalty = 0.7
-            instinct_norm *= chaos_penalty
-            
-            # Kalman Bias
-            kalman = self.qm.kalman_filter(closes).iloc[-1]
-            price = closes.iloc[-1]
-            kalman_bias = 0
-            if price > kalman: kalman_bias = -0.1
-            else: kalman_bias = 0.1
-            
-            instinct_norm += kalman_bias
+        # 3. Quantum Layer (Math Reality Check)
+        closes = df_m5['close']
+        entropy_series = self.qm.calculate_entropy(closes, window=14)
+        entropy_latest = entropy_series.iloc[-1] if not entropy_series.empty else 0
+        
+        # Penalty for Chaos
+        chaos_penalty = 1.0
+        if entropy_latest > 2.0: chaos_penalty = 0.7
+        instinct_norm *= chaos_penalty
+        
+        # Kalman Bias
+        kalman = self.qm.kalman_filter(closes).iloc[-1]
+        price = closes.iloc[-1]
+        kalman_bias = 0
+        if price > kalman: kalman_bias = -0.1
+        else: kalman_bias = 0.1
+        
+        instinct_norm += kalman_bias
 
         # 4. Final Consensus
         # Mix: Instinct (Current) + Memory (Past) + Oracle (Future)
@@ -129,11 +130,11 @@ class DeepCognition:
                 final_decision = max(min(final_decision, 1.0), -1.0) # Cap at 1
                 is_super_confluence = True
              
-        # Detect Energy
+        # Detect Energy State
         state_label = "NEUTRAL"
         if orbit_energy > 2.5:
             state_label = "HIGH_ENERGY"
-        elif entropy_latest > 0.8: # Using entropy if defined
+        elif entropy_latest > 0.8: 
             state_label = "CHAOTIC"
             
         if is_super_confluence:

@@ -24,7 +24,6 @@ from analysis.smart_money import SmartMoneyEngine
 from analysis.deep_cognition import DeepCognition
 from analysis.hyper_dimension import HyperDimension
 from analysis.scalper_swarm import ScalpSwarm
-from analysis.scalper_swarm import ScalpSwarm
 from analysis.second_eye import SecondEye
 from analysis.fourth_eye import FourthEye
 from analysis.trade_manager import TradeManager
@@ -100,30 +99,23 @@ def main():
                 continue
                 
             live_tick = bridge.get_tick()
-            
+
+            if live_tick is None:
+                 time.sleep(0.01)
+                 continue # Skip loop if no tick data
+                 
             # Smart Time Check (Sao Paulo)
             now_sp = datetime.now(sp_tz)
             current_minute = now_sp.minute
             
-            # Check for 5-Minute Trigger (00, 05, 10, 15...)
-            # We trigger once when the minute changes to a multiple of 5
+            # Check for 5-Minute Trigger
             is_report_time = False
             if current_minute % 5 == 0 and current_minute != last_candle_minute:
                 is_report_time = True
                 last_candle_minute = current_minute
                 logger.info(f"--- 5-MINUTE CYCLE TRIGGER: {now_sp.strftime('%H:%M:%S')} ---")
-            
-            live_tick = mt5.symbol_info_tick(config.SYMBOL)
 
-            if live_tick is None:
-                 time.sleep(0.5)
-                 continue # Skip loop if no tick data
-                 
-            # Convert to dict for easier handling if it is an object
-            if hasattr(live_tick, '_asdict'):
-                live_tick = live_tick._asdict()
-
-            if live_tick and live_tick['last'] > 0:
+            if live_tick.get('last', 0) > 0:
                 # Update Data Logic
                 if not df_m5.empty:
                     last_time = df_m5.index[-1]
@@ -164,23 +156,20 @@ def main():
                     continue
 
             # 2. Advanced Multi-Dimensional Analysis
-            # Run this ONLY on report time (every 5 mins) OR if debugging
-            # To be responsive, we can run analysis every loop but only NOTIFY on schedule.
-            # Let's run analysis every loop to update Dashboard live.
-            
             if len(df_m5) < 50: continue 
             
             try:
                 base_decision, base_score, details = consensus.deliberate(data_map, verbose=False)
-            except:
+            except Exception as e:
+                logger.error(f"Consensus Error: {e}")
                 base_score = 0
-            logging.getLogger("Atl4s-Consensus").setLevel(logging.INFO)
+                details = {}
             
             # --- INVERSE MODE LOGIC ---
-            original_base_score = base_score # Backup for Scalper (Inverse of Inverse)
+            original_base_score = base_score 
             tech_label_suffix = ""
             if config.INVERT_TECHNICALS:
-                base_score = -base_score # FLIP THE SIGNAL
+                base_score = -base_score 
                 tech_label_suffix = " (Inv)"
             
             # Scalp Swarm Logic removed from here (will be re-inserted after Deep Cognition)
@@ -197,16 +186,31 @@ def main():
                 live_tick=live_tick
             )
             
-            # --- ACTIVE PROFIT TAKER (Virtual TP) ---
-            # Checks every tick if any trade has hit the target ($0.70)
-            # This combats broker latency/spread issues.
+            # --- ACTIVE POSITION MANAGEMENT (TradeManager) ---
             open_positions = mt5_monitor.get_open_positions() 
             if open_positions:
+                 # Standard Indicators needed for TradeManager if available
+                 atr = df_m5.iloc[-1]['ATR'] if 'ATR' in df_m5.columns else 1.0
+                 struc_low = df_m5.iloc[-20:]['low'].min()
+                 struc_high = df_m5.iloc[-20:]['high'].max()
+
                  for pos in open_positions:
-                     # Check Hard Exit
-                     exit_signal = trade_manager.check_hard_exit(pos, config.SCALP_TP, config.SCALP_SL)
+                     pos_dict = pos._asdict() if hasattr(pos, '_asdict') else pos
+                     
+                     # 1. Trailing Stop
+                     new_sl = trade_manager.check_trailing_stop(pos_dict, live_tick['last'], struc_low, struc_high)
+                     if new_sl:
+                         bridge.send_command("MODIFY_TRADE", [str(pos_dict['ticket']), f"{new_sl:.2f}", str(pos_dict['tp'])])
+                     
+                     # 2. Partial TP
+                     partial_action = trade_manager.check_partial_tp(pos_dict, live_tick['last'])
+                     if partial_action:
+                         bridge.send_command("CLOSE_PARTIAL", [str(pos_dict['ticket']), str(partial_action['volume'])])
+                         notif_manager.send_notification("PARTIAL PROFIT", f"Ticket {pos_dict['ticket']} closed {partial_action['volume']} lots", "PROFIT")
+
+                     # 3. Hard Exit (Virtual TP/SL)
+                     exit_signal = trade_manager.check_hard_exit(pos_dict, config.SCALP_TP, config.SCALP_SL)
                      if exit_signal and exit_signal['action'] == "CLOSE_FULL":
-                         # Execute Immediate Close
                          ticket = exit_signal['ticket']
                          reason = exit_signal['reason']
                          logger.info(f"⚡ INSTANT EXIT: {reason} | Closing Ticket {ticket}...")

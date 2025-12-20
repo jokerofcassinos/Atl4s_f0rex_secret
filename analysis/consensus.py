@@ -465,6 +465,10 @@ class ConsensusEngine:
             return "WAIT", 0, details
 
         total_vector = v_trend + v_sniper + v_quant + v_pattern + v_cycle + v_sd + v_div + v_kin + v_fractal
+        
+        # Breakdown Log for Debugging Stagnation
+        logger.debug(f"Consensus Breakdown: Trend={v_trend:.2f} Sniper={v_sniper:.2f} Quant={v_quant:.2f} Pat={v_pattern:.2f} Cycle={v_cycle:.2f} SD={v_sd:.2f} Div={v_div:.2f} Kin={v_kin:.2f} Frac={v_fractal:.2f}")
+        
         final_score = abs(total_vector)
         
         # --- ADAPTIVE THRESHOLD (Scalping Mode) ---

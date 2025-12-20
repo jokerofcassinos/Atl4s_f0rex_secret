@@ -50,7 +50,7 @@ def test_engines():
     tick = {'time': 1678888000000, 'last': 2005.0, 'bid': 2004.9, 'ask': 2005.1, 'volume': 100}
     
     # Mock inputs
-    decision, phy_state, future_prob = dc.consult_subconscious(
+    decision, phy_state, future_prob, energy, velocity = dc.consult_subconscious(
         trend_score=50, 
         volatility_score=20, 
         pattern_score=score_hd, 
@@ -58,7 +58,7 @@ def test_engines():
         df_m5=df,
         live_tick=tick
     )
-    print(f"[DeepCognition] Decision: {decision:.2f} | State: {phy_state} | Future Prob: {future_prob:.2f}")
+    print(f"[DeepCognition] Decision: {decision:.2f} | State: {phy_state} | Future Prob: {future_prob:.2f} | Energy: {energy:.2f}")
 
     # 4. Notifications (Dry Run)
     nm = NotificationManager(cooldown_minutes=0)
