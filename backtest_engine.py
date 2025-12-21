@@ -43,7 +43,7 @@ class BacktestEngine:
 
     def run_simulation(self, data_map, params=None, verbose=True):
         """
-        Detailed simulation with advanced modules and trade logging.
+        Detailed simulation with Ultra Optimization (Pre-calculated signals).
         """
         df = data_map.get('M5')
         df_h1 = data_map.get('H1')
@@ -56,37 +56,92 @@ class BacktestEngine:
             self.consensus.update_parameters(params)
 
         if verbose:
-            logger.info("Starting Advanced Detailed Simulation...")
+            logger.info(f"Preparing Advanced Simulation ({len(df)} candles)...")
         
+        # --- PRE-DELIBERATION (Parallel Pre-calculation) ---
+        signals_cache = {}
+        smc_cache = {}
+        reality_cache = {}
+        
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+        
+        start_pre = time.time()
+        
+        def calculate_candle_signals(idx):
+            current_time = df.index[idx]
+            current_slice_m5 = df.iloc[:idx+1]
+            current_slice_h1 = None
+            if df_h1 is not None:
+                current_slice_h1 = df_h1[df_h1.index <= current_time]
+            
+            # 1. Consensus
+            try:
+                base_decision, base_score, details = self.consensus.deliberate({'M5': current_slice_m5, 'H1': current_slice_h1}, verbose=False)
+            except:
+                base_score = 0
+                details = {}
+            
+            # 2. SMC & Hyper
+            smc_score = self.smc_engine.analyze(current_slice_m5)
+            reality_score, reality_state = self.third_eye.analyze_reality(current_slice_m5)
+            
+            return idx, (base_score, details), smc_score, (reality_score, reality_state)
+
+        # Only analyze candles in trading hours to save more time
+        indices_to_analyze = []
+        for i in range(200, len(df)):
+            current_time = df.index[i]
+            if config.TRADING_START_TIME <= current_time.time() <= config.TRADING_END_TIME:
+                indices_to_analyze.append(i)
+
+        if verbose:
+            logger.info(f"Analyzing {len(indices_to_analyze)} trading windows in parallel...")
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            results = list(executor.map(calculate_candle_signals, indices_to_analyze))
+            for idx, cons, smc, real in results:
+                signals_cache[idx] = cons
+                smc_cache[idx] = smc
+                reality_cache[idx] = real
+
+        pre_duration = time.time() - start_pre
+        if verbose:
+            logger.info(f"Pre-Deliberation complete in {pre_duration:.2f}s")
+
+        # --- SIMULATION LOOP ---
         balance = config.INITIAL_CAPITAL
         trades_log = []
         trades_pnl = []
         active_trade = None
         
-        # Iterate through data
+        start_sim = time.time()
+
         for i in range(200, len(df)):
             current_candle = df.iloc[i]
             current_time = current_candle.name
             
-            # Check Time Window (only trade 10-12)
-            is_trading_hours = config.TRADING_START_TIME <= current_time.time() <= config.TRADING_END_TIME
-            
-            if not is_trading_hours:
+            if i not in signals_cache:
                 if active_trade:
-                    # Close at candle close
+                    # Close at candle close if outside hours
                     pnl = (current_candle['close'] - active_trade['entry']) * active_trade['direction'] * active_trade['size']
                     balance += pnl
                     trades_pnl.append(pnl)
-                    active_trade['exit_time'] = current_time
-                    active_trade['exit_price'] = current_candle['close']
-                    active_trade['pnl'] = pnl
-                    active_trade['reason'] = "EndOfDay"
+                    active_trade.update({'exit_time': current_time, 'exit_price': current_candle['close'], 'pnl': pnl, 'reason': "EndOfDay"})
                     trades_log.append(active_trade)
                     active_trade = None
                 continue
 
-            # Simulate Ticks within the candle (Internal OHLC)
-            # This allows TradeManager and tick-based "Eyes" to trigger mid-candle
+            # Get pre-calculated signals
+            base_score, details = signals_cache[i]
+            smc_score = smc_cache[i]
+            reality_score, reality_state = reality_cache[i]
+            
+            orig_score = base_score
+            if config.INVERT_TECHNICALS:
+                base_score = -base_score
+            
+            # --- TICK SIMULATION ---
             ms_time = int(current_time.timestamp() * 1000)
             ticks = [
                 {'last': current_candle['open'], 'bid': current_candle['open'], 'ask': current_candle['open'], 'time': ms_time, 'volume': 100},
@@ -99,20 +154,14 @@ class BacktestEngine:
                 price = tick['last']
                 
                 if active_trade:
-                    # Update floating profit for Hard Exit logic
-                    active_trade['profit'] = (price - active_trade['open_price']) * active_trade['direction'] * active_trade['size'] * 100 # Approx USD for XAUUSD 0.01 lot
-
-                    # Manage Trade with TradeManager
-                    atr = df.iloc[max(0, i-20):i+1]['close'].diff().abs().mean() or 1.0 # Approx ATR
+                    active_trade['profit'] = (price - active_trade['open_price']) * active_trade['direction'] * active_trade['size'] * 100
+                    atr_tm = df.iloc[max(0, i-20):i+1]['close'].diff().abs().mean() or 1.0
                     struc_low = df.iloc[max(0, i-20):i+1]['low'].min()
                     struc_high = df.iloc[max(0, i-20):i+1]['high'].max()
 
-                    # 1. Trailing Stop
                     new_sl = self.trade_manager.check_trailing_stop(active_trade, price, struc_low, struc_high)
-                    if new_sl:
-                        active_trade['sl'] = new_sl
+                    if new_sl: active_trade['sl'] = new_sl
                     
-                    # 2. Hard Exit (Virtual SL/TP or Logic Exit)
                     exit_signal = self.trade_manager.check_hard_exit(active_trade, config.SCALP_TP, config.SCALP_SL)
                     
                     hit_sl = (active_trade['direction'] == 1 and price <= active_trade['sl']) or \
@@ -125,27 +174,17 @@ class BacktestEngine:
                         pnl = (exit_price - active_trade['entry']) * active_trade['direction'] * active_trade['size']
                         balance += pnl
                         trades_pnl.append(pnl)
-                        active_trade.update({
-                            'exit_time': current_time,
-                            'exit_price': exit_price,
-                            'pnl': pnl,
-                            'reason': "SL" if hit_sl else exit_signal['reason']
-                        })
+                        active_trade.update({'exit_time': current_time, 'exit_price': exit_price, 'pnl': pnl, 'reason': "SL" if hit_sl else exit_signal['reason']})
                         trades_log.append(active_trade)
                         active_trade = None
-                        break # No more ticks for this candle after exit
+                        break 
 
                     elif hit_tp:
                         exit_price = active_trade['tp']
                         pnl = (exit_price - active_trade['entry']) * active_trade['direction'] * active_trade['size']
                         balance += pnl
                         trades_pnl.append(pnl)
-                        active_trade.update({
-                            'exit_time': current_time,
-                            'exit_price': exit_price,
-                            'pnl': pnl,
-                            'reason': "TP"
-                        })
+                        active_trade.update({'exit_time': current_time, 'exit_price': exit_price, 'pnl': pnl, 'reason': "TP"})
                         trades_log.append(active_trade)
                         active_trade = None
                         break
@@ -154,36 +193,12 @@ class BacktestEngine:
                     if current_time.time() > config.TRADING_LAST_ENTRY_TIME:
                         continue
 
-                    # FULL POWER ANALYSIS
-                    current_slice_m5 = df.iloc[:i+1]
-                    current_slice_h1 = None
-                    if df_h1 is not None:
-                        current_slice_h1 = df_h1[df_h1.index <= current_time]
-                    
-                    current_data_map = {'M5': current_slice_m5, 'H1': current_slice_h1}
-                    
-                    # 1. Consensus
-                    try:
-                        base_decision, base_score, details = self.consensus.deliberate(current_data_map, verbose=False)
-                    except:
-                        base_score = 0
-                        details = {}
-
-                    orig_score = base_score
-                    if config.INVERT_TECHNICALS:
-                        base_score = -base_score
-                    
-                    # 2. SMC & Hyper
-                    smc_score = self.smc_engine.analyze(current_slice_m5)
-                    reality_score, reality_state = self.third_eye.analyze_reality(current_slice_m5)
-                    
-                    # 3. Deep Cognition
                     final_decision_value, phy_state, future_prob, orbit_energy, micro_velocity = self.deep_brain.consult_subconscious(
                         trend_score=base_score,
                         volatility_score=details.get('Vol', {}).get('score', 0) if details else 0,
                         pattern_score=reality_score,
                         smc_score=smc_score,
-                        df_m5=current_slice_m5,
+                        df_m5=df.iloc[:i+1],
                         live_tick=tick
                     )
 
@@ -191,21 +206,18 @@ class BacktestEngine:
                     if final_decision_value > 0.5: decision = "BUY"
                     elif final_decision_value < -0.5: decision = "SELL"
 
-                    # Tick-based Eyes (Simulated)
+                    # Fast Eye Check
                     if decision == "WAIT" and config.ENABLE_FIRST_EYE:
-                         swarm_action, swarm_reason, _ = self.swarm.process_tick(tick, current_slice_m5, final_decision_value, orig_score, orbit_energy, micro_velocity)
-                         if swarm_action:
-                             decision = swarm_action
+                         swarm_action, _, _ = self.swarm.process_tick(tick, df.iloc[:i+1], final_decision_value, orig_score, orbit_energy, micro_velocity)
+                         if swarm_action: decision = swarm_action
                     
                     if decision == "WAIT" and config.ENABLE_SECOND_EYE:
-                        sniper_action, sniper_reason, lots = self.sniper.process_tick(tick, current_slice_m5, final_decision_value, orig_score, orbit_energy)
-                        if sniper_action:
-                            decision = sniper_action
+                        sniper_action, _, _ = self.sniper.process_tick(tick, df.iloc[:i+1], final_decision_value, orig_score, orbit_energy)
+                        if sniper_action: decision = sniper_action
 
                     if decision != "WAIT":
                         direction = 1 if decision == "BUY" else -1
                         risk_amt = balance * config.RISK_PER_TRADE
-                        
                         atr_val = df.iloc[max(0, i-14):i+1]['close'].diff().abs().mean() or 1.0
                         sl_dist = max(1.5 * atr_val, 0.50)
                         pos_size = risk_amt / sl_dist 
@@ -214,18 +226,22 @@ class BacktestEngine:
                             "ticket": len(trades_log) + 1,
                             "entry_time": current_time,
                             "entry": price,
-                            "open_price": price, # TradeManager compatibility
+                            "open_price": price,
                             "direction": direction,
-                            "type": 0 if direction == 1 else 1, # TradeManager compatibility
+                            "type": 0 if direction == 1 else 1,
                             "size": pos_size,
                             "sl": price - (direction * sl_dist),
                             "tp": price + (direction * sl_dist * 2.0),
                             "decision": decision,
                             "score": final_decision_value,
-                            "volume": pos_size, # TradeManager compatibility
-                            "profit": 0.0 # Initial floating profit
+                            "volume": pos_size,
+                            "profit": 0.0
                         }
                         break
+        
+        sim_duration = time.time() - start_sim
+        if verbose:
+            logger.info(f"Simulation loop finished in {sim_duration:.2f}s")
 
         # Metrics
         wins = [t for t in trades_pnl if t > 0]
