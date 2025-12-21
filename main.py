@@ -39,8 +39,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Atl4s-Main")
 
+def check_market_status():
+    """Checks if the market is likely closed (Weekends)."""
+    now = datetime.now()
+    # 5 = Saturday, 6 = Sunday
+    if now.weekday() >= 5:
+        return False
+    return True
+
 def main():
     logger.info("--- Atl4s-Forex System 2.0: Deep Awakening ---")
+    
+    if not check_market_status():
+        print("\n" + "!"*50)
+        print("WARNING: MARKET IS CLOSED (WEEKEND)")
+        print("The bot will wait for ticks, but no new data is expected.")
+        print("To test parameters, run the simulation system:")
+        print(">>> python simulation_system.py --days 15")
+        print("!"*50 + "\n")
+        time.sleep(5)
     
     # 1. Initialize Infrastructure
     try:
