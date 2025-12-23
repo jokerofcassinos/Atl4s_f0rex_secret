@@ -31,13 +31,34 @@ INVERT_TECHNICALS = True # Set to True to fade the retail trend (Buy becomes Sel
 ENABLE_FIRST_EYE = True
 ENABLE_SECOND_EYE = True # The Sniper
 ENABLE_FOURTH_EYE = True # The Whale (Consensus > 33)
+ENABLE_FIFTH_EYE = True # The Oracle (Swing/Intermarket)
+ENABLE_SIXTH_EYE = True # The Council (Secular/Position)
 SCALP_SL = 1.0 # Stop Loss ($1.00 USD Risk per 0.01)
 SCALP_TP = 0.70 # Take Profit ($0.70 USD Gain per 0.01)
 SCALP_LOTS = 0.01 # Fixed Lot Size
+SWING_LOTS = 0.02 # For Fifth Eye
+POSITION_LOTS = 0.05 # For Sixth Eye (Senior Council)
+
+# --- Intermarket Symbols ---
+INTERMARKET_SYMBOLS = {
+    "DXY": "DX-Y.NYB",     # US Dollar Index
+    "US10Y": "^TNX",       # 10Y Treasury Yield
+    "SPX": "^GSPC",        # S&P 500
+    "OIL": "CL=F"          # Crude Oil
+}
 
 # --- Swarm Settings ---
 SWARM_MAX_TRADES = 5
 SWARM_COOLDOWN = 10 # Seconds
+SWARM_EYE_WEIGHTS = {
+    'hybrid': 0.2,
+    'pullback': 0.2,
+    'momentum': 0.2,
+    'ofi': 0.2,
+    'hurst_climax': 0.2
+}
+SWARM_THRESHOLD = 0.5 # Consensus required to fire
+SWARM_ENTROPY_LIMITS = (0.2, 2.5) # Min/Max Entropy for execution
 
 # --- ZeroMQ Settings ---
 # --- ZeroMQ Settings ---

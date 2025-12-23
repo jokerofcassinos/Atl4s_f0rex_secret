@@ -19,6 +19,9 @@ from .wavelet_core import WaveletCore
 from .topology_engine import TopologyEngine
 from .game_theory import GameTheoryCore
 from .chaos_engine import ChaosEngine
+from .supply_chain import SupplyChainGraph
+from .fifth_eye import FifthEye
+from .sixth_eye import SixthEye
 
 logger = logging.getLogger("Atl4s-Consensus")
 
@@ -43,6 +46,9 @@ class ConsensusEngine:
         self.topology = TopologyEngine()
         self.game = GameTheoryCore()
         self.chaos = ChaosEngine()
+        self.sc_graph = SupplyChainGraph()
+        self.oracle = FifthEye()
+        self.council = SixthEye()
         
         # Default Genome (Weights & Thresholds)
         self.params = {
@@ -108,7 +114,10 @@ class ConsensusEngine:
             'Wavelet': lambda: self.wavelet.decompose(df_m5['close'].values),
             'Topology': lambda: self.topology.analyze_persistence(df_m5['close'].values),
             'Game': lambda: self.game.calculate_nash_equilibrium(df_m5),
-            'Chaos': lambda: self.chaos.calculate_lyapunov(df_m5)
+            'Chaos': lambda: self.chaos.calculate_lyapunov(df_m5),
+            'SupplyChain': lambda: self.sc_graph.get_impact(),
+            'Oracle': lambda: self.oracle.deliberate(data_map),
+            'Council': lambda: self.council.deliberate(data_map)
         }
         
         results = {}
@@ -201,7 +210,15 @@ class ConsensusEngine:
         hurst = math_res.get('hurst', 0.5)
         entropy = math_res.get('entropy', 0)
         kalman_diff = math_res.get('kalman_diff', 0)
+        
+        # New Quantum Math Metrics
+        from src.quantum_math import QuantumMath
+        fisher_curv = QuantumMath.fisher_information_curvature(df_m5['close']).iloc[-1]
+        robust_hurst = QuantumMath.calculate_hurst_exponent(df_m5['close']).iloc[-1]
+        
         details['Math'] = math_res
+        details['Math']['fisher_curvature'] = fisher_curv
+        details['Math']['robust_hurst'] = robust_hurst
         
         # Quantum Core
         quantum_res = results.get('Quantum')
@@ -247,6 +264,22 @@ class ConsensusEngine:
         if chaos_res is None: chaos_res = 0.0
         lyapunov = chaos_res
         details['Chaos'] = {'lyapunov': lyapunov}
+        
+        # Supply Chain
+        sc_impact = results.get('SupplyChain', 0)
+        details['SupplyChain'] = {'impact': sc_impact}
+        
+        # Fifth Eye (Oracle)
+        oracle_res = results.get('Oracle', {'decision': 'WAIT', 'score': 0})
+        details['Oracle'] = oracle_res
+        oracle_score = oracle_res['score']
+        oracle_dir = 1 if oracle_res['decision'] == "BUY" else -1 if oracle_res['decision'] == "SELL" else 0
+        
+        # Sixth Eye (Council)
+        council_res = results.get('Council', {'anchor': 'WAIT', 'score': 0})
+        details['Council'] = council_res
+        council_anchor = council_res['anchor']
+        council_dir = 1 if "BUY" in council_anchor else -1 if "SELL" in council_anchor else 0
         
         # --- CHAOS FILTER (Entropy Gate) ---
         if entropy > self.params['chaos_threshold']:
@@ -306,6 +339,14 @@ class ConsensusEngine:
                  if mc_skew < 0.5:
                      logger.info(f"GOLDEN SETUP: Micro-Structure Bearish Rejection + Delta. FLASH ENTRY. (Skew {mc_skew:.2f})")
                      return "SELL", 90.0, details
+                     
+        # 4. Fisher Curvature Jump (Regime Transition)
+        if fisher_curv > 2.0: # Threshold for "significant" geometric change
+            # Curvature spike usually means imminent explosion. Align with Flow.
+            if abs(m_delta) > 10:
+                dir_flow = 1 if m_delta > 0 else -1
+                logger.info(f"GOLDEN SETUP: Fisher Curvature Spike ({fisher_curv:.2f}). Transition imminent. Aligning with Flow.")
+                return "BUY" if dir_flow == 1 else "SELL", 92.0, details
 
         confluence_boost = 0
         # 4. Quantum Excited State (Mean Reversion)
@@ -447,6 +488,44 @@ class ConsensusEngine:
         elif lyapunov > 0.05: # High Chaos
              confluence_boost -= 20 # Penalize
              logger.warning(f"CHAOS WARNING: High Lyapunov ({lyapunov:.4f}). Unpredictable.")
+             
+        # 13. VPIN Toxicity Veto
+        vpin = micro_metrics.get('vpin', 0.5)
+        if vpin > 0.8:
+            # Toxic flow detected. Highly informed/HFT predatiry volume.
+            # Only trade IF our direction aligns with the informed flow (aggressive follow)
+            # Otherwise, VETO.
+            direction = 1 if m_delta > 0 else -1
+            mismatch = False # We'll check this later in the final vector
+            logger.warning(f"VPIN AWARENESS: Toxic Flow Detected ({vpin:.2f}). Informed trading high.")
+
+        # 14. Supply Chain Shock Bias
+        if abs(sc_impact) > 0.5:
+             # Supply chain bias is strong. Align with shock.
+             confluence_boost += 15
+             logger.info(f"CONFLUENCE: Supply Chain Shock Bias ({sc_impact:.2f}) provides macro tailwind.")
+
+        # 15. Oracle Swing Alignment
+        if oracle_dir != 0:
+            if (oracle_dir == 1 and total_vector > 0) or (oracle_dir == -1 and total_vector < 0):
+                confluence_boost += 30
+                logger.info(f"CONFLUENCE: Oracle Swing Alignment! Global Bias {oracle_res['decision']} confirms trade.")
+            else:
+                confluence_boost -= 20
+                logger.warning(f"DIVERGENCE: Oracle Swing Bias {oracle_res['decision']} opposes total vector. Reducing confidence.")
+
+        # 16. Council Position Alignment (The Macro Anchor)
+        if council_dir != 0:
+            if (council_dir == 1 and total_vector > 0) or (council_dir == -1 and total_vector < 0):
+                # Strong alignment with secular trend
+                boost = 50 if "STRONG" in council_anchor else 30
+                confluence_boost += boost
+                logger.info(f"CONFLUENCE: Council Position Alignment! Secular Anchor {council_anchor} confirms direction.")
+            else:
+                # Conflict with secular trend - High Caution
+                penalty = 40 if "STRONG" in council_anchor else 20
+                confluence_boost -= penalty
+                logger.warning(f"DANGER: Major Divergence! Secular Anchor {council_anchor} opposes trade direction.")
 
         # Calculate Weighted Score
         v_trend = t_score * t_dir * w_trend
@@ -464,7 +543,16 @@ class ConsensusEngine:
             logger.info("Volatility Guard: Market too quiet. Veto.")
             return "WAIT", 0, details
 
-        total_vector = v_trend + v_sniper + v_quant + v_pattern + v_cycle + v_sd + v_div + v_kin + v_fractal
+        total_vector = v_trend + v_sniper + v_quant + v_pattern + v_cycle + v_sd + v_div + v_kin + v_fractal + (sc_impact * 20)
+        
+        # VPIN Veto Check
+        if vpin > 0.8:
+             # Toxic flow. If our total vector direction is opposite to informed flow delta, VETO.
+             flow_dir = 1 if m_delta > 0 else -1
+             trade_dir = 1 if total_vector > 0 else -1 if total_vector < 0 else 0
+             if trade_dir != 0 and trade_dir != flow_dir:
+                 logger.warning(f"VPIN VETO: Trade direction {trade_dir} opposes Toxic Flow {flow_dir}. DANGER.")
+                 return "WAIT", 0, details
         
         # Breakdown Log for Debugging Stagnation
         logger.debug(f"Consensus Breakdown: Trend={v_trend:.2f} Sniper={v_sniper:.2f} Quant={v_quant:.2f} Pat={v_pattern:.2f} Cycle={v_cycle:.2f} SD={v_sd:.2f} Div={v_div:.2f} Kin={v_kin:.2f} Frac={v_fractal:.2f}")

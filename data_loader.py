@@ -21,7 +21,12 @@ class DataLoader:
         data_map = {}
         
         # Timeframes to fetch
-        timeframes = [("M5", "5m", 59), ("H1", "1h", 720)] # Name, YF Interval, Days Limit
+        timeframes = [
+            ("M5", "5m", 59), 
+            ("H1", "1h", 720), 
+            ("D1", "1d", 3650), # 10 years for swing context
+            ("MN", "1mo", 7300) # 20 years for secular context
+        ]
         
         for tf_name, yf_interval, days_limit in timeframes:
             cache_file = os.path.join(config.CACHE_DIR, f"{self.symbol}_{tf_name}.parquet")
@@ -70,29 +75,33 @@ class DataLoader:
         # Derive H4 from H1
         if 'H1' in data_map and data_map['H1'] is not None:
             try:
-                data_map['H4'] = self.resample_to_h4(data_map['H1'])
+                data_map['H4'] = self.resample_to_tf(data_map['H1'], '4h')
                 logger.info(f"[H4] Derived {len(data_map['H4'])} candles from H1.")
             except Exception as e:
                 logger.error(f"[H4] Error deriving data: {e}")
                 data_map['H4'] = None
+
+        # Derive W1 from D1
+        if 'D1' in data_map and data_map['D1'] is not None:
+            try:
+                data_map['W1'] = self.resample_to_tf(data_map['D1'], 'W')
+                logger.info(f"[W1] Derived {len(data_map['W1'])} candles from D1.")
+            except Exception as e:
+                logger.error(f"[W1] Error deriving data: {e}")
+                data_map['W1'] = None
         
         return data_map
 
-    def resample_to_h4(self, df_h1):
+    def resample_to_tf(self, df, tf_string):
         """
-        Resamples H1 data to H4 timeframe.
+        Resamples data to a specific timeframe string (e.g., '4h', 'W').
         """
-        if df_h1 is None or df_h1.empty:
+        if df is None or df.empty:
             return None
             
-        # Ensure index is datetime
-        if not isinstance(df_h1.index, pd.DatetimeIndex):
-            df_h1.index = pd.to_datetime(df_h1.index)
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index)
             
-        # Resample logic
-        # H4 bars usually start at 00:00, 04:00, 08:00...
-        # We use '4h' offset.
-        
         agg_dict = {
             'open': 'first',
             'high': 'max',
@@ -101,8 +110,7 @@ class DataLoader:
             'volume': 'sum'
         }
         
-        df_h4 = df_h1.resample('4h').agg(agg_dict).dropna()
-        return df_h4
+        return df.resample(tf_string).agg(agg_dict).dropna()
 
     def _load_cache(self, filepath):
         if os.path.exists(filepath):

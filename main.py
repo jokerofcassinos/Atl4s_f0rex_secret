@@ -131,6 +131,14 @@ def main():
                 is_report_time = True
                 last_candle_minute = current_minute
                 logger.info(f"--- 5-MINUTE CYCLE TRIGGER: {now_sp.strftime('%H:%M:%S')} ---")
+                
+                # Refresh High-Timeframe Data for Quinto Olho
+                try:
+                    data_map = data_loader.get_data()
+                    df_m5 = data_map.get('M5', df_m5)
+                    logger.info("High-Timeframe data map refreshed (H1, H4, D1, W1).")
+                except Exception as e:
+                    logger.error(f"Failed to refresh data map: {e}")
 
             if live_tick.get('last', 0) > 0:
                 # Update Data Logic
@@ -194,7 +202,7 @@ def main():
             smc_score = smc_engine.analyze(df_m5)
             reality_score, reality_state = third_eye.analyze_reality(df_m5)
             
-            final_cortex_decision, phy_state, future_prob, orbit_energy, micro_velocity = deep_brain.consult_subconscious(
+            final_cortex_decision, phy_state, future_prob, orbit_energy, micro_stats = deep_brain.consult_subconscious(
                 trend_score=base_score,
                 volatility_score=details.get('Vol', {}).get('score', 0) if 'details' in locals() else 0,
                 pattern_score=reality_score,
@@ -202,6 +210,7 @@ def main():
                 df_m5=df_m5,
                 live_tick=live_tick
             )
+            micro_velocity = micro_stats.get('velocity', 0)
             
             # --- ACTIVE POSITION MANAGEMENT (TradeManager) ---
             open_positions = mt5_monitor.get_open_positions() 
@@ -246,11 +255,10 @@ def main():
                 swarm_action, swarm_reason, swarm_price = swarm.process_tick(
                     tick=live_tick,
                     df_m5=df_m5,
-                    alpha_score=final_cortex_decision, # SmartBrain (Inverted if active)
-                    tech_score=original_base_score,    # Retail Technical (Non-Inverted)
-                    phy_score=orbit_energy,            # Physics Energy for Hybrid Switching
-                    velocity=micro_velocity,           # NEW: Micro Velocity for Guard
-                    signal_dir=swarm_tech_dir # (Unused in new logic but kept for sig info)
+                    alpha_score=final_cortex_decision, # SmartBrain
+                    tech_score=original_base_score,    # Retail Technical
+                    phy_score=orbit_energy,            # Physics Energy
+                    micro_stats=micro_stats            # NEW: Full HFT Metrics
                 )
                 
                 if swarm_action:

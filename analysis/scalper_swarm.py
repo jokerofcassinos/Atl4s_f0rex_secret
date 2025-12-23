@@ -6,117 +6,107 @@ import numpy as np
 logger = logging.getLogger("Atl4s-Swarm")
 
 class ScalpSwarm:
+    """
+    HFT-tier Swarm (1st Eye).
+    Implements a multi-agent voting system (Swarm Intelligence).
+    Consists of 5 specialized 'Eyes' that analyze micro-structure in real-time.
+    """
     def __init__(self):
         self.max_trades = config.SWARM_MAX_TRADES
         self.trade_count = 0
         self.last_candle_time = None
         self.last_trade_time = 0
         self.cooldown = config.SWARM_COOLDOWN
+        self.weights = config.SWARM_EYE_WEIGHTS
+        self.threshold = config.SWARM_THRESHOLD
         
-    def process_tick(self, tick, df_m5, alpha_score, tech_score, phy_score, velocity=0, signal_dir="WAIT"):
+    def process_tick(self, tick, df_m5, alpha_score, tech_score, phy_score, micro_stats):
         """
-        Analyzes the tick and context to decide if one of the 'Eyes' should fire.
-        Returns: (Action: str, Reason: str, Price: float) or (None, None, None)
+        Main HFT entry point. Uses a weighted consensus of 5 'Eyes'.
+        Returns: (Action, Reason, Price)
         """
         current_time = time.time()
         
-        # 1. New Candle Reset
-        # Assuming df_m5 index is datetime, we check if the last candle timestamp changed
+        # 1. Housekeeping & Constraints
         if not df_m5.empty:
             latest_candle_time = df_m5.index[-1]
             if self.last_candle_time != latest_candle_time:
                 self.trade_count = 0
                 self.last_candle_time = latest_candle_time
-                # logger.info("Swarm: New Candle. Trade Limit Reset.")
 
-        # 2. Constraints Check
-        if self.trade_count >= self.max_trades:
-            # logger.debug(f"Swarm: Max Trades Reached ({self.trade_count})")
-            return None, "Max Trades Reached", 0
+        if self.trade_count >= self.max_trades: return None, "Max Trades", 0
+        if current_time - self.last_trade_time < self.cooldown: return None, "Cooldown", 0
+        
+        # 2. Micro-Entropy Gate
+        entropy = micro_stats.get('entropy', 1.0)
+        e_min, e_max = config.SWARM_ENTROPY_LIMITS
+        if entropy < e_min or entropy > e_max:
+            # logger.debug(f"Swarm: Entropy Gate Active ({entropy:.2f})")
+            return None, "Entropy Gate", 0
             
-        if current_time - self.last_trade_time < self.cooldown:
-            # logger.debug("Swarm: Cooldown Active")
-            return None, "Cooldown", 0
-            
-        if signal_dir not in ["BUY", "SELL"]:
-            # logger.debug(f"Swarm: No Valid Direction ({signal_dir})")
-            return None, "No Direction", 0
-
-        # 3. Strategy Logic (The Eyes)
+        # 3. The 5 Eyes Consensus Engine
+        votes = {
+            'hybrid': 0,        # Eye 1
+            'pullback': 0,      # Eye 2
+            'momentum': 0,      # Eye 3
+            'ofi': 0,           # Eye 4 (NEW)
+            'hurst_climax': 0   # Eye 5 (NEW)
+        }
+        
         price = tick['last']
-        action = None
-        reason = None
+        is_chaotic = phy_score > 2.5
         
-        # LOG INPUTS FOR DEBUGGING
-        logger.debug(f"SWARM DEBUG: Alpha={alpha_score:.2f} Tech={tech_score:.2f} Energy={phy_score:.2f} Dir={signal_dir}")
-        
-        # --- HYBRID SWARM LOGIC ---
-        # Mode A: "Bait Scalp" (Low Energy/Orderly) -> Follow Retail Tech (Ride the wave)
-        # Mode B: "Smart Predator" (High Energy/Chaos) -> Follow Alpha Brain (Fade the move/Inverse)
-        
-        is_chaotic = phy_score > 2.5 # High Energy Threshold
-        
-        # Determine Target Direction based on Regime
-        target_action = None
-        mode_label = ""
-        
+        # --- Eye 1: Hybrid Mode ---
         if is_chaotic:
-            # High Energy -> Trust the Brain (Alpha)
-            # Alpha is already 'Inverted' if config says so.
-            if abs(alpha_score) > 0.4:
-                target_action = "BUY" if alpha_score > 0 else "SELL"
-                mode_label = "Smart Predator (Chaos)"
+            if abs(alpha_score) > 0.4: votes['hybrid'] = 1 if alpha_score > 0 else -1
         else:
-            # Low Energy -> Trust the Chart (Tech/Retail)
-            # Tech is passed as 'original_base_score' (Non-Inverted)
-                target_action = "BUY" if tech_score > 0 else "SELL"
-                mode_label = "Bait Scalp (Orderly)"
-
-        # --- VELOCITY GUARD (The 80% WinRate Filter) ---
-        # Don't buy if the knife is falling (Neg Vel). Don't sell if rocket (Pos Vel).
-        # We allow small counter-velocity for limit fills, but not momentum crashes.
-        if target_action == "BUY":
-            if velocity < -0.2: # Falling fast
-                target_action = None
-                # logger.debug(f"SWARM FILTER: Buy Rejected by Velocity Guard ({velocity:.2f})")
-        elif target_action == "SELL":
-            if velocity > 0.2: # Rising fast
-                target_action = None
-                # logger.debug(f"SWARM FILTER: Sell Rejected by Velocity Guard ({velocity:.2f})")
+            if abs(tech_score) > 5: votes['hybrid'] = 1 if tech_score > 0 else -1
+            
+        # --- Eye 2: Pullback Sniper ---
+        if not df_m5.empty:
+            open_p = df_m5.iloc[-1]['open']
+            if price < open_p - 0.5: votes['pullback'] = 1 # Discount
+            elif price > open_p + 0.5: votes['pullback'] = -1 # Premium
+            
+        # --- Eye 3: Momentum Burst ---
+        if abs(phy_score) > 3.0:
+            votes['momentum'] = 1 if phy_score > 0 else -1
+            
+        # --- Eye 4: Order Flow Shadow (OFI) ---
+        ofi = micro_stats.get('ofi', 0)
+        if abs(ofi) >= 5: # Threshold for consensus
+            votes['ofi'] = 1 if ofi > 0 else -1
+            
+        # --- Eye 5: Fractal Micro-Climax (Hurst) ---
+        h = micro_stats.get('micro_hurst', 0.5)
+        if h < 0.3: # Strong Mean Reversion (Exhaustion)
+            # Fade the current velocity
+            vel = micro_stats.get('velocity', 0)
+            if abs(vel) > 0.1:
+                votes['hurst_climax'] = -1 if vel > 0 else 1
                 
-        # --- Eye 1: The Hybrid Eye ---
-        # Execute if we have a target action from the active mode (and passed Guard)
-        if target_action:
-             action = target_action
-             reason = f"Eye 1: {mode_label}"
-             
-        # --- Eye 2: Pullback Sniper (Better Price) ---
-        # If signal is BUY but price is below Open (Discount)
-        elif not df_m5.empty:
-            candle_open = df_m5.iloc[-1]['open']
-            if signal_dir == "BUY" and price < candle_open - 0.5: # 50 points dip
-                if alpha_score > 0.4: # Decent support
-                    action = "BUY"
-                    reason = "Eye 2: Pullback Sniper"
-            elif signal_dir == "SELL" and price > candle_open + 0.5:
-                if alpha_score < -0.4:
-                    action = "SELL"
-                    reason = "Eye 2: Pullback Sniper"
-                    
-        # --- Eye 3: Momentum Burst (Physics) ---
-        # If Physics implies High Energy (>3.0) and direction aligns
-        if not action and abs(phy_score) > 3.0: # High Energy
-             # Check if phy direction aligns with signal
-             # Usually positive kinematics means acceleration UP? Need to verify kinematics output.
-             # Assuming phy_score sign matches direction (it usually does in simple kinematics)
-             if np.sign(phy_score) == (1 if signal_dir == "BUY" else -1):
-                 action = signal_dir
-                 reason = "Eye 3: Momentum Burst"
-
-        # 4. Execution Update
+        # 4. Weighted Voting Calculation
+        final_vector = 0
+        active_eyes = []
+        for eye, weight in self.weights.items():
+            if votes[eye] != 0:
+                final_vector += votes[eye] * weight
+                active_eyes.append(eye)
+                
+        # 5. Final Decision
+        action = None
+        if final_vector >= self.threshold: action = "BUY"
+        elif final_vector <= -self.threshold: action = "SELL"
+        
         if action:
+            # Velocity Guard Check
+            velocity = micro_stats.get('velocity', 0)
+            if (action == "BUY" and velocity < -0.3) or (action == "SELL" and velocity > 0.3):
+                return None, "Velocity Guard", 0
+                
             self.trade_count += 1
             self.last_trade_time = current_time
+            reason = f"Swarm Consensus ({final_vector:.2f}) | Eyes: {','.join(active_eyes)}"
             logger.info(f"SWARM EXECUTION ({self.trade_count}/{self.max_trades}): {reason} @ {price}")
             return action, reason, price
             

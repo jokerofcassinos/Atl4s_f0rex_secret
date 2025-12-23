@@ -26,21 +26,68 @@ class QuantumMath:
     @staticmethod
     def calculate_hurst_exponent(series: pd.Series, window=100):
         """
-        Estimates Hurst Exponent to determine if series is random walk, trending, or mean reverting.
-        H < 0.5: Mean Reverting
-        H = 0.5: Random Walk (Brownian Motion)
-        H > 0.5: Trending
-        Note: Simplified R/S analysis implementation for rolling window.
+        Estimates Hurst Exponent using a more robust DFA-like approach.
+        H < 0.5: Mean Reverting (Rough Volatility)
+        H = 0.5: Random Walk
+        H > 0.5: Trending (Persistent)
         """
-        def _hurst(ts):
-            lags = range(2, 20)
-            tau = [np.sqrt(np.std(np.subtract(ts[lag:], ts[:-lag]))) for lag in lags]
-            poly = np.polyfit(np.log(lags), np.log(tau), 1)
-            return poly[0] * 2.0 
+        def _robust_hurst(ts):
+            if len(ts) < 20: return 0.5
+            lags = range(2, min(len(ts)//2, 30))
+            # Calculate the variance of the differences at different lags
+            tau = []
+            for lag in lags:
+                diffs = ts[lag:] - ts[:-lag]
+                std = np.std(diffs)
+                tau.append(max(std, 1e-6)) # Avoid zero std
+            
+            # Log-log slope
+            try:
+                # Use Hurst Exponent based on Average Range (Simplified R/S)
+                # We Use the variance of increments at different scales
+                log_lags = np.log(lags)
+                log_variances = np.log([np.var(ts[lag:] - ts[:-lag]) for lag in lags])
+                
+                # Hurst = Slope / 2
+                mask = np.isfinite(log_lags) & np.isfinite(log_variances)
+                if np.sum(mask) < 2: return 0.5
+                
+                poly = np.polyfit(log_lags[mask], log_variances[mask], 1)
+                h = poly[0] / 2.0
+                return max(0.01, min(0.99, h))
+            except:
+                return 0.5
 
-        # Rolling Hurst is computationally expensive, use with care.
-        # This is a simplified placeholder. Ideal Hursts require log-log plots over longer ranges.
-        return series.rolling(window=window).apply(_hurst) # This might be slow for real-time M5 if window is huge
+        return series.rolling(window=window).apply(_robust_hurst)
+
+    @staticmethod
+    def fisher_information_curvature(series: pd.Series, window=20):
+        """
+        Calculates the Scalar Curvature of the Statistical Manifold (Fisher Information).
+        This measures the 'rate of change of the market distribution's geometry'.
+        Spikes in curvature often precede regime transitions.
+        """
+        def _fisher_r(data):
+            if len(data) < 10: return 0
+            # We model the distribution as Gaussian (mu, sigma)
+            # The Fisher Metric for Gaussian is g = [[1/sigma^2, 0], [0, 2/sigma^2]]
+            # Scalar Curvature R for this manifold is -1 (constant negative curvature)
+            # HOWEVER, we want the VELOCITY of change on this manifold (Fisher Distance)
+            
+            # Split window into two halves to measure informational distance
+            mid = len(data) // 2
+            h1 = data[:mid]
+            h2 = data[mid:]
+            
+            mu1, sigma1 = np.mean(h1), np.std(h1) + 1e-9
+            mu2, sigma2 = np.mean(h2), np.std(h2) + 1e-9
+            
+            # Fisher Distance between two Gaussians
+            # d^2 = 2 * log( ( (mu1-mu2)^2 + 2*(sigma1^2 + sigma2^2) ) / (4 * sigma1 * sigma2) )
+            distance = np.sqrt(max(0, 2 * np.log(((mu1 - mu2)**2 + 2*(sigma1**2 + sigma2**2)) / (4 * sigma1 * sigma2))))
+            return distance
+
+        return series.rolling(window=window).apply(_fisher_r)
 
     @staticmethod
     def kalman_filter(series: pd.Series, q=0.0001, r=0.1):

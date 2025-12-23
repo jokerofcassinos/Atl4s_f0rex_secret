@@ -140,9 +140,8 @@ class DeepCognition:
         if is_super_confluence:
             state_label += " [SUPER]"
              
-        # Return Decision, State Label, Future Prob, Physics Energy, AND Micro Velocity for Swarm Guard
-        velocity = micro_metrics.get('velocity', 0)
-        return final_decision, state_label, bullish_prob_future, orbit_energy, velocity
+        # Return Decision, State Label, Future Prob, Physics Energy, AND full Micro Metrics for Swarm
+        return final_decision, state_label, bullish_prob_future, orbit_energy, micro_metrics
 
     def learn(self, df, outcome):
         features = self.memory.extract_features(df)
