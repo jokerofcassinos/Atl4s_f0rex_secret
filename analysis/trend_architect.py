@@ -66,7 +66,9 @@ class TrendArchitect:
             adx = 20.0 # Default to weak trend if error
             
         regime = "TRENDING" if adx > 25 else "RANGING"
-        logger.info(f"Market Regime: {regime} (ADX: {adx:.2f})")
+        from datetime import datetime
+        now_str = datetime.now().strftime("%H:%M:%S")
+        logger.info(f"Market Regime: {regime} (ADX: {adx:.2f}) [{now_str}]")
 
         # --- 2. Determine The River (H1 Context) ---
         river_dir = 0 # 0: Neutral, 1: Bullish, -1: Bearish

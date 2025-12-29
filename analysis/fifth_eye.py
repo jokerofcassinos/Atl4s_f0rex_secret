@@ -64,12 +64,12 @@ class FifthEye:
         bias = 0
         
         if df_gold is None or len(df_gold) < 32: return 0
-        gold_close = df_gold['close'].values[-32:]
+        gold_close = df_gold['close'].values.flatten()[-32:]
         
         # Gold vs DXY (Wavelet)
         dxy = self.intermarket_data.get('DXY')
         if dxy is not None and len(dxy) >= 32:
-            dxy_close = dxy['close'].values[-32:]
+            dxy_close = dxy['close'].values.flatten()[-32:]
             w_res = MacroMath.wavelet_haar_mra(gold_close, dxy_close)
             # DXY is generally INVERSE to Gold.
             # If high coherence on Trend (negative), it confirms the bias.
@@ -79,7 +79,7 @@ class FifthEye:
         # Gold vs Yields (Wavelet)
         yields = self.intermarket_data.get('US10Y')
         if yields is not None and len(yields) >= 32:
-            yield_close = yields['close'].values[-32:]
+            yield_close = yields['close'].values.flatten()[-32:]
             w_res = MacroMath.wavelet_haar_mra(gold_close, yield_close)
             if w_res['trend_coherence'] < -0.6: bias += 20 * (-w_res['trend_coherence'])
             elif w_res['trend_coherence'] > 0.4: bias -= 15

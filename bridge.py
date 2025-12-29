@@ -96,12 +96,14 @@ class ZmqBridge: # Keeping name for compatibility, but it's now SocketBridge
                             "volume": int(parts[6])
                         }
                         
-                        # Fix for Forex symbols where Last price is 0
                         if last_tick['last'] <= 0:
                             if last_tick['bid'] > 0:
                                 last_tick['last'] = last_tick['bid']
                             else:
                                 logger.warning(f"Received Zero Price Tick (Bid also 0): {msg}")
+                    else:
+                        # Log any other message (Command responses, Errors)
+                        logger.info(f"MT5 MESSAGE: {msg}")
                             
                 return last_tick
                 
@@ -128,8 +130,12 @@ class ZmqBridge: # Keeping name for compatibility, but it's now SocketBridge
             
             cmd_str += "\n" # Delimiter
             
+            # Prepend a newline/space as padding to prevent "First Byte Dropped" issue in MQL5
+            # The MQL5 logic uses StringTrimLeft, so spaces/newlines are safely ignored.
+            final_payload = "\n" + cmd_str
+            
             logger.info(f"Sending Command: {cmd_str.strip()}")
-            self.conn.sendall(cmd_str.encode('utf-8'))
+            self.conn.sendall(final_payload.encode('utf-8'))
             
             # Wait for reply (simplified, assuming immediate ACK)
             # In a robust system, we'd use a request ID.

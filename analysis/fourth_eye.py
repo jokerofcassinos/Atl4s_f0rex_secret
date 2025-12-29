@@ -18,6 +18,8 @@ class FourthEye:
         self.last_candle_time = None
         self.trade_executed_this_candle = False
         self.threshold = 33.0
+        self.last_trade_time = 0
+        self.cooldown_seconds = 300 # 5 Minutes Hard Cooldown
         
     def process_tick(self, tick, df_m5, consensus_score):
         """
@@ -34,6 +36,10 @@ class FourthEye:
             
         if self.trade_executed_this_candle:
             return None, "Candle Limit", 0
+            
+        # Hard Cooldown Check (Backup for Candle Logic)
+        if time.time() - self.last_trade_time < self.cooldown_seconds:
+             return None, "Cooldown", 0
             
         # 2. Whale Logic
         # Consensus Score > 33 means multiple engines strongly agree.
@@ -65,6 +71,7 @@ class FourthEye:
             if dynamic_lots > 0.15: dynamic_lots = 0.15 # Hard Cap for Whale
             
             self.trade_executed_this_candle = True
+            self.last_trade_time = time.time()
             return action, reason, dynamic_lots
             
         return None, None, 0

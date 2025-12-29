@@ -37,13 +37,6 @@ class ScalpSwarm:
         if self.trade_count >= self.max_trades: return None, "Max Trades", 0
         if current_time - self.last_trade_time < self.cooldown: return None, "Cooldown", 0
         
-        # 2. Micro-Entropy Gate
-        entropy = micro_stats.get('entropy', 1.0)
-        e_min, e_max = config.SWARM_ENTROPY_LIMITS
-        if entropy < e_min or entropy > e_max:
-            # logger.debug(f"Swarm: Entropy Gate Active ({entropy:.2f})")
-            return None, "Entropy Gate", 0
-            
         # 3. The 5 Eyes Consensus Engine
         votes = {
             'hybrid': 0,        # Eye 1
@@ -93,7 +86,15 @@ class ScalpSwarm:
                 final_vector += votes[eye] * weight
                 active_eyes.append(eye)
                 
-        # 5. Final Decision
+        # 5. Micro-Entropy Gate (Now after vector calculation for better debugging)
+        entropy = micro_stats.get('entropy', 1.0)
+        e_min, e_max = config.SWARM_ENTROPY_LIMITS
+        if entropy < 0.05 or entropy > e_max:
+            if final_vector != 0:
+                logger.debug(f"Swarm Gate: Entropy {entropy:.2f} blocks Vector {final_vector:.2f}")
+            return None, "Entropy Gate", 0
+            
+        # 6. Final Decision
         action = None
         if final_vector >= self.threshold: action = "BUY"
         elif final_vector <= -self.threshold: action = "SELL"
@@ -110,4 +111,8 @@ class ScalpSwarm:
             logger.info(f"SWARM EXECUTION ({self.trade_count}/{self.max_trades}): {reason} @ {price}")
             return action, reason, price
             
+        if final_vector != 0:
+            vote_details = f"Hyb:{votes['hybrid']} Pull:{votes['pullback']} Mom:{votes['momentum']} OFI:{votes['ofi']} Hurst:{votes['hurst_climax']}"
+            logger.info(f"Swarm Vector: {final_vector:.2f} (Threshold: {self.threshold}) | {vote_details}")
+
         return None, None, 0

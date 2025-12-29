@@ -88,8 +88,8 @@ class SixthEye:
         # 1. Cointegration Analysis (Gold vs TIP)
         # Gold is a long-term inflation hedge, should be cointegrated with TIP ETF prices.
         n = min(len(tip), len(df_gold))
-        y = df_gold['close'].values[-n:]
-        x = tip['close'].values[-n:]
+        y = df_gold['close'].values.flatten()[-n:]
+        x = tip['close'].values.flatten()[-n:]
         
         coint_res = MacroMath.calculate_cointegration(y, x)
         

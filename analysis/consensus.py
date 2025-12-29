@@ -22,6 +22,12 @@ from .chaos_engine import ChaosEngine
 from .supply_chain import SupplyChainGraph
 from .fifth_eye import FifthEye
 from .sixth_eye import SixthEye
+from .seventh_eye import SeventhEye
+from .eighth_eye import EighthEye
+from .ninth_eye import NinthEye
+from .tenth_eye import TenthEye
+from .recursive_reasoner import RecursiveReasoner
+from .black_swan_adversary import BlackSwanAdversary
 
 logger = logging.getLogger("Atl4s-Consensus")
 
@@ -49,6 +55,15 @@ class ConsensusEngine:
         self.sc_graph = SupplyChainGraph()
         self.oracle = FifthEye()
         self.council = SixthEye()
+        self.overlord = SeventhEye() # The High Synthesis
+        self.sovereign = EighthEye() # The Universal Alignment
+        self.singularity = NinthEye() # The High Geometry
+        self.architect = TenthEye() # The Meta Manager
+        self.debater = RecursiveReasoner() # The Internal Critic
+        self.adversary = BlackSwanAdversary() # The Stress Tester
+        
+        # Persistent Thread Pool for fast execution
+        self.executor = ThreadPoolExecutor(max_workers=14)
         
         # Default Genome (Weights & Thresholds)
         self.params = {
@@ -117,21 +132,24 @@ class ConsensusEngine:
             'Chaos': lambda: self.chaos.calculate_lyapunov(df_m5),
             'SupplyChain': lambda: self.sc_graph.get_impact(),
             'Oracle': lambda: self.oracle.deliberate(data_map),
-            'Council': lambda: self.council.deliberate(data_map)
+            'Council': lambda: self.council.deliberate(data_map),
+            'Overlord': lambda: self.overlord.deliberate(data_map),
+            'Sovereign': lambda: self.sovereign.deliberate(data_map),
+            'Singularity': lambda: self.singularity.deliberate(data_map)
         }
         
         results = {}
         
         # Execute in parallel
-        with ThreadPoolExecutor(max_workers=14) as executor:
-            future_to_task = {executor.submit(func): name for name, func in tasks.items()}
-            for future in as_completed(future_to_task):
-                name = future_to_task[future]
-                try:
-                    results[name] = future.result()
-                except Exception as e:
-                    logger.error(f"Analysis Error in {name}: {e}")
-                    results[name] = None # Handle gracefully
+        # Execute in parallel using persistent executor
+        future_to_task = {self.executor.submit(func): name for name, func in tasks.items()}
+        for future in as_completed(future_to_task):
+            name = future_to_task[future]
+            try:
+                results[name] = future.result()
+            except Exception as e:
+                logger.error(f"Analysis Error in {name}: {e}")
+                # We don't set anything so results.get(name, default) works
 
         # Unpack Results
         # Trend
@@ -212,9 +230,10 @@ class ConsensusEngine:
         kalman_diff = math_res.get('kalman_diff', 0)
         
         # New Quantum Math Metrics
+        # New Quantum Math Metrics (Optimized: Last window only)
         from src.quantum_math import QuantumMath
-        fisher_curv = QuantumMath.fisher_information_curvature(df_m5['close']).iloc[-1]
-        robust_hurst = QuantumMath.calculate_hurst_exponent(df_m5['close']).iloc[-1]
+        fisher_curv = QuantumMath.fisher_information_curvature(df_m5['close'], last_only=True)
+        robust_hurst = QuantumMath.calculate_hurst_exponent(df_m5['close'], last_only=True)
         
         details['Math'] = math_res
         details['Math']['fisher_curvature'] = fisher_curv
@@ -248,9 +267,6 @@ class ConsensusEngine:
         topology_res = results.get('Topology')
         if topology_res is None: topology_res = (0, 0)
         topo_score, topo_loops = topology_res
-        topology_res = results.get('Topology')
-        if topology_res is None: topology_res = (0, 0)
-        topo_score, topo_loops = topology_res
         details['Topology'] = {'loop_score': topo_score, 'betti_1': topo_loops}
         
         # Hyper-Complexity Modules
@@ -281,10 +297,35 @@ class ConsensusEngine:
         council_anchor = council_res['anchor']
         council_dir = 1 if "BUY" in council_anchor else -1 if "SELL" in council_anchor else 0
         
-        # --- CHAOS FILTER (Entropy Gate) ---
+        # Seventh Eye (Overlord)
+        overlord_res = results.get('Overlord', {'decision': 'WAIT', 'score': 0})
+        details['Overlord'] = overlord_res
+        overlord_score = overlord_res['score']
+        overlord_dir = 1 if overlord_res['decision'] == "BUY" else -1 if overlord_res['decision'] == "SELL" else 0
+        
+        # Eighth Eye (Sovereign)
+        sovereign_res = results.get('Sovereign', {'decision': 'WAIT', 'score': 0})
+        details['Sovereign'] = sovereign_res
+        sov_score = sovereign_res['score']
+        sov_dir = 1 if "BUY" in sovereign_res['decision'] else -1 if "SELL" in sovereign_res['decision'] else 0
+        
+        # Ninth Eye (Singularity)
+        singularity_res = results.get('Singularity', {'decision': 'WAIT', 'score': 0})
+        details['Singularity'] = singularity_res
+        is_singularity = singularity_res['decision'] == "SINGULARITY_REACHED"
+        
+        # --- AUDIT FLAGS ---
+        architect_audit = self.architect.deliberate(details)
+        system_veto = False
+        veto_msg = ""
+        
+        if architect_audit['veto']:
+             system_veto = True
+             veto_msg = f"ARCHITECT: Low Coherence ({architect_audit['coherence']:.2f})"
+             
         if entropy > self.params['chaos_threshold']:
-            logger.warning(f"Chaos Filter: Market Entropy too high ({entropy:.2f}). Veto.")
-            return "WAIT", 0, details
+             system_veto = True
+             veto_msg = f"CHAOS: High Entropy ({entropy:.2f})"
 
         # --- GLOBAL REGIME LOCK (New!) ---
         # If H4 Structure opposes H1 River, we are in a "Choppy/Transition" phase.
@@ -311,7 +352,10 @@ class ConsensusEngine:
             if s_dir == p_dir == d_dir:
                 logger.info(f"GOLDEN SETUP DETECTED: Sniper + {p_name} + {d_type}. FULL SEND!")
                 decision = "BUY" if s_dir == 1 else "SELL"
-                return decision, 99.0, details
+                # Dynamic Score: Base 95 + excess Sniper Score
+                base_dynamic = 95.0 + (s_score - 50) * 0.1
+                score = base_dynamic if decision == "BUY" else -base_dynamic
+                return decision, score, details
                 
         # 2. Momentum Burst (Kinematics) + Trend Alignment
         if abs(k_score) > 70 and regime == "TRENDING":
@@ -325,8 +369,13 @@ class ConsensusEngine:
                 elif t_dir == -1 and 180 <= k_angle < 270: valid_phase = True
                 
                 if valid_phase:
+                    decision = "BUY" if k_dir == 1 else "SELL"
+                    # Dynamic Score: Base 90 + Kinematics Intensity
+                    intensity = min(10.0, (abs(k_score) - 70) * 0.2)
+                    base_dynamic = 90.0 + intensity
+                    score = base_dynamic if decision == "BUY" else -base_dynamic
                     logger.info(f"GOLDEN SETUP: Phase Space BOOM ({k_angle:.0f} deg). AGGRESSIVE ENTRY.")
-                    return "BUY" if k_dir == 1 else "SELL", 95.0, details
+                    return decision, score, details
                 
         # 3. Micro-Structure Flash Scalp (New!)
         # High Frequency + High Delta + Wick Rejection + Quantum Cloud Confirmation
@@ -338,15 +387,22 @@ class ConsensusEngine:
             elif m_rej == "BEARISH_REJECTION" and m_delta < 0:
                  if mc_skew < 0.5:
                      logger.info(f"GOLDEN SETUP: Micro-Structure Bearish Rejection + Delta. FLASH ENTRY. (Skew {mc_skew:.2f})")
-                     return "SELL", 90.0, details
+                     # Dynamic Score based on Frequency
+                     score = -(90.0 + min(5.0, m_freq))
+                     return "SELL", score, details
                      
         # 4. Fisher Curvature Jump (Regime Transition)
         if fisher_curv > 2.0: # Threshold for "significant" geometric change
             # Curvature spike usually means imminent explosion. Align with Flow.
             if abs(m_delta) > 10:
                 dir_flow = 1 if m_delta > 0 else -1
+                decision = "BUY" if dir_flow == 1 else "SELL"
+                # Dynamic Score based on Curvature magnitude
+                metric = min(5.0, (fisher_curv - 2.0) * 2)
+                base_dynamic = 92.0 + metric
+                score = base_dynamic if decision == "BUY" else -base_dynamic
                 logger.info(f"GOLDEN SETUP: Fisher Curvature Spike ({fisher_curv:.2f}). Transition imminent. Aligning with Flow.")
-                return "BUY" if dir_flow == 1 else "SELL", 92.0, details
+                return decision, score, details
 
         confluence_boost = 0
         # 4. Quantum Excited State (Mean Reversion)
@@ -505,29 +561,7 @@ class ConsensusEngine:
              confluence_boost += 15
              logger.info(f"CONFLUENCE: Supply Chain Shock Bias ({sc_impact:.2f}) provides macro tailwind.")
 
-        # 15. Oracle Swing Alignment
-        if oracle_dir != 0:
-            if (oracle_dir == 1 and total_vector > 0) or (oracle_dir == -1 and total_vector < 0):
-                confluence_boost += 30
-                logger.info(f"CONFLUENCE: Oracle Swing Alignment! Global Bias {oracle_res['decision']} confirms trade.")
-            else:
-                confluence_boost -= 20
-                logger.warning(f"DIVERGENCE: Oracle Swing Bias {oracle_res['decision']} opposes total vector. Reducing confidence.")
-
-        # 16. Council Position Alignment (The Macro Anchor)
-        if council_dir != 0:
-            if (council_dir == 1 and total_vector > 0) or (council_dir == -1 and total_vector < 0):
-                # Strong alignment with secular trend
-                boost = 50 if "STRONG" in council_anchor else 30
-                confluence_boost += boost
-                logger.info(f"CONFLUENCE: Council Position Alignment! Secular Anchor {council_anchor} confirms direction.")
-            else:
-                # Conflict with secular trend - High Caution
-                penalty = 40 if "STRONG" in council_anchor else 20
-                confluence_boost -= penalty
-                logger.warning(f"DANGER: Major Divergence! Secular Anchor {council_anchor} opposes trade direction.")
-
-        # Calculate Weighted Score
+        # Calculate Base Vector (Foundational Modules)
         v_trend = t_score * t_dir * w_trend
         v_sniper = s_score * s_dir * w_sniper
         v_quant = q_score * q_dir * w_quant
@@ -538,12 +572,60 @@ class ConsensusEngine:
         v_kin = abs(k_score) * k_dir * w_kin
         v_fractal = abs(f_score) * f_dir * w_fractal
         
+        prelim_vector = v_trend + v_sniper + v_quant + v_pattern + v_cycle + v_sd + v_div + v_kin + v_fractal + (sc_impact * 20)
+        
+        # --- PHASE 8: MULTI-EYE ALIGNMENT BOOSTS (Contextual Authority) ---
+        # 15. Oracle Swing Alignment
+        if oracle_dir != 0:
+            if (oracle_dir == 1 and prelim_vector > 0) or (oracle_dir == -1 and prelim_vector < 0):
+                prelim_vector += 30 * oracle_dir
+                logger.info(f"CONFLUENCE: Oracle Swing Alignment! Global Bias {oracle_res['decision']} confirms trade.")
+            else:
+                prelim_vector -= 20 * oracle_dir
+                logger.warning(f"DIVERGENCE: Oracle Swing Bias {oracle_res['decision']} opposes prelim vector. Reducing confidence.")
+
+        # 16. Council Position Alignment (The Macro Anchor)
+        if council_dir != 0:
+            if (council_dir == 1 and prelim_vector > 0) or (council_dir == -1 and prelim_vector < 0):
+                boost = 50 if "STRONG" in council_anchor else 30
+                prelim_vector += boost * council_dir
+                logger.info(f"CONFLUENCE: Council Position Alignment! Secular Anchor {council_anchor} confirms direction.")
+            else:
+                penalty = 40 if "STRONG" in council_anchor else 20
+                prelim_vector -= penalty * council_dir
+                logger.warning(f"DANGER: Major Divergence! Secular Anchor {council_anchor} opposes trade direction.")
+                
+        # 17. Overlord Meta-Directive
+        if overlord_dir != 0:
+            if (overlord_dir == 1 and prelim_vector > 0) or (overlord_dir == -1 and prelim_vector < 0):
+                boost = 60 if abs(overlord_score) > 80 else 30
+                prelim_vector += boost * overlord_dir
+                logger.info(f"CONFLUENCE: Overlord Master Directive {overlord_res['decision']} confirms trade. Authority Boost: {boost}")
+            else:
+                prelim_vector -= 40 * overlord_dir
+                logger.warning(f"CRITICAL DIVERGENCE: Overlord Directive {overlord_res['decision']} opposes consensus! Reducing power.")
+                
+        # 18. Sovereign Alignment (The Universal Law)
+        if sov_dir != 0:
+            if (sov_dir == 1 and prelim_vector > 0) or (sov_dir == -1 and prelim_vector < 0):
+                boost = 80 if "STRONG" in sovereign_res['decision'] else 40
+                prelim_vector += boost * sov_dir
+                logger.info(f"SOVEREIGN ALIGNMENT: {sovereign_res['decision']}. Universal coherence triggers major confidence boost (+{boost}).")
+            else:
+                 prelim_vector -= 60 * sov_dir
+                 logger.warning(f"SOVEREIGN VETO: Multi-scale fractals oppose entry direction! DANGER.")
+                 
+        # 19. Singularity Convergence
+        if is_singularity:
+            prelim_vector += 100 * (1 if prelim_vector > 0 else -1 if prelim_vector < 0 else 0)
+            logger.info("SINGULARITY DETECTED: Geometric Manifold has folded. Absolute Certainty Surge (+100).")
+
+        total_vector = prelim_vector
+
         # Volatility Gatekeeper
         if v_score == 0:
             logger.info("Volatility Guard: Market too quiet. Veto.")
             return "WAIT", 0, details
-
-        total_vector = v_trend + v_sniper + v_quant + v_pattern + v_cycle + v_sd + v_div + v_kin + v_fractal + (sc_impact * 20)
         
         # VPIN Veto Check
         if vpin > 0.8:
@@ -555,7 +637,8 @@ class ConsensusEngine:
                  return "WAIT", 0, details
         
         # Breakdown Log for Debugging Stagnation
-        logger.debug(f"Consensus Breakdown: Trend={v_trend:.2f} Sniper={v_sniper:.2f} Quant={v_quant:.2f} Pat={v_pattern:.2f} Cycle={v_cycle:.2f} SD={v_sd:.2f} Div={v_div:.2f} Kin={v_kin:.2f} Frac={v_fractal:.2f}")
+        health_score = architect_audit.get('health_score', 100)
+        logger.debug(f"Consensus Breakdown: Trend={v_trend:.2f} Sniper={v_sniper:.2f} Quant={v_quant:.2f} Pat={v_pattern:.2f} Cycle={v_cycle:.2f} SD={v_sd:.2f} Div={v_div:.2f} Kin={v_kin:.2f} Frac={v_fractal:.2f} | Health={health_score}")
         
         final_score = abs(total_vector)
         
@@ -607,7 +690,38 @@ class ConsensusEngine:
             else:
                 decision = "SELL"
                 
+        # --- PHASE 10: RECURSIVE DEBATE (Chain-of-Thought) ---
+        if decision != "WAIT":
+            decision, final_score, debate_log = self.debater.debate(decision, final_score, data_map)
+            details['RecursiveDebate'] = debate_log
+            logger.info(f"RECURSIVE DEBATE: {debate_log}")
+            
+        # --- PHASE 11: ADVERSARIAL BLACK-SWAN AUDIT ---
+        if decision != "WAIT":
+             current_price = df_m5.iloc[-1]['close']
+             atr = df_m5.iloc[-20:]['close'].diff().abs().mean() # Quick ATR
+             # Determine hypothetical SL based on config or logic
+             sl_dist = atr * 2.0
+             sl_price = current_price - sl_dist if decision == "BUY" else current_price + sl_dist
+             
+             is_safe, surv_prob = self.adversary.audit_trade(decision, current_price, sl_price, atr)
+             details['BlackSwanAudit'] = {'safe': is_safe, 'survival_prob': surv_prob}
+             
+             if not is_safe:
+                 logger.info(f"Black-Swan Audit: VETO entry. Survival probability {surv_prob:.2f} is too low.")
+                 decision = "WAIT"
+                 final_score = 0
+
+        # --- FINAL SYSTEM VETO APPLY ---
+        if system_veto and decision != "WAIT":
+            logger.warning(f"VETO ACTIVE: {veto_msg}. Silencing Main Decision (Score Preserved for Swarm).")
+            decision = "WAIT"
+
         if decision != "WAIT" or verbose:
             logger.info(f"Consensus Reached: {decision} (Score: {final_score:.2f})")
             
-        return decision, final_score, details
+        # Heartbeat Log (Show activity even if WAIT)
+        if decision == "WAIT":
+            logger.info(f"Consensus Heartbeat: Trend={t_score:.0f} Sniper={s_score:.0f} Quant={q_score:.0f} Vector={total_vector:.2f}")
+            
+        return decision, total_vector, details

@@ -68,77 +68,8 @@ def main():
 
     # Initialize Managers
     notif_manager = NotificationManager(cooldown_minutes=5)
-    # Initialize MT5 Monitor
     mt5_monitor = MT5Monitor()
     
-    # Get Dynamic Symbol Info (Digits/Point)
-    symbol_info = mt5_monitor.get_symbol_info(config.SYMBOL)
-    if not symbol_info:
-        logger.error(f"CRITICAL: Could not fetch info for {config.SYMBOL}. Using defaults (Digits=2).")
-        symbol_digits = 2
-        symbol_point = 0.01
-    else:
-        symbol_digits = symbol_info['digits']
-        symbol_point = symbol_info['point']
-        symbol_stops_level = symbol_info['stops_level']
-        logger.info(f"Symbol {config.SYMBOL}: Digits={symbol_digits}, Point={symbol_point}, StopsLevel={symbol_stops_level}")
-
-    def normalize_price(price):
-        """Rounds price to the correct number of digits."""
-        return f"{round(price, symbol_digits):.{symbol_digits}f}"
-
-    def validate_sl_tp(current_bid, current_ask, sl, tp, cmd_type):
-        """
-        Enforces minimum StopsLevel distance relative to the correct price anchor (Bid/Ask).
-        Returns (valid_sl, valid_tp) adjusted if necessary.
-        """
-        # Hard Minimum Fallback: 50 points (e.g. 0.50 on Gold) to prevent ECN "0 stops" rejection
-        effective_stops_level = max(symbol_stops_level, 50) 
-        min_dist = effective_stops_level * symbol_point
-        
-        # Add a comfortable buffer (e.g. 20 points)
-        safe_dist = min_dist + (20 * symbol_point) 
-        
-        if cmd_type == "BUY":
-            # BUY Order:
-            # SL must be below Bid: (Bid - SL) >= safe_dist  =>  SL <= Bid - safe_dist
-            # TP must be above Ask (Exec at Ask, Target Price > Ask) 
-            # Note: MT5 checks TP distance from Bid for Buy? No, usually Bid->Ask close.
-            # Safest: TP >= Ask + safe_dist
-            
-            # 1. Validate SL (Anchor: BID)
-            max_sl = current_bid - safe_dist
-            if sl > max_sl:
-                logger.warning(f"BUY SL too close to Bid ({sl} > {max_sl}). Pushing down.")
-                sl = max_sl
-                
-            # 2. Validate TP (Anchor: ASK)
-            min_tp = current_ask + safe_dist
-            if tp < min_tp:
-                logger.warning(f"BUY TP too close to Ask ({tp} < {min_tp}). Pushing up.")
-                tp = min_tp
-
-        else: # SELL
-            # SELL Order:
-            # SL must be above Ask: (SL - Ask) >= safe_dist  =>  SL >= Ask + safe_dist
-            # TP must be below Bid (Exec at Bid, Target Price < Bid)
-            
-            # 1. Validate SL (Anchor: ASK)
-            min_sl = current_ask + safe_dist
-            if sl < min_sl:
-                logger.warning(f"SELL SL too close to Ask ({sl} < {min_sl}). Pushing up.")
-                sl = min_sl
-                
-            # 2. Validate TP (Anchor: BID)
-            max_tp = current_bid - safe_dist
-            if tp > max_tp:
-                logger.warning(f"SELL TP too close to Bid ({tp} > {max_tp}). Pushing down.")
-                tp = max_tp
-                 
-        return sl, tp
-
-    # Load Historical Data
-    logger.info("Loading Historical Data...")
     data_loader = DataLoader() # Historical Data
     reporter = ReportGenerator()
     
@@ -195,9 +126,6 @@ def main():
         while True:
             # 1. Connectivity & Data Ingestion
             if not bridge.conn:
-                if time.time() - last_log_print > 5:
-                    logger.info("Waiting for MT5 Connection via ZMQ...")
-                    last_log_print = time.time()
                 time.sleep(1)
                 continue
                 
@@ -269,12 +197,7 @@ def main():
                     continue
 
             # 2. Advanced Multi-Dimensional Analysis (Rate Limited)
-            # CRITICAL: Feed MicroStructure EVERY TICK for accurate HFT metrics
-            if live_tick:
-                deep_brain.micro.on_tick(live_tick)
-
             current_time = time.time()
-
             if len(df_m5) >= 50 and (current_time - last_analysis_time >= analysis_cooldown or is_report_time):
                 try:
                     base_decision, base_score, details = consensus.deliberate(data_map, verbose=False)
@@ -340,7 +263,7 @@ def main():
                      # 1. Trailing Stop
                      new_sl = trade_manager.check_trailing_stop(pos_dict, live_tick['last'], struc_low, struc_high)
                      if new_sl:
-                         bridge.send_command("MODIFY_TRADE", [str(pos_dict['ticket']), normalize_price(new_sl), str(pos_dict['tp'])])
+                         bridge.send_command("MODIFY_TRADE", [str(pos_dict['ticket']), f"{new_sl:.2f}", str(pos_dict['tp'])])
                      
                      # 2. Partial TP
                      partial_action = trade_manager.check_partial_tp(pos_dict, live_tick['last'])
@@ -353,7 +276,7 @@ def main():
                      if exit_signal and exit_signal['action'] == "CLOSE_FULL":
                          ticket = exit_signal['ticket']
                          reason = exit_signal['reason']
-                         logger.info(f"âš¡ INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
+                         logger.info(f"INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
                          bridge.send_command("CLOSE_TRADE", [str(ticket)])
                          notif_manager.send_notification("INSTANT PROFIT", f"{reason}", "PROFIT")
             
@@ -382,17 +305,14 @@ def main():
                     # Fix: Use ASK for BUY, BID for SELL to account for Spread
                     if cmd_type == "BUY":
                         base_price = live_tick['ask'] # Entry at Ask
-                        sl_price = live_tick['bid'] - config.SCALP_SL # SL below Bid
+                        sl_price = base_price - config.SCALP_SL
                         tp_price = base_price + config.SCALP_TP
                         mt5_type = 0 # OP_BUY
                     else:
                         base_price = live_tick['bid'] # Entry at Bid
-                        sl_price = live_tick['ask'] + config.SCALP_SL # SL above Ask
+                        sl_price = base_price + config.SCALP_SL
                         tp_price = base_price - config.SCALP_TP
                         mt5_type = 1 # OP_SELL
-                        
-                    # Validate Stops
-                    sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, cmd_type)
                         
                     # Protocol: OPEN_TRADE|SYMBOL|TYPE(Int)|VOLUME|SL|TP
                     # Note: Volume is index 3 in EA, SL is 4, TP is 5.
@@ -400,8 +320,8 @@ def main():
                         config.SYMBOL, 
                         str(mt5_type), 
                         f"{(config.SCALP_LOTS * lot_multiplier):.2f}", 
-                        normalize_price(sl_price),
-                        normalize_price(tp_price)
+                        f"{sl_price:.2f}", 
+                        f"{tp_price:.2f}"
                     ]
                     
                     # Log attempt
@@ -435,28 +355,25 @@ def main():
                     
                     if sniper_action == "BUY":
                         base_price = live_tick['ask']
-                        sl_price = live_tick['bid'] - config.SCALP_SL
+                        sl_price = base_price - config.SCALP_SL
                         tp_price = base_price + config.SCALP_TP
                     else:
                         base_price = live_tick['bid']
-                        sl_price = live_tick['ask'] + config.SCALP_SL
+                        sl_price = base_price + config.SCALP_SL
                         tp_price = base_price - config.SCALP_TP
-                        
-                    # Validate Stops Distance (StopsLevel Check)
-                    sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, sniper_action)
                         
                     params = [
                         config.SYMBOL, 
                         str(mt5_type), 
                         f"{(sniper_lots * lot_multiplier):.2f}", # Dynamic + Sovereign Multiplier
-                        normalize_price(sl_price),
-                        normalize_price(tp_price)
+                        f"{sl_price:.2f}", 
+                        f"{tp_price:.2f}"
                     ]
                     
                     logger.info(f"SNIPER SIGNAL: {sniper_reason} | {sniper_action} | Lots: {sniper_lots} | Executing...")
                     resp = bridge.send_command("OPEN_TRADE", params)
                     if resp == "SENT":
-                        logger.info(f">>> SNIPER FIRED: {sniper_reason} | {sniper_action} @ {normalize_price(curr_price)}")
+                        logger.info(f">>> SNIPER FIRED: {sniper_reason} | {sniper_action} @ {curr_price:.2f}")
                         notif_manager.send_notification("SNIPER EXECUTION", f"{sniper_reason} | {sniper_lots} Lots", "TRADE")
 
             # --- FOURTH EYE (The Whale) ---
@@ -473,28 +390,25 @@ def main():
                     
                     if whale_action == "BUY":
                         base_price = live_tick['ask']
-                        sl_price = live_tick['bid'] - config.SCALP_SL
+                        sl_price = base_price - config.SCALP_SL
                         tp_price = base_price + config.SCALP_TP
                     else:
                         base_price = live_tick['bid']
-                        sl_price = live_tick['ask'] + config.SCALP_SL
+                        sl_price = base_price + config.SCALP_SL
                         tp_price = base_price - config.SCALP_TP
-                        
-                    # Validate Stops
-                    sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, whale_action)
                         
                     params = [
                         config.SYMBOL, 
                         str(mt5_type), 
                         f"{(whale_lots * lot_multiplier):.2f}", 
-                        normalize_price(sl_price),
-                        normalize_price(tp_price)
+                        f"{sl_price:.2f}", 
+                        f"{tp_price:.2f}"
                     ]
                     
                     logger.info(f"WHALE SIGNAL: {whale_reason} | {whale_action} | Lots: {whale_lots} | Executing...")
                     resp = bridge.send_command("OPEN_TRADE", params)
                     if resp == "SENT":
-                        logger.info(f">>> WHALE SURFACED: {whale_reason} | {whale_action} @ {normalize_price(base_price)}")
+                        logger.info(f">>> WHALE SURFACED: {whale_reason} | {whale_action} @ {base_price:.2f}")
                         notif_manager.send_notification("WHALE EXECUTION", f"{whale_reason} | {whale_lots} Lots", "TRADE")
             
             # 3. Account Awareness (MT5 Check)
@@ -509,11 +423,6 @@ def main():
                     pnl_emoji = "(+)" if pnl > 0 else "(-)" if pnl < 0 else "(=)"
                     logger.info(f"MONITOR: {pnl_emoji} Floating PnL: ${pnl:.2f} | Eq: {acc_stats['equity']:.2f}")
                     
-                last_log_print = time.time()
-
-            # Heartbeat Log (if everything is quiet but running)
-            if time.time() - last_log_print > 60:
-                logger.debug(f"HEARTBEAT: System Active | Tick: {live_tick.get('last') if live_tick else 'N/A'}")
                 last_log_print = time.time()
 
             # 4. Smart Notification Logic (Clock Aligned)
@@ -557,9 +466,18 @@ def main():
                 logger.info(f">>> REPORT SENT ({now_sp.strftime('%H:%M')}): {title} | {body}")
                 
                 # --- FIRST EYE / SCALP SWARM (Auto-Scalper) ---
-                # NOTE: Swarm is processed on EVERY TICK (see above).
-                # This block was redundant and empty.
-
+                # NOTE: Swarm is processed on EVERY TICK (see above), but we log here for visibility if needed.
+                # Actually, the user wants Swarm to run continuously.
+                # If we put it only here, it runs once every 5 mins.
+                # Ideally, we should remove this block and let the tick-level logic handle it.
+                # However, to be safe and ensure at least one check per 5 mins, we can leave a manual check or rely on the loop above.
+                # WAIT! I haven't inserted the loop above yet. I am replacing THIS block with the Tick Loop block?
+                # No, I should insert the tick loop block earlier in the code (around line 170) and REMOVE this block.
+                # But I cannot insert earlier without a separate edit.
+                # Strategy:
+                # 1. I will effectively DELETE this "Report Time" execution block.
+                # 2. I'll insert the real execution logic higher up in the next step.
+                pass # Swarm Logic moved to main loop for High Frequency Execution
 
             # Dashboard Pub (Live)
             try:

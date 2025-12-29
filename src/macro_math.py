@@ -13,6 +13,7 @@ class MacroMath:
         Simplified GARCH(1,1) parameter estimation and volatility forecast.
         sigma_t^2 = omega + alpha * epsilon_{t-1}^2 + beta * sigma_{t-1}^2
         """
+        returns = np.array(returns).flatten()
         if len(returns) < 20: return np.std(returns)
         
         # Returns must be centered
@@ -68,6 +69,9 @@ class MacroMath:
         Simplified Multi-Resolution Analysis (Haar Wavelet Proxy)
         Calculates coherence between two series at different scales (High/Low frequency).
         """
+        s1 = np.array(s1).flatten()
+        s2 = np.array(s2).flatten()
+        
         def haar_transform(x):
             if len(x) % 2 != 0: x = x[:-1]
             avgs = (x[0::2] + x[1::2]) / np.sqrt(2)
@@ -101,19 +105,34 @@ class MacroMath:
         1. OLS: y = beta * x + alpha + residuals
         2. Check residuals for stationarity.
         """
-        if len(y) != len(x): return 0
+        y = np.array(y).flatten()
+        x = np.array(x).flatten()
         
-        # OLS
-        poly = np.polyfit(x, y, 1)
-        beta, alpha = poly[0], poly[1]
+        if len(y) != len(x) or len(y) < 2: return {'beta': 0, 'stat_score': 0, 'z_score': 0}
         
-        target = beta * x + alpha
+        # Sanitize inputs
+        y = np.nan_to_num(y)
+        x = np.nan_to_num(x)
+        
+        # Check variance (Polyfit SVD fails on constant input)
+        if np.var(x) < 1e-9 or np.var(y) < 1e-9:
+             return {'beta': 0, 'stat_score': 0, 'z_score': 0}
+        
+        try:
+            # OLS
+            poly = np.polyfit(x, y, 1)
+            beta, alpha = poly[0], poly[1]
+            
+            target = beta * x + alpha
+        except Exception as e:
+            logger.error(f"MacroMath Polyfit Error: {e}")
+            return {'beta': 0, 'stat_score': 0, 'z_score': 0}
         residuals = y - target
         
         # Simplified Stationarity Check: Autocorrelation of residuals
         # Stationary series have low/decaying autocorrelation.
         # We check the correlation between res and res[1:]
-        if len(residuals) < 10: return {'beta': beta, 'stat_score': 0, 'z_score': curr_z}
+        if len(residuals) < 10: return {'beta': beta, 'stat_score': 0, 'z_score': 0}
         
         autocorr = np.corrcoef(residuals[:-1], residuals[1:])[0, 1]
         
@@ -135,6 +154,7 @@ class MacroMath:
         Recursive Bayesian filter to detect "Expansion" vs "Contraction".
         Likelihood based on recent direction vs global volatility.
         """
+        series = np.array(series).flatten()
         if len(series) < 10: return 0.5
         
         change = (series[-1] - series[-5]) / series[-5]

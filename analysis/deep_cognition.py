@@ -4,6 +4,7 @@ from src.quantum_math import QuantumMath
 from analysis.microstructure import MicroStructure
 from analysis.kinematics import Kinematics
 from analysis.prediction_engine import PredictionEngine
+from analysis.seventh_eye import SeventhEye
 
 class DeepCognition:
     def __init__(self):
@@ -12,8 +13,9 @@ class DeepCognition:
         self.qm = QuantumMath()
         self.kinematics = Kinematics()
         self.oracle = PredictionEngine()
+        self.overlord = SeventhEye() # Synthesis Sensor
         
-    def consult_subconscious(self, trend_score, volatility_score, pattern_score, smc_score, df_m5=None, live_tick=None):
+    def consult_subconscious(self, trend_score, volatility_score, pattern_score, smc_score, df_m5=None, live_tick=None, details=None):
         """
         Weighted consensus of different 'brain' parts, augmented by:
         - Cortex (Memory)
@@ -102,9 +104,27 @@ class DeepCognition:
         
         instinct_norm += kalman_bias
 
-        # 4. Final Consensus
-        # Mix: Instinct (Current) + Memory (Past) + Oracle (Future)
-        final_decision = (instinct_norm * 0.5) + (memory_bias * 0.3) + (future_bias * 0.2)
+        # 4. Meta-Critic Layer (Information Geometry)
+        # Check for 'Internal Conflict' between Sensors 
+        # Optimized: Use Overlord data from 'details' if provided
+        overlord_data = details.get('Overlord', {}) if details else self.overlord.deliberate({'M5': df_m5})
+        
+        overlord_dir = np.sign(overlord_data.get('score', 0)) if abs(overlord_data.get('score', 0)) > 10 else 0
+        
+        # If Overlord (The High Brain) disagrees with Instinct (The Base Brain)
+        if overlord_dir != 0 and np.sign(instinct_norm) != overlord_dir:
+            conflict_score = 0.5
+            instinct_norm *= 0.7 # Penalyze instinct if Overlord says 'Wait' or 'Reverse'
+            
+        # Curvature Awareness (Geometry of the Manifold)
+        curvature = overlord_data.get('metrics', {}).get('curvature', 0)
+        
+        # final_decision = ...
+        overlord_score = overlord_data.get('score', 0)
+        final_decision = (instinct_norm * 0.4) + \
+                         (memory_bias * 0.2) + \
+                         (future_bias * 0.2) + \
+                         (np.tanh(overlord_score / 50.0) * 0.2)
         
         # Conflicting Timeframes?
         if np.sign(future_bias) != np.sign(instinct_norm) and abs(future_bias) > 0.3:

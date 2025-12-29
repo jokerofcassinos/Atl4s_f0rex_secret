@@ -87,8 +87,10 @@ void OnTick()
                Print("Reconnected to Python Server.");
             }
          }
+         }
+
       }
-   }
+
    
    // Check for commands on Tick as well (faster response)
    ReadCommands();
@@ -125,16 +127,90 @@ void ProcessCommand(string cmd)
             if(trade.Buy(volume, symbol, 0, sl, tp, "Atl4s-Bot"))
                Print("Buy Order Executed Successfully. Ticket: ", trade.ResultOrder());
             else
-               Print("Buy Order Failed. Error: ", trade.ResultRetcode(), " - ", trade.ResultRetcodeDescription());
+              {
+               int err = trade.ResultRetcode();
+               Print("Buy Order Failed. Error: ", err, " - ", trade.ResultRetcodeDescription());
+               
+               // Retry for Market Execution (Error 10016)
+               if(err == 10016)
+                 {
+                  Print("Retrying with Market Execution (0 SL/TP)...");
+                  if(trade.Buy(volume, symbol, 0, 0, 0, "Atl4s-Bot"))
+                    {
+                     ulong ticket = trade.ResultOrder();
+                     Print("Market Entry Success. Ticket: ", ticket, ". Applying Stops...");
+                     Sleep(200); // Small wait for position registration
+                     if(trade.PositionModify(ticket, sl, tp))
+                        Print("Stops Applied Successfully.");
+                     else
+                        Print("Failed to apply stops: ", trade.ResultRetcode());
+                    }
+                 }
+              }
            }
          else if(type == 1) // SELL
            {
             if(trade.Sell(volume, symbol, 0, sl, tp, "Atl4s-Bot"))
                Print("Sell Order Executed Successfully. Ticket: ", trade.ResultOrder());
             else
-               Print("Sell Order Failed. Error: ", trade.ResultRetcode(), " - ", trade.ResultRetcodeDescription());
+              {
+               int err = trade.ResultRetcode();
+               Print("Sell Order Failed. Error: ", err, " - ", trade.ResultRetcodeDescription());
+               
+               // Retry for Market Execution (Error 10016)
+               if(err == 10016)
+                 {
+                  Print("Retrying with Market Execution (0 SL/TP)...");
+                  if(trade.Sell(volume, symbol, 0, 0, 0, "Atl4s-Bot"))
+                    {
+                     ulong ticket = trade.ResultOrder();
+                     Print("Market Entry Success. Ticket: ", ticket, ". Applying Stops...");
+                     Sleep(200); // Small wait for position registration
+                     if(trade.PositionModify(ticket, sl, tp))
+                        Print("Stops Applied Successfully.");
+                     else
+                        Print("Failed to apply stops: ", trade.ResultRetcode());
+                    }
+                 }
+              }
            }
         }
+         else if(parts[0] == "MODIFY_TRADE")
+           {
+            // MODIFY_TRADE|TICKET|SL|TP
+            if(count < 4) { Print("Error: Malformed MODIFY_TRADE"); return; }
+            ulong ticket = (ulong)StringToInteger(parts[1]);
+            double sl = StringToDouble(parts[2]);
+            double tp = StringToDouble(parts[3]);
+            
+            if(trade.PositionModify(ticket, sl, tp))
+               Print("Modify Trade Success: Ticket ", ticket);
+            else
+               Print("Modify Trade Failed: ", trade.ResultRetcode());
+           }
+         else if(parts[0] == "CLOSE_TRADE")
+           {
+            // CLOSE_TRADE|TICKET
+            if(count < 2) { Print("Error: Malformed CLOSE_TRADE"); return; }
+            ulong ticket = (ulong)StringToInteger(parts[1]);
+            
+            if(trade.PositionClose(ticket))
+               Print("Close Trade Success: Ticket ", ticket);
+            else
+               Print("Close Trade Failed: ", trade.ResultRetcode());
+           }
+         else if(parts[0] == "CLOSE_PARTIAL")
+           {
+            // CLOSE_PARTIAL|TICKET|VOLUME
+            if(count < 3) { Print("Error: Malformed CLOSE_PARTIAL"); return; }
+            ulong ticket = (ulong)StringToInteger(parts[1]);
+            double volume = StringToDouble(parts[2]);
+            
+            if(trade.PositionClosePartial(ticket, volume))
+               Print("Partial Close Success: Ticket ", ticket, " Vol: ", volume);
+            else
+               Print("Partial Close Failed: ", trade.ResultRetcode());
+           }
      }
   }
 

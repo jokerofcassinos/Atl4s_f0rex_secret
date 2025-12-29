@@ -74,6 +74,26 @@ class MT5Monitor:
             logger.error(f"Error fetching positions: {e}")
             return []
 
+    def get_symbol_info(self, symbol):
+        """
+        Retrieves critical symbol info for execution (Digits, StopsLevel, Point).
+        """
+        if not self.connected: self._initialize()
+        
+        info = mt5.symbol_info(symbol)
+        if info is None:
+            logger.error(f"Symbol not found: {symbol}")
+            return None
+            
+        return {
+            'digits': info.digits,
+            'point': info.point,
+            'stops_level': info.trade_stops_level,
+            'ask': info.ask,
+            'bid': info.bid,
+            'spread': info.spread
+        }
+
     def analyze_manual_performance(self, magic_number=0, days=30):
         """
         Analyzes trade history.

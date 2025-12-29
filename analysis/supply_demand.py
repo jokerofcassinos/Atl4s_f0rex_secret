@@ -39,6 +39,7 @@ class SupplyDemand:
         new_zones = []
         df['body'] = abs(df['close'] - df['open'])
         avg_body = df['body'].rolling(20).mean()
+        avg_vol = df['volume'].rolling(20).mean()
         
         for i in range(len(df)-2, len(df)-50, -1):
             c_out = df.iloc[i]
@@ -50,17 +51,26 @@ class SupplyDemand:
             is_strong_red = c_out['close'] < c_out['open'] and c_out['body'] > avg_body.iloc[i] * 1.5
             is_base = c_base['body'] < (avg_body.iloc[i] * 0.6)
             
+            # Quality Calculation: Breakout Intensity + Volume Surge + Age Bias
+            intensity = c_out['body'] / (avg_body.iloc[i] + 1e-9)
+            vol_surge = c_out['volume'] / (avg_vol.iloc[i] + 1e-9)
+            
+            # Age Bias: Closer to current candle = higher score
+            age_factor = (50 - (len(df) - 1 - i)) / 50.0  # 1.0 (new) to 0.0 (old)
+            
+            quality = min(98, 45 + (intensity * 12) + (vol_surge * 10) + (age_factor * 5))
+            
             if is_strong_green and is_base and c_in['close'] < c_in['open']:
                 # Demand
                 top = max(c_base['open'], c_base['close'])
                 bottom = c_base['low']
-                new_zones.append({'type': 'DEMAND', 'top': top, 'bottom': bottom, 'touches': 0, 'strength': 100})
+                new_zones.append({'type': 'DEMAND', 'top': top, 'bottom': bottom, 'touches': 0, 'strength': 100, 'quality': quality})
                 
             elif is_strong_red and is_base and c_in['close'] > c_in['open']:
                 # Supply
                 top = c_base['high']
                 bottom = min(c_base['open'], c_base['close'])
-                new_zones.append({'type': 'SUPPLY', 'top': top, 'bottom': bottom, 'touches': 0, 'strength': 100})
+                new_zones.append({'type': 'SUPPLY', 'top': top, 'bottom': bottom, 'touches': 0, 'strength': 100, 'quality': quality})
 
         # 2. Evaluate Current Price vs Zones (The Fortress Logic)
         best_score = 0
@@ -71,15 +81,9 @@ class SupplyDemand:
             # Check if price is interacting with this zone
             # Demand: Price inside or near top
             if zone['type'] == 'DEMAND':
-                if zone['bottom'] <= curr_price <= zone['top'] * 1.02:
+                if zone['bottom'] <= curr_price <= zone['top'] * 1.01:
                     # Interaction!
-                    # Calculate Permeability
-                    # Ideally we track touches over time. For now, we estimate based on proximity history?
-                    # Simplified: We assume 1st touch if it's a fresh detection in this loop context
-                    # In a real stateful system, we'd persist 'self.zones'. 
-                    # Let's assume this is a fresh analysis for the decision moment.
-                    
-                    base_score = 70
+                    base_score = zone.get('quality', 69.5)
                     
                     # Permeability Penalty (Simulated)
                     # If price has been here before in the last 20 candles, reduce score
@@ -103,13 +107,13 @@ class SupplyDemand:
                         
             # Supply: Price inside or near bottom
             elif zone['type'] == 'SUPPLY':
-                if zone['bottom'] * 0.98 <= curr_price <= zone['top']:
-                    base_score = 70
+                if zone['bottom'] * 0.99 <= curr_price <= zone['top']:
+                    base_score = zone.get('quality', 69.5)
                     
                     recent_touches = df[(df['high'] >= zone['bottom']) & (df.index > df.index[-20])].shape[0]
                     if recent_touches > 3:
                         zone['strength'] = 20
-                        logger.info("Fortress: Supply Zone Weakened (Too many touches)")
+                        logger.info(f"Fortress: Supply Zone Weakened ({recent_touches} touches)")
                     elif recent_touches > 1:
                         zone['strength'] = 80
                         
