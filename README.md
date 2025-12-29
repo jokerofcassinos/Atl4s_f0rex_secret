@@ -70,7 +70,7 @@ The system is monitored via a futuristic, **HFT-grade Cyberpunk SPA** (Single Pa
 
 ---
 ### 🤝 Credits & Architecture
-**Lead Developer:** [User]
+**Lead Developer:** R4mboFromBlock
 **Principal AI Architect:** **Antigravity** (Google Deepmind)
 
 *Built in collaboration through the chaos of the markets. "We are the signal in the noise."*
