@@ -1,77 +1,51 @@
-# 🌌 Atl4s-Forex: The Swarm Sentinel 🦅
-> **"Turning Market Chaos into Predictive Certainty through Multi-Agent Intelligence."**
+# 🌌 Atl4s-Forex v1.0 (Legacy Stable) 🦅
+> **"The Original Foundation. Stable, Proven, and Precise."**
 
-Welcome to the cutting edge of automated trading. **Atl4s-Forex** has evolved into a **Swarm Intelligence Orchestrator** designed to dominate the XAUUSD (Gold) market. It transcends basic algorithmic trading by integrating advanced physics, quantum mathematics, Game Theory, and institutional "Smart Money" concepts into one unbeatable execution machine. 🚀
-
----
-
-## 🏆 Current Status: 100% Accuracy (Phase 12 Complete)
-The system has achieved a milestone of **Execution Perfection**. Through rigorous "Deep System Sweeps" and "Execution Hardening", Atl4s now operates with:
-- **Zero-Rejection Execution**: Spread-Aware anchoring guarantees acceptance by any broker (ECN or Standard).
-- **Dynamic Adaptability**: Real-time adjustment to volatility, spreads, and market regime shifts.
-- **Surgical Precision**: 100% Win-Rate on initial deployment following the Phase 12 patch.
+Welcome to the **Legacy Branch (v1.0)** of Atl4s-Forex. This is the original, stable version of the bot before the introduction of dynamic sizing and automated installers.
 
 ---
 
-## 🧠 The Hive Mind: How it Thinks
-Atl4s doesn't rely on simple indicators. It uses a **Swarm of 20+ Specialized Modules** that deliberate in parallel to reach a high-confidence consensus.
+## 🏆 Status: STABLE (Maintenance Mode)
+This version is in **Maintenance Mode**. New features (like Dynamic Capital Scaling and Margin Checks) are developed in the `v2.0` branch.
 
-### 🛡️ Analytical Intelligence Layers
-| Layer | Domain | Capabilities |
-| :--- | :--- | :--- |
-| **Swarm Scalp** | ⚡ **HFT & Flow** | Real-time tick analysis using **VPIN (Volume Probability of Informed Trading)** and **Micro-Entropy** gates to capture lightning-fast opportunities. |
-| **Quantum Geometry** | 🧬 **Regime Detection** | Utilizes **Persistent Homology (Topology)** and **Fisher Curvature** to spot market structural shifts before they manifest in price. |
-| **Game Theory** | ⚖️ **Fair Value** | Calculates **Nash Equilibrium** between BULL/BEAR agents to find the magnetic fair value of Gold. |
-| **Kinematics** | 🏎️ **Physics Engine** | Measures Market **Velocity**, **Acceleration**, and **Phase Space** trajectory to distinguish between spikes and sustainable trends. |
-| **Cortex Memory** | 📚 **Neural Recall** | A deep historical memory bank that compares current patterns to 10+ years of institutional data. |
-| **The Oracle & Council** | 🔮 **Global Bias** | High-level "Eyes" (5th & 6th) that analyze macro-structures and secular anchors to ensure every trade has the "Wind at its back". |
+**Use this version if:**
+*   You prefer static lot sizes (configured manually).
+*   You need a strictly stable environment with no new experimental changes.
+*   You are running on an older setup that relies on the original architecture.
 
 ---
 
-## ⚡ The "Royal Flush" (Golden Setups)
-Atl4s is programmed to wait for perfection. When multiple layers align, it triggers **Golden Setups** with >90% confidence:
-1.  **Phase Space Boom:** Momentum alignment with Physics-based acceleration.
-2.  **Fisher Curve Jump:** Geometric transition detection via Quantum Math.
-3.  **Nash Gravity:** Mean reversion when price overextends from Game Theory equilibrium.
-4.  **Micro-Flash Scalp:** High-frequency bid/ask delta shifts for instant execution.
+## ⚡ Core Features (v1.0)
+*   **Swarm Scalp**: 1st Eye HFT Logic.
+*   **Static Risk**: Risk is determined by `config.py` (Fixed Lots or Fixed Risk %).
+*   **Manual Config**: Port and Trade Settings must be set in `config.py` before running.
+*   **Execution**: Standard reliable bridge connection.
 
 ---
 
-## 🌃 Cyberpunk Dashboard
-The system is monitored via a futuristic, **HFT-grade Cyberpunk SPA** (Single Page Application) built with Next.js 14+:
-*   **Neural View:** Real-time visibility into the "Council" deliberation scores.
-*   **System Health:** Monitoring of MT5 Bridge latency and packet stability.
-*   **HFT Logs:** Millisecond-level execution streaming for total transparency.
-*   **Live Metrics:** Dynamic tracking of drawdown, alpha generation, and win-rate.
+## 🛠️ Usage
+1.  **Clone & Switch**:
+    ```bash
+    git clone https://github.com/jokerofcassinos/Atl4s_f0rex_secret.git
+    cd Atl4s-Forex
+    git checkout main
+    ```
+2.  **Run**:
+    ```bash
+    python main.py
+    ```
 
 ---
 
-## 🛠️ Built with Peak Technology
-*   🐍 **Python 3.10+ Core:** High-performance analytical backbone.
-*   ⚛️ **Next.js & Framer Motion:** Modern React architecture for the dashboard.
-*   📉 **MT5 Ultra-Bridge:** Direct-to-exchange latency optimization (Socket-based).
-*   📊 **Vectorized Backtest Engine:** Simulate months of data in seconds with institutional accuracy.
+## 🚀 Upgrade to v2.0
+To access **Dynamic Lot Sizing**, **Interactive Startup**, and **Automated Installation**, switch to the v2.0 branch:
+```bash
+git checkout v2.0
+install_v2.bat
+```
 
 ---
 
-## 📈 Project Roadmap
-- [x] **Swarm Intelligence Core** (20+ Modules Active)
-- [x] **Quantum & Topological Math Engine** 🧬
-- [x] **Game Theory (Nash) Implementation** ⚖️
-- [x] **HFT Micro-Structure Analysis** ⚡
-- [x] **Execution Hardening (Anti-Rejection)** 🛡️
-- [x] **Cyberpunk Dashboard UI** (Live & Interactive) 🌃
-- [ ] **Reinforcement Learning Layer** (Next Phase: Self-Evolving Weights)
-
----
-
-> [!IMPORTANT]
-> **Atl4s-Forex** is not a commercial product. It is a research-intensive trading framework focused on **Statistical Alpha** and the elimination of retail noise. It plays the game the way the banks do: with math, physics, and patience.
-
----
-### 🤝 Credits & Architecture
+### 🤝 Credits
 **Lead Developer:** R4mboFromBlock
-
 **Principal AI Architect:** **Antigravity** (Google Deepmind)
-
-*Built in collaboration through the chaos of the markets. "We are the signal in the noise."*
