@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATL4S // COMMAND CENTER</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Outfit:wght@300;500;700;900&family=JetBrains+Mono:wght@400&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Background Elements -->
+    <canvas id="particle-canvas"></canvas>
+    <div id="bg-container" class="bg-container home"></div>
+    <div class="bg-overlay"></div>
+
+    <div class="app-container">
+        <!-- Top Navigation -->
+        <nav class="top-nav">
+            <div class="nav-pill active" onclick="switchTab('home')">home</div>
+            <div class="nav-pill" onclick="switchTab('system')">system</div>
+            <div class="nav-pill" onclick="switchTab('neural')">neural</div>
+            <div class="nav-pill" onclick="switchTab('logs')">logs</div>
+
+            <div class="brand-logo">
+                <!-- Wireframe Cube Icon -->
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 0L37.3205 10V30L20 40L2.67949 30V10L20 0Z" stroke="white" stroke-width="1.5" />
+                    <path d="M20 10L28.6603 15V25L20 30L11.3397 25V15L20 10Z" stroke="white" stroke-width="1" />
+                    <path d="M20 20V40" stroke="white" stroke-width="0.5" />
+                    <path d="M20 20L37.3205 10" stroke="white" stroke-width="0.5" />
+                    <path d="M20 20L2.67949 10" stroke="white" stroke-width="0.5" />
+                </svg>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content-area">
+
+            <!-- TAB: HOME -->
+            <div id="tab-home" class="tab-pane active">
+                <div class="hero-section">
+                    <div class="hero-subtitle">seja</div>
+                    <h1 class="hero-title">BEM-VINDO</h1>
+                    <div class="hero-subtitle">de volta</div>
+                    <div class="hero-name">UNKNOWN</div>
+
+                    <div class="hero-connector"></div>
+
+                    <div class="hero-footer">
+                        nós somos o futuro, nós somos a inovação
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: SYSTEM -->
+            <div id="tab-system" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <div class="subtitle">4tlas systems</div>
+                        <h1>RELATORIO DE SISTEMA</h1>
+                    </div>
+                    <div class="subtitle" style="text-align: right;">
+                        • informação<br>• desempenho<br>• status
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Cards -->
+                    <div class="glass-panel metric-card">
+                        <div class="card-label">equity</div>
+                        <div class="metric-value" id="equity">$---.--</div>
+                        <div class="metric-ring"></div>
+                    </div>
+                    <div class="glass-panel metric-card">
+                        <div class="card-label">balance</div>
+                        <div class="metric-value" id="balance">$---.--</div>
+                        <div class="metric-ring"></div>
+                    </div>
+                    <div class="glass-panel metric-card">
+                        <div class="card-label">profit</div>
+                        <div class="metric-value" id="profit">---</div>
+                        <div class="metric-ring"></div>
+                    </div>
+                    <div class="glass-panel metric-card">
+                        <div class="card-label">win rate</div>
+                        <div class="metric-value" id="winrate">--%</div>
+                        <div class="metric-ring"></div>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="status-panel">
+                        <div class="status-label">STATUS</div>
+                        <div class="status-main" id="conn-status">OFFLINE</div>
+                        <div class="status-detail">ligado pela ultima vez em <span class="highlight">hoje</span></div>
+                        <div class="status-detail">operou por <span class="highlight">-- minutos</span></div>
+                    </div>
+                </div>
+
+                <div class="chart-footer">
+                    grafico
+                </div>
+            </div>
+
+            <!-- TAB: NEURAL -->
+            <div id="tab-neural" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <div class="subtitle">4tlas deep think</div>
+                        <h1>NEURAL CORTEX</h1>
+                    </div>
+                    <div class="subtitle" style="text-align: right;">
+                        • raciocinio<br>• tecnologia<br>• quantico
+                    </div>
+                </div>
+
+                <div class="neural-layout">
+                    <div class="neural-status">
+                        <div class="console-text">
+                            sistemas inicializados: 4tlas_sniper, 4tlas_quant,
+                            <span class="highlight">4tlas_trend</span>, 4tlas_micro, 4tlas_neuralweight,
+                            4tlas_risk, 4tlas_kinematics, 4tlas_volatility,
+                            4tlas_cycle, 4tlas_patterns
+                        </div>
+
+                        <div class="regime-display">
+                            <div class="subtitle">market regime</div>
+                            <div class="regime-indicator" id="regime">SCANNING...</div>
+
+                            <div class="neural-stats">
+                                <div>• hurst exponent: <span id="hurst">--</span></div>
+                                <div>• entropy (chaos): <span id="entropy">--</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="neural-controls">
+                        <div class="subtitle" style="text-align: center;">manual override</div>
+                        <div class="control-btn outline" onclick="sendCommand('FORCE_BUY')">force buy</div>
+                        <div class="control-btn filled" onclick="sendCommand('FORCE_SELL')">force sell</div>
+                        <div class="control-btn outline" onclick="sendCommand('CLOSE_ALL')">panic close</div>
+
+                        <div class="footer-note">drawdown previsto: 00 | stop-loss previsto: 00</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: LOGS -->
+            <div id="tab-logs" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <div class="subtitle">4tlas out system</div>
+                        <h1>LOGS DO SISTEMA</h1>
+                    </div>
+                </div>
+
+                <div class="logs-container">
+                    <div id="terminal" class="terminal-content">
+                        <div class="log-line system">[S Y S T E M] interface loaded. waiting for neural link...</div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+
+</html>
