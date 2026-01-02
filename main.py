@@ -17,7 +17,8 @@ from report_generator import ReportGenerator
 
 # Old Analysis (Legacy Support)
 from analysis.consensus import ConsensusEngine
-from analysis.risk_neural import NeuralRiskManager
+from analysis.consensus import ConsensusEngine
+from risk_manager import RiskManager # Using New Quantum Engine
 
 # NEW Advanced Modules
 from src.notifications import NotificationManager
@@ -179,7 +180,7 @@ def main():
     
     # Initialize Minds (Analysis Engines)
     consensus = ConsensusEngine() # Old Logic
-    risk_manager = NeuralRiskManager()
+    risk_manager = RiskManager() # Quantum Sigmoid Risk Engine
     
     # New Engines
     smc_engine = SmartMoneyEngine()
