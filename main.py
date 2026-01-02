@@ -415,11 +415,13 @@ def main():
                     )
                     
                     # 4. Tenth Eye (The Holographic Architect)
-                    # Needs Market State (Hurst, Lyapunov, Volatility)
+                    # Needs Market State (Hurst, Lyapunov, Volatility, RIVER)
                     market_state = {
                         'hurst': micro_stats.get('micro_hurst', 0.5),
                         'lyapunov': micro_stats.get('lyapunov', 0.0),
-                        'volatility': details.get('Volatility', {}).get('score', 0)
+                        'volatility': details.get('Volatility', {}).get('score', 0),
+                        'river': details.get('Trend', {}).get('river', 0), # Inject H1 Trend for Reality Check
+                        'regime': details.get('Trend', {}).get('regime', 'RANGING')
                     }
                     
                     architect_res = tenth_eye.deliberate(details, market_state)
@@ -487,7 +489,7 @@ def main():
                         logger.warning(f"📉 SMART WAIT: Inversion wants to SELL, but Market is OVERSOLD (Z {quant_z:.2f}). Waiting for Bounce.")
                         final_cortex_decision = 0
                     else:
-                        logger.info(f"🧠 SMART INVERSION: Flipping BUY ({final_cortex_decision:.1f}) -> SELL due to BEARISH RIVER.")
+                        logger.info(f"[SMART] INVERSION: Flipping BUY ({final_cortex_decision:.1f}) -> SELL due to BEARISH RIVER.")
                         final_cortex_decision = -abs(final_cortex_decision) # Force Negative
                     
                 # 2. Bullish Trend + Sell Signal -> FLIP TO BUY
@@ -556,14 +558,17 @@ def main():
                 logger.info(">>> OVERLORD CONFIDENCE: Multiplier 1.5x Active <<<")
             
             # Final Margin Safety Check on Multiplied Lots
-            if (dynamic_base_lots * lot_multiplier) > max_safe_lots:
-                 # Reduce multiplier if it breaks bank
-                 max_multiplier = max_safe_lots / dynamic_base_lots if dynamic_base_lots > 0 else 1
-                 if max_multiplier < 1: max_multiplier = 1
-                 lot_multiplier = max_multiplier
-                 logger.warning(f"Margin Safety: Capping Multiplier to {lot_multiplier:.2f}x to fit {max_safe_lots} lots.")
+            final_raw_lots = dynamic_base_lots * lot_multiplier
             
+            # HARD CAP ENFORCEMENT (User Request: "3.54 is too risky")
+            if final_raw_lots > config.MAX_LOTS_PER_TRADE:
+                logger.warning(f"Safety Cap: Reducing Lots {final_raw_lots:.2f} -> {config.MAX_LOTS_PER_TRADE} (Max Limit).")
+                final_raw_lots = config.MAX_LOTS_PER_TRADE
 
+            if final_raw_lots > max_safe_lots:
+                 # Reduce multiplier if it breaks bank
+                 logger.warning(f"Margin Safety: Capping Lots to {max_safe_lots:.2f} due to Free Margin.")
+                 final_raw_lots = max_safe_lots
             
             # --- SCALP SWARM (High Frequency Tick Execution) ---
             # User Request: "Inverse of Inverse" -> Use Original Technical Score (The 'Retail' Score)
@@ -580,7 +585,8 @@ def main():
                     alpha_score=final_cortex_decision, # SmartBrain
                     tech_score=original_base_score,    # Retail Technical
                     phy_score=orbit_energy,            # Physics Energy
-                    micro_stats=micro_stats            # NEW: Full HFT Metrics
+                    micro_stats=micro_stats,           # NEW: Full HFT Metrics
+                    forced_lots=final_raw_lots         # Pass capped lots
                 )
                 
                 if swarm_action:
@@ -720,6 +726,11 @@ def main():
                     sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, whale_action)
                     
                     # --- FINAL WHALE MARGIN CLAMP ---
+                    # HARD CAP ENFORCEMENT
+                    if whale_lots > config.MAX_LOTS_PER_TRADE:
+                         logger.warning(f"Safety Cap: Reducing Whale Lots {whale_lots:.2f} -> {config.MAX_LOTS_PER_TRADE}")
+                         whale_lots = config.MAX_LOTS_PER_TRADE
+
                     if whale_lots > max_safe_lots:
                          logger.warning(f"Margin Safety: Capping Whale Lots {whale_lots} -> {max_safe_lots}")
                          whale_lots = max_safe_lots
@@ -765,6 +776,11 @@ def main():
                  gap_lots = dynamic_base_lots * 1.5 
                  
                  # --- FINAL GAP MARGIN CLAMP ---
+                 # HARD CAP ENFORCEMENT
+                 if gap_lots > config.MAX_LOTS_PER_TRADE:
+                      logger.warning(f"Safety Cap: Reducing Gap Lots {gap_lots:.2f} -> {config.MAX_LOTS_PER_TRADE}")
+                      gap_lots = config.MAX_LOTS_PER_TRADE
+
                  if gap_lots > max_safe_lots:
                       logger.warning(f"Margin Safety: Capping Gap Lots {gap_lots} -> {max_safe_lots}")
                       gap_lots = max_safe_lots

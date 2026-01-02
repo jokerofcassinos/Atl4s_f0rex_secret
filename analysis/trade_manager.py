@@ -198,31 +198,61 @@ class TradeManager:
         velocity = micro_metrics.get('velocity', 0) # Raw Velocity (Signed)
         abs_velocity = abs(velocity)
         entropy = micro_metrics.get('entropy', 0)
+        trade_type = position.get('type') # 0=Buy, 1=Sell
         
         reason = ""
         should_close = False
         
-        # --- 1. PROFIT EROSION PROTECTION (Secure the Bag) ---
-        # User Report: "Profit 170 -> 10". We must lock it in.
+        # --- 0. RAPID REVERSAL KILL (Panic Button) ---
+        # User Feedback: "Candle went back up fast".
+        # If we have significant profit ($100+) and Velocity flips aggressively against us.
+        if profit > 100.0:
+            if trade_type == 0 and velocity < -0.2: # Long, but price crashing down
+                 should_close = True
+                 reason = f"Lethal TP: MOMENTUM FLIPPED (Vel {velocity:.2f}) | Securing ${profit:.2f}"
+            elif trade_type == 1 and velocity > 0.2: # Short, but price rocketing up
+                 should_close = True
+                 reason = f"Lethal TP: MOMENTUM FLIPPED (Vel {velocity:.2f}) | Securing ${profit:.2f}"
+                 
+            if should_close:
+                 logger.info(f"🚨 {reason}")
+                 return {
+                    "action": "CLOSE_FULL",
+                    "ticket": ticket,
+                    "reason": reason
+                 }
+        
+        # --- 1. PROFIT EROSION PROTECTION (The Ratchet) ---
         
         drop_percent = 0.0
         if current_peak > 0:
             drop_percent = (current_peak - profit) / current_peak
-            
-        # Tier 1: Peak > $50 -> Allow 50% Drop (Secure $25)
-        if current_peak > 50.0 and drop_percent > 0.50:
+        
+        # Tier 0: Peak > $30 -> Allow 50% Drop (Secure $15)
+        if current_peak > 30.0 and drop_percent > 0.50:
             should_close = True
             reason = f"Lethal TP: Profit Erosion 50% (Peak ${current_peak:.2f} -> ${profit:.2f})"
+            
+        # Tier 1: Peak > $50 -> Allow 40% Drop (Secure $30)
+        elif current_peak > 50.0 and drop_percent > 0.40:
+            should_close = True
+            reason = f"Lethal TP: Profit Erosion 40% (Peak ${current_peak:.2f} -> ${profit:.2f})"
             
         # Tier 2: Peak > $100 -> Allow 30% Drop (Secure $70)
         elif current_peak > 100.0 and drop_percent > 0.30:
             should_close = True
             reason = f"Lethal TP: Profit Erosion 30% (Peak ${current_peak:.2f} -> ${profit:.2f})"
             
-        # Tier 3: Peak > $150 -> Allow 20% Drop (Secure $120)
-        elif current_peak > 150.0 and drop_percent > 0.20:
+        # Tier 3: Peak > $200 -> Allow 10% Drop (TITANIUM LOCK - Secure $180)
+        # User: "Had 300, lost 100". With this, exit at 270.
+        elif current_peak > 200.0 and drop_percent > 0.10:
              should_close = True
-             reason = f"Lethal TP: Profit Erosion 20% (Peak ${current_peak:.2f} -> ${profit:.2f})"
+             reason = f"Lethal TP: Titanium Lock 10% (Peak ${current_peak:.2f} -> ${profit:.2f})"
+             
+        # Tier 4: Peak > $300 -> Allow 5% Drop (Secure $285)
+        elif current_peak > 300.0 and drop_percent > 0.05:
+             should_close = True
+             reason = f"Lethal TP: Diamond Lock 5% (Peak ${current_peak:.2f} -> ${profit:.2f})"
 
         if should_close:
              logger.info(f"🛡️ {reason}")

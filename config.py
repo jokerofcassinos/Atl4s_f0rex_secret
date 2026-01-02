@@ -38,6 +38,7 @@ SCALP_TP = 0.70 # Take Profit ($0.70 USD Gain per 0.01)
 SCALP_LOTS = 0.13 # Fixed Lot Size
 SWING_LOTS = 0.26 # For Fifth Eye
 POSITION_LOTS = 0.52 # For Sixth Eye (Senior Council)
+MAX_LOTS_PER_TRADE = 0.50 # ABSOLUTE HARD CAP (Safety Limit)
 
 # --- Intermarket Symbols ---
 INTERMARKET_SYMBOLS = {

@@ -115,24 +115,26 @@ class RiskManager:
 
     def calculate_dynamic_lot(self, current_equity):
         """
-        Calculates lot size based on linear scaling from base config.
-        Base: $30 -> 0.02 lots.
-        Formula: (Equity / 30) * 0.02
+        Calculates lot size based on linear scaling.
+        OLD: (Equity / 30) * 0.02 -> Too Aggressive ($5k = 3.3 lots).
+        NEW: (Equity / 500) * 0.05 -> Safer ($5k = 0.50 lots).
         """
-        base_equity = 30.0
-        base_lots = 0.02
+        # Conservative Scaling
+        base_runs = current_equity / 500.0 # How many '500 blocks' do we have?
+        base_lots = 0.05 # Per $500
         
-        if current_equity < base_equity:
-            return 0.01 # Minimum possible
-            
-        ratio = current_equity / base_equity
-        raw_lots = ratio * base_lots
+        raw_lots = base_runs * base_lots
+        
+        # Minimum Floor
+        if raw_lots < 0.01: raw_lots = 0.01
         
         # Round to 2 decimals
         final_lots = round(raw_lots, 2)
         
-        # Safety Cap (optional, e.g. max 10 lots)
-        if final_lots > 10.0: final_lots = 10.0
+        # Hard Safety Cap (User "Scared" of 3.3)
+        # We cap Base Lots at 0.40. 
+        # With Singularity (3x), this becomes 1.2 lots (Max Aggression).
+        if final_lots > 0.40: final_lots = 0.40
         
         return final_lots
 
