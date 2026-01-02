@@ -39,10 +39,14 @@ CACHE_DIR = os.path.join(DATA_DIR, "cache")
 # --- NETWORK ---
 ZMQ_PORT = 5555
 
-# --- SWARM SETTINGS ---
-SWARM_MAX_TRADES = 50 # Increased Max Trades
-SWARM_COOLDOWN = 10 # Seconds (Faster)
-SWARM_THRESHOLD = 0.30 # Execution Confidence Floor (Lowered for Activity)
+# --- SWARM & SCALPING ---
+SWARM_MAX_TRADES = 50       # Restored: Max active swarm trades
+SWARM_THRESHOLD = 0.15      # Reduced from 0.30 (Tachyon Mode: Hyper-Sensitive)
+SWARM_COOLDOWN = 3          # Reduced from 10s (Machine Gun Mode)
+
+# --- 13th EYE (QUANTUM GRID) ---
+GRID_LAYERS = 3             # 3 Layers for "Spray"
+GRID_SPACING = 30           # 30 pts spacing (Tight Grid)
 
 # --- LEGACY / ADVANCED ANALYSIS ---
 INVERT_TECHNICALS = False # For Contrarian Testing
@@ -52,4 +56,3 @@ INTERMARKET_SYMBOLS = {
     'SPX': '^GSPC',
     'OIL': 'CL=F'
 }
-

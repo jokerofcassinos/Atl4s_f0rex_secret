@@ -138,6 +138,18 @@ class ScalpSwarm:
         # Clip
         S = np.clip(S, -1.0, 1.0)
         
+        # --- 13th EYE OVERRIDE (Project Tachyon) ---
+        # If Alpha Brain screams (100.0), we force the Vector to match.
+        # This prevents "Calculated Indecision" from stopping the Sniper Shot.
+        if alpha_score >= 99.0:
+            S = 1.0
+            S_override = True
+        elif alpha_score <= -99.0:
+            S = -1.0
+            S_override = True
+        else:
+            S_override = False
+        
         # 6. Decision Logic
         action = None
         
@@ -164,15 +176,14 @@ class ScalpSwarm:
         needed_threshold = max(0.15, needed_threshold) # Hard floor lowered from 0.25 for Tachyon
         
         if S > needed_threshold: 
+            # Check for 13th Eye Override (Alpha Score extreme)
+            is_override = abs(alpha_score) >= 99.0
+
             # MOMENTUM SAFETY: Don't BUY if we are actively crashing
-            if v > -0.1: 
-                # FOMO GUARD (Avg Reversion)
+            # UNLESS it is an Override (Knife Catch)
+            if v > -0.1 or is_override: 
                 # FOMO GUARD (Avg Reversion)
                 is_safe_entry = True
-                
-                # Check for 13th Eye Override (Alpha Score extreme)
-                # If Score is 100/-100, we BYPASS filters (Sniper Shot)
-                is_override = abs(alpha_score) >= 99.0
                 
                 if is_override:
                      # Skip Wick/Density checks
@@ -209,13 +220,14 @@ class ScalpSwarm:
                  logger.debug(f"Swarm BUY Vetoed: Negative Velocity ({v:.2f})")
 
         elif S < -needed_threshold: 
-            if v < 0.1: 
+            # Check for 13th Eye Override (Alpha Score extreme)
+            is_override = abs(alpha_score) >= 99.0
+            
+            # MOMENTUM SAFETY: Don't SELL if we are actively rocketing
+            # UNLESS it is an Override (Selling the Top)
+            if v < 0.1 or is_override: 
                 # FOMO GUARD (Avg Reversion)
                 is_safe_entry = True
-                
-                # Check for 13th Eye Override (Alpha Score extreme)
-                # If Score is 100/-100, we BYPASS filters (Sniper Shot)
-                is_override = abs(alpha_score) >= 99.0
                 
                 if is_override:
                      # Skip Wick/Density checks
