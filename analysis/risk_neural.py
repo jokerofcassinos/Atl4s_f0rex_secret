@@ -22,6 +22,54 @@ class NeuralRiskManager:
         if new_balance > self.peak_capital:
             self.peak_capital = new_balance
 
+    def check_margin_survival(self, acc_stats):
+        """
+        Checks if the account has sufficient margin to survive new trades.
+        Returns True if safe to trade, False otherwise.
+        """
+        if not acc_stats:
+            logger.warning("Margin Check: No account stats available. Assuming unsafe.")
+            return False
+            
+        margin_level = acc_stats.get('margin_level', 0)
+        margin_free = acc_stats.get('margin_free', 0)
+        
+        # Safety Thresholds
+        CRITICAL_MARGIN_LEVEL = 150.0 # Percentage
+        
+        if margin_level > 0 and margin_level < CRITICAL_MARGIN_LEVEL:
+            logger.warning(f"Margin Safety: CRITICAL LEVEL ({margin_level:.2f}%). Halting Trading.")
+            return False
+            
+        if margin_free < 0:
+            logger.critical(f"Margin Safety: NEGATIVE FREE MARGIN (${margin_free:.2f}). Emergency Halt.")
+            return False
+            
+        return True
+
+    def calculate_dynamic_lot(self, current_equity):
+        """
+        Calculates the base lot size based on linear equity scaling.
+        Logic: $30 Equity -> 0.02 Lots.
+        """
+        # Base Ratio: 0.02 lots per $30
+        # Ratio = 0.02 / 30 = 0.000666...
+        base_ratio = 0.02 / 30.0
+        
+        raw_lots = current_equity * base_ratio
+        
+        # Round to 2 decimal places (standard lot step)
+        lots = round(raw_lots, 2)
+        
+        # Hard limits
+        lots = max(0.01, lots) # Minimum 0.01
+        # lots = min(lots, 5.0) # Optional Max Cap for safety
+        
+        # Log occasionally? Too verbose for every tick maybe, but useful for debugging
+        # logger.debug(f"Dynamic Lot Calc: Equity ${current_equity:.2f} -> {lots} Lots")
+        
+        return lots
+
     def calculate_dynamic_kelly(self, win_rate, profit_factor):
         """
         Calculates Kelly Percentage.

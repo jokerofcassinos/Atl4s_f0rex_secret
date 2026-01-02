@@ -400,8 +400,18 @@ def main():
                      if exit_signal and exit_signal['action'] == "CLOSE_FULL":
                          ticket = exit_signal['ticket']
                          reason = exit_signal['reason']
-                         logger.info(f"âš¡ INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
+                         logger.info(f"⚡ INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
+                         
+                         # PRIMARY: Send Bridge Command (Legacy)
                          bridge.send_command("CLOSE_TRADE", [str(ticket)])
+                         
+                         # SECONDARY/FALLBACK: Direct Python API Close (Faster & More Reliable)
+                         # This allows closing even if Bridge is stuck or MQL5 fails to execute.
+                         if mt5_monitor.close_position(ticket):
+                             logger.info(f"Direct Python Close confirmed for Ticket {ticket}.")
+                         else:
+                             logger.warning(f"Direct Python Close failed for Ticket {ticket}. Bridge command sent as backup.")
+                             
                          notif_manager.send_notification("INSTANT PROFIT", f"{reason}", "PROFIT")
             
             # --- SCALP SWARM (High Frequency Tick Execution) ---
@@ -516,9 +526,13 @@ def main():
                 
                 if whale_action:
                     # Execute Whale Trade
-                    mt5_type = 0 if whale_action == "BUY" else 1
+                    # --- SIGNAL INVERSION: User Requested Counter-Trend Logic ---
+                    # If Whale says BUY -> We SELL
+                    # If Whale says SELL -> We BUY
+                    inverted_action = "SELL" if whale_action == "BUY" else "BUY"
+                    mt5_type = 0 if inverted_action == "BUY" else 1
                     
-                    if whale_action == "BUY":
+                    if inverted_action == "BUY":
                         base_price = live_tick['ask']
                         sl_price = live_tick['bid'] - config.SCALP_SL
                         tp_price = base_price + config.SCALP_TP
@@ -528,7 +542,7 @@ def main():
                         tp_price = base_price - config.SCALP_TP
                         
                     # Validate Stops
-                    sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, whale_action)
+                    sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, inverted_action)
                         
                     params = [
                         config.SYMBOL, 
@@ -538,11 +552,11 @@ def main():
                         normalize_price(tp_price)
                     ]
                     
-                    logger.info(f"WHALE SIGNAL: {whale_reason} | {whale_action} | Lots: {whale_lots} | Executing...")
+                    logger.info(f"WHALE SIGNAL (INVERTED): {whale_reason} | Orig: {whale_action} -> Exec: {inverted_action} | Lots: {whale_lots}")
                     resp = bridge.send_command("OPEN_TRADE", params)
                     if resp == "SENT":
-                        logger.info(f">>> WHALE SURFACED: {whale_reason} | {whale_action} @ {normalize_price(base_price)}")
-                        notif_manager.send_notification("WHALE EXECUTION", f"{whale_reason} | {whale_lots} Lots", "TRADE")
+                        logger.info(f">>> WHALE (INV) SURFACED: {whale_reason} | {inverted_action} @ {normalize_price(base_price)}")
+                        notif_manager.send_notification("WHALE EXECUTION (INV)", f"{whale_reason} | {inverted_action} | {whale_lots} Lots", "TRADE")
             
             # 3. Account Awareness (MT5 Check)
             # Run every minute or on new candle to avoid spamming API

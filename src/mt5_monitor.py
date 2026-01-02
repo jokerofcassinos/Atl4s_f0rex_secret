@@ -149,3 +149,54 @@ class MT5Monitor:
             'net': net_profit,
             'accuracy_label': f"{win_rate:.1f}%"
         }
+
+    def close_position(self, ticket):
+        """
+        Closes a specific position by ticket using Python API.
+        """
+        if not self.connected: self._initialize()
+        
+        # 1. Get Position Info
+        positions = mt5.positions_get(ticket=ticket)
+        if not positions:
+            logger.warning(f"Close Position: Ticket {ticket} not found.")
+            return False
+            
+        pos = positions[0]
+        symbol = pos.symbol
+        volume = pos.volume
+        pos_type = pos.type # 0=Buy, 1=Sell
+        
+        # 2. Get Market Price
+        tick = mt5.symbol_info_tick(symbol)
+        if not tick:
+            logger.warning(f"Close Position: No tick for {symbol}")
+            return False
+            
+        price = tick.bid if pos_type == 0 else tick.ask # Buy -> Sell (Bid), Sell -> Buy (Ask)
+        order_type = mt5.ORDER_TYPE_SELL if pos_type == 0 else mt5.ORDER_TYPE_BUY
+        
+        # 3. Create Request
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "position": ticket,
+            "symbol": symbol,
+            "volume": volume,
+            "type": order_type,
+            "price": price,
+            "deviation": 20,
+            "magic": pos.magic,
+            "comment": "Atl4s-Python-HardExit",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
+        }
+        
+        # 4. Send Order
+        result = mt5.order_send(request)
+        
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            logger.error(f"Close Failed for {ticket}: {result.comment} (Ret: {result.retcode})")
+            return False
+            
+        logger.info(f"Direct Close Success: Ticket {ticket} Closed at {price}")
+        return True
