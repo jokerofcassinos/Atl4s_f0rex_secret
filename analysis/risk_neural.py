@@ -47,6 +47,31 @@ class NeuralRiskManager:
             
         return True
 
+    def calculate_safe_margin_lots(self, equity, margin_free, current_price, leverage=500):
+        """
+        Calculates the absolute maximum NEW lots allowed based on FREE MARGIN.
+        """
+        if current_price <= 0: return 0.01
+        
+        # Contract Size for XAUUSD is 100
+        contract_size = 100 
+        
+        # Margin Required for 1.0 Lot = (Price * Contract) / Leverage
+        margin_per_lot = (current_price * contract_size) / leverage
+        
+        if margin_per_lot <= 0: return 0.01
+        
+        # Max New Lots = Free Margin / MarginPerLot
+        # Use margin_free if available (and positive), else fallback to equity (risky)
+        available_funds = margin_free if margin_free > 0 else 0
+        
+        max_theoretical_lots = available_funds / margin_per_lot
+        
+        # Safety Buffer: Use only 90% of available free margin
+        safe_lots = max_theoretical_lots * 0.90
+        
+        return round(safe_lots, 2)
+
     def calculate_dynamic_lot(self, current_equity):
         """
         Calculates the base lot size based on linear equity scaling.

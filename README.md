@@ -35,21 +35,17 @@ Atl4s doesn't rely on simple indicators. It uses a **Swarm of 10+ Specialized Mo
 *   **Laminar Flow Boost**: Automatically lowers thresholds when the market is smooth (Trending), capturing more rapid-fire trades.
 *   **Turbulence Shield**: Raises shields when Entropy is high.
 
-### 2. 🏛️ The Strategic Architect (Tenth Eye)
-*   **Directives**: Issues global commands like `AGGRESSIVE_TREND`, `SNIPER_AMBUSH`, or `SURVIVAL`.
-*   **Dynamic Weighting**: Re-weights every other Eye in real-time based on the current Directive.
+### 2. 🧠 Adaptive Intelligence (Zero-Point Learning)
+*   **Neuroplasticity**: The bot dynamically adjusts the "trust weight" of each strategy based on real-time performance.
+*   **Strategic Inversion**: Automatically detects and inverts signals from modules that are misaligned with the current regime, turning loss-leaders into profit-generators.
 
-### 3. 🐋 All-New Quantum Whale (Fourth Eye)
-*   **Multi-Dimensional Scoring**: A fused decision engine combining Consensus (Retail), Smart Money Concepts (SMC), and Volatility.
-*   **Capital-Scaled Aggression**: Automatically scales lot sizes for "Whale" trades, utilizing `dynamic_base_lots` to maximize yield on high-probability setups.
-*   **Contrarian Logic**: Capable of fading retail sentiment (Inversion) to trade with the liquidity providers.
+### 3. 🔫 Lethal Smart-Exit (Virtual TP)
+*   **Exhaustion Kill**: Does not blindly wait for TP. If profit is secured but momentum dies (Velocity = 0), the bot kills the trade instantly to banking the profit.
+*   **Chaos Dump**: If market entropy spikes while in profit, the bot exits immediately to avoid reversal.
 
-### 4. 💰 Dynamic Capital Management
-*   **Linear Scaling**: Lot size scales with equity (`$30 = 0.02 Lots` base).
-*   **Whale Multipliers**: High-conviction setups can trigger x2 or x3 multipliers (Sovereign Assertiveness).
-
-### 4. 🛡️ Margin Survival Check
-*   **Safety Floor**: Halts trading if Margin Level < 150% or Free Margin < $10.
+### 4. 💰 Dynamic Margin Ledger
+*   **Real-Time Sub-Tick Tracking**: Calculates virtual margin usage for every potential trade in the queue before execution, preventing "Over-Leverage" errors.
+*   **Safety Floor**: Halts trading immediately if Margin Level drops below critical thresholds.
 
 ---
 

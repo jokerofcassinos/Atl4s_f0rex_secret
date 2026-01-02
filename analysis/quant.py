@@ -27,10 +27,20 @@ class Quant:
         df['std'] = df['close'].rolling(window=period).std()
         
         # Z = (Price - Mean) / Std
+        # Z = (Price - Mean) / Std
         # Ensure scalars
-        current_close = float(df['close'].iloc[-1])
-        current_mean = float(df['mean'].iloc[-1])
-        current_std = float(df['std'].iloc[-1])
+        close_s = df['close']
+        if isinstance(close_s, pd.DataFrame): close_s = close_s.iloc[:, 0]
+        
+        mean_s = df['mean']
+        if isinstance(mean_s, pd.DataFrame): mean_s = mean_s.iloc[:, 0]
+        
+        std_s = df['std']
+        if isinstance(std_s, pd.DataFrame): std_s = std_s.iloc[:, 0]
+        
+        current_close = float(close_s.iloc[-1])
+        current_mean = float(mean_s.iloc[-1])
+        current_std = float(std_s.iloc[-1])
         
         if current_std == 0:
             return 0, 0

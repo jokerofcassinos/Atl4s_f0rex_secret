@@ -156,10 +156,24 @@ class FractalVision:
         # H4 Structure is King
         if "BULLISH" in h4_struct: score += 40
         elif "BEARISH" in h4_struct: score -= 40
+        else:
+             # Fallback: EMA Trend
+             if len(df_h4) > 50:
+                 ema20 = df_h4['close'].ewm(span=20).mean().iloc[-1]
+                 ema50 = df_h4['close'].ewm(span=50).mean().iloc[-1]
+                 if ema20 > ema50: score += 20
+                 elif ema20 < ema50: score -= 20
         
         # H1 Structure Confirmation
         if "BULLISH" in h1_struct: score += 20
         elif "BEARISH" in h1_struct: score -= 20
+        else:
+             # Fallback: EMA Trend
+             if len(df_h1) > 50:
+                 ema20 = df_h1['close'].ewm(span=20).mean().iloc[-1]
+                 ema50 = df_h1['close'].ewm(span=50).mean().iloc[-1]
+                 if ema20 > ema50: score += 10
+                 elif ema20 < ema50: score -= 10
         
         # HA Trend Confirmation
         if "BULLISH" in results['ha_trend']: score += 10

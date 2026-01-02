@@ -57,7 +57,9 @@ class VolatilityGuard:
             
         # Bandwidth Expansion
         # If bandwidth is increasing, volatility is expanding.
-        prev_bandwidth = float(df['bb_width'].iloc[-2])
+        # Bandwidth Expansion
+        # If bandwidth is increasing, volatility is expanding.
+        prev_bandwidth = float(df['bb_width'].iloc[-2]) if not isinstance(df['bb_width'], pd.DataFrame) else float(df['bb_width'].iloc[:, 0].iloc[-2])
         
         if bandwidth > prev_bandwidth:
             status = "EXPANDING"

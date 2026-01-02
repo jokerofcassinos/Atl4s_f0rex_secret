@@ -15,6 +15,30 @@ class DeepCognition:
         self.oracle = PredictionEngine()
         self.overlord = SeventhEye() # Synthesis Sensor
         
+        # Adaptive Cognitive Weights (ACW) - NeuroPlasticity
+        self.weights = {
+            'trend': 0.35,
+            'volatility': 0.10,
+            'pattern': 0.15,
+            'smc': 0.20,
+            'micro': 0.10,
+            'physics': 0.10
+        }
+        self.learning_rate = 0.01
+
+    def update_neuroplasticity(self, success, signal_matrix):
+        """
+        Adjusts synaptic weights based on who was 'right'.
+        success: True (Profit) / False (Loss)
+        signal_matrix: dict of {'trend': 1, 'smc': -1, ...} directions at time of trade.
+        """
+        # If trade was a WIN, boost those who agreed with the final decision.
+        # If trade was a LOSS, punish those who agreed.
+        # This requires storing the signal matrix at execution time suitable for feedback loop.
+        # For now, we implement a simpler Hebbian drift: 
+        # "Neurons that fire together, wire together."
+        pass # Placeholder for v2.1 Feedback Learning loop
+
     def consult_subconscious(self, trend_score, volatility_score, pattern_score, smc_score, df_m5=None, live_tick=None, details=None):
         """
         Weighted consensus of different 'brain' parts, augmented by:
@@ -31,15 +55,8 @@ class DeepCognition:
             
         micro_metrics = self.micro.analyze()
         
-        # 1. Base Instincts
-        # User Feedback: Trend was correct while Physics was too cautious.
-        # Adjustment: Boost Trend Weight to trust Technicals more.
-        w_trend = 0.35 
-        w_vol = 0.1
-        w_pat = 0.15
-        w_smc = 0.20
-        w_micro = 0.10 
-        w_phy = 0.10 # Reduced Physics weight to avoid over-caution
+        # 1. Base Instincts (Using Adaptive Weights)
+        w = self.weights
         
         # Micro Inputs
         micro_score = 0
@@ -55,12 +72,12 @@ class DeepCognition:
         if df_m5 is not None and not df_m5.empty and len(df_m5) > 10:
              _, _, phy_score, phase_angle, orbit_energy = self.kinematics.analyze(df_m5)
              
-        instinct_signal = (trend_score * w_trend) + \
-                          (volatility_score * w_vol) + \
-                          (pattern_score * w_pat) + \
-                          (smc_score * w_smc) + \
-                          (micro_score * w_micro) + \
-                          (phy_score * w_phy)
+        instinct_signal = (trend_score * w['trend']) + \
+                          (volatility_score * w['volatility']) + \
+                          (pattern_score * w['pattern']) + \
+                          (smc_score * w['smc']) + \
+                          (micro_score * w['micro']) + \
+                          (phy_score * w['physics'])
                           
         # Instinct is roughly -100 to 100. Normalize to -1 to 1.
         # Adjusted sensitivity: Divisor 20.0 makes 20 score -> 0.76 (Strong)

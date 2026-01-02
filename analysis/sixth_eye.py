@@ -58,7 +58,11 @@ class SixthEye:
             if isinstance(close_mn, pd.DataFrame): close_mn = close_mn.iloc[:, 0]
             
             ma12 = close_mn.rolling(12).mean()
-            if close_mn.iloc[-1] > ma12.iloc[-1]:
+            # Force Scalar
+            curr_mn_val = float(close_mn.iloc[-1])
+            ma12_val = float(ma12.iloc[-1])
+            
+            if curr_mn_val > ma12_val:
                 score += 25 # Secular Bullish
                 details['MN_SECULAR'] = "BULLISH"
             else:
@@ -71,8 +75,11 @@ class SixthEye:
             if isinstance(close_w1, pd.DataFrame): close_w1 = close_w1.iloc[:, 0]
             
             ma52 = close_w1.rolling(52).mean()
-            current_w = close_w1.iloc[-1]
-            if current_w > ma52.iloc[-1]:
+            # Force Scalar
+            current_w = float(close_w1.iloc[-1])
+            ma52_val = float(ma52.iloc[-1])
+            
+            if current_w > ma52_val:
                 score += 15
                 details['W1_SECULAR'] = "BULLISH"
             else:
@@ -100,8 +107,21 @@ class SixthEye:
         coint_res = MacroMath.calculate_cointegration(y, x)
         
         # 2. Real Rate Direction Bias
-        tip_slope = (tip['close'].iloc[-1] - tip['close'].iloc[-10]) / 10
-        yield_slope = (yields['close'].iloc[-1] - yields['close'].iloc[-10]) / 10
+        # 2. Real Rate Direction Bias
+        # Force scalar access
+        tip_close = tip['close']
+        if isinstance(tip_close, pd.DataFrame): tip_close = tip_close.iloc[:, 0]
+        
+        yield_close = yields['close']
+        if isinstance(yield_close, pd.DataFrame): yield_close = yield_close.iloc[:, 0]
+        
+        tip_last = float(tip_close.iloc[-1])
+        tip_prev = float(tip_close.iloc[-10])
+        yield_last = float(yield_close.iloc[-1])
+        yield_prev = float(yield_close.iloc[-10])
+        
+        tip_slope = (tip_last - tip_prev) / 10.0
+        yield_slope = (yield_last - yield_prev) / 10.0
         
         real_rate_bias = 0
         if tip_slope > 0 and yield_slope < 0: real_rate_bias = 30
@@ -122,14 +142,14 @@ class SixthEye:
         """Proxies Commitment of Traders (COT) via volume persistence."""
         if df_w1 is None or len(df_w1) < 13: return 0
         
-        # Institutional 'Managed Money' accumulation usually shows as:
-        # 1. Price rising on rising volume over multiple weeks.
-        # 2. Narrowing spreads on pullbacks (absorption).
+        # Force scalars
+        recent_vol = float(df_w1['volume'].iloc[-4:].mean())
+        prev_vol = float(df_w1['volume'].iloc[-13:-4].mean())
         
-        recent_vol = df_w1['volume'].iloc[-4:].mean()
-        prev_vol = df_w1['volume'].iloc[-13:-4].mean()
+        last_close = float(df_w1['close'].iloc[-1])
+        prev_close = float(df_w1['close'].iloc[-4])
         
-        price_change = (df_w1['close'].iloc[-1] - df_w1['close'].iloc[-4]) / df_w1['close'].iloc[-4]
+        price_change = (last_close - prev_close) / prev_close
         
         bias = 0
         if price_change > 0 and recent_vol > prev_vol:

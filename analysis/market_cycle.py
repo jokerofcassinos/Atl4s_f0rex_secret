@@ -85,5 +85,16 @@ class MarketCycle:
             # Bearish Manipulation
             logger.info(f"Cycle: Bearish Manipulation Detected (Resistance {recent_resistance:.2f} grabbed)")
             return "MANIPULATION_SELL", 90
+            
+        # 3. Detect Expansion (Trending)
+        # If not ranging and not manipulating, maybe we are trending?
+        # Simple check: Price > SMA20 > SMA50
+        sma20 = df['close'].rolling(20).mean().iloc[-1]
+        sma50 = df['close'].rolling(50).mean().iloc[-1]
+        
+        if current_close > sma20 > sma50:
+             return "EXPANSION_BUY", 30
+        elif current_close < sma20 < sma50:
+             return "EXPANSION_SELL", 30
 
         return "NEUTRAL", 0

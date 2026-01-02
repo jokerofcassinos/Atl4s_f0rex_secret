@@ -132,4 +132,25 @@ class DivergenceHunter:
                     else:
                         logger.info(f"Bearish Divergence Detected (Confluence: {div_count})")
                 
+                
+        # --- Micro-Divergence (Slope Analysis) ---
+        # If no major swing divergence, check local slope discordance (Last 5 candles)
+        if score == 0:
+            subset = df.iloc[-5:]
+            price_vals = subset['close'].values
+            rsi_vals = subset['RSI_14'].values
+            x = np.arange(len(price_vals))
+            
+            # Simple Linear Regression Slope
+            slope_price = np.polyfit(x, price_vals, 1)[0]
+            slope_rsi = np.polyfit(x, rsi_vals, 1)[0]
+            
+            # Normalize slopes (direction only matters)
+            if slope_price > 0 and slope_rsi < 0:
+                # Price rising, Momentum falling -> Weakness
+                return 25, -1, "Micro-Bearish (Slope)"
+            elif slope_price < 0 and slope_rsi > 0:
+                # Price falling, Momentum rising -> Strength
+                return 25, 1, "Micro-Bullish (Slope)"
+
         return score, direction, div_type

@@ -1,0 +1,46 @@
+# RELATÓRIO DE ATUALIZAÇÃO: ATL4S-FOREX v2.1
+**Data:** 02 de Janeiro de 2026
+**Status:** Sistema Operacional e Otimizado
+
+Este relatório detalha as melhorias recentes implementadas no sistema de trading Atl4s. O foco desta atualização foi aumentar a inteligência de decisão, a segurança do capital e a precisão nas saídas das operações.
+
+---
+
+## 1. INTELIGÊNCIA ARTIFICIAL ADAPTATIVA (O "Cérebro")
+
+### ✅ Aprendizado Dinâmico
+O sistema agora possui capacidade de **adaptação em tempo real**. Antes, ele confiava em todas as suas estratégias igualmente. Agora, ele "aprende" qual estratégia está funcionando melhor no momento (ex: seguir tendência ou operar reversão) e dá mais peso para ela automaticamente. É como um trader humano que percebe que o mercado mudou e ajusta sua mão.
+
+### ✅ Detector de Oportunidades Ocultas (Gap Exploiter)
+Implementamos uma nova tecnologia capaz de identificar oportunidades que indicadores comuns não veem.
+- **O que faz:** Percebe quando a estratégia principal vê um futuro movimento, mas o mercado ainda não reagiu.
+- **Timing Perfeito:** O sistema ajusta a velocidade de reação. Se o mercado está caótico, ele espera a poeira baixar. Se está em tendência forte, ele age instantaneamente.
+
+### ✅ Correção Automática de Estratégia
+Identificamos que, em certas condições, dois módulos específicos estavam entrando na direção errada. Implementamos uma **"Inversão Inteligente"**: agora, quando esses módulos sinalizam uma entrada, o sistema automaticamente inverte a ordem (ex: de Venda para Compra), transformando potenciais perdas em lucros.
+
+---
+
+## 2. SEGURANÇA FINANCEIRA (A "Proteção")
+
+### ✅ Verificação de Saldo em Tempo Real
+Para evitar erros de "Saldo Insuficiente", o robô agora calcula o impacto de cada operação milissegundos antes de enviá-la. Isso garante que ele nunca tente abrir uma posição maior do que a conta suporta, protegendo a margem livre.
+
+### ✅ Validação de Ordens
+O sistema agora verifica automaticamente as regras da corretora (distância mínima de Stops) antes de enviar qualquer ordem, garantindo que nenhuma operação seja rejeitada por erro técnico.
+
+---
+
+## 3. GESTÃO DE LUCRO INTELIGENTE (A "Saída")
+
+### ✅ Saída por Exaustão (Lethal TP)
+Esta é uma das melhorias mais importantes. O robô não espera mais cegamente que o preço atinja o alvo final.
+- **Proteção de Lucro:** Se o robô percebe que o preço andou a favor, mas começou a perder força ou "engasgar", ele **encerra a operação e coloca o dinheiro no bolso**.
+- **Benefício:** Evita aquelas situações frustrantes onde você está ganhando, mas o mercado vira e a operação termina no prejuízo.
+
+---
+
+## RESUMO TÉCNICO
+O sistema evoluiu de um executor de sinais para um gestor inteligente de operações. Ele sabe quando entrar, mas principalmente, sabe **como proteger o capital** e **quando sair** para garantir o lucro.
+
+**Recomendação:** Reinicie o sistema (`main.py`) para carregar todas as novas funções.

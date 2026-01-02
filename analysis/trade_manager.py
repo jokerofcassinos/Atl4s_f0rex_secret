@@ -146,3 +146,54 @@ class TradeManager:
         #      }
              
         return None
+
+    def check_exhaustion_exit(self, position, micro_metrics):
+        """
+        Lethal TP logic (User Request):
+        Detects "Struggle/Oscillation" while in profit to secure gains before reversal.
+        
+        Args:
+            position (dict): MT5 Position Data
+            micro_metrics (dict): Velocity, Entropy, etc. from ScaplerSwarm/MicroStructure
+            
+        Returns:
+            action (dict) or None
+        """
+        profit = position['profit']
+        if profit <= 5.0: return None # Ignore small/negative profits
+        
+        # Metrics
+        velocity = abs(micro_metrics.get('velocity', 0))
+        entropy = micro_metrics.get('entropy', 0)
+        
+        reason = ""
+        should_close = False
+        
+        # 1. Stagnation Exit (Price stuck in mud)
+        # If we have decent profit ($15+) but velocity is dead, close it.
+        if profit > 15.0 and velocity < 0.15:
+            should_close = True
+            reason = f"Lethal TP: Stagnation Detected (Vel {velocity:.2f}) at ${profit:.2f}"
+            
+        # 2. Chaos Protection (Oscillation/Choppiness)
+        # User: "Oscilando muito... descendo novamente"
+        # If Entropy is High (Choppy) and we have good profit ($20+), don't gamble.
+        elif profit > 20.0 and entropy > 0.6:
+            should_close = True
+            reason = f"Lethal TP: Chaos/Oscillation (Ent {entropy:.2f}) at ${profit:.2f}"
+            
+        # 3. Momentum Decay (Reversal Risk)
+        # If profit is HUGE ($30+) but momentum drops, SECURE IT ($34 example).
+        elif profit > 30.0 and velocity < 0.3:
+             should_close = True
+             reason = f"Lethal TP: Momentum Fading (Vel {velocity:.2f}) at ${profit:.2f}"
+             
+        if should_close:
+             logger.info(f"🔫 {reason}")
+             return {
+                "action": "CLOSE_FULL",
+                "ticket": position['ticket'],
+                "reason": reason
+             }
+             
+        return None

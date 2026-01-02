@@ -126,15 +126,37 @@ class ScalpSwarm:
         needed_threshold = self.threshold
         
         if regime == "TURBULENT": 
-            needed_threshold += 0.15
+            needed_threshold += 0.05 # Lowered penalty to keep Swarm active
         elif regime == "LAMINAR":
             needed_threshold -= 0.15 # Aggressive Boost for Trend Following
         
         # Base sensitivity boost
         needed_threshold = max(0.35, needed_threshold) # Hard floor
         
-        if S > needed_threshold: action = "BUY"
-        elif S < -needed_threshold: action = "SELL"
+        if S > needed_threshold: 
+            # MOMENTUM SAFETY: Don't BUY if we are actively crashing
+            if v > -0.1: 
+                 action = "BUY"
+            else:
+                 logger.debug(f"Swarm BUY Vetoed: Negative Velocity ({v:.2f})")
+
+        elif S < -needed_threshold: 
+            # MOMENTUM SAFETY: Don't SELL if we are mooning
+            if v < 0.1: 
+                action = "SELL"
+            else:
+                 logger.debug(f"Swarm SELL Vetoed: Positive Velocity ({v:.2f})")
+        
+        # 7. Trend Alignment (Laminar Mode Only)
+        # In Laminar (Easy) mode, we should NOT fight the consensus trend.
+        if action and regime == "LAMINAR":
+            # tech_score > 0 means General Bullish
+            if action == "BUY" and tech_score < -10:
+                action = None
+                logger.debug(f"Swarm BUY Vetoed: Fighting Laminar Bear Trend (Tech:{tech_score})")
+            elif action == "SELL" and tech_score > 10:
+                action = None
+                logger.debug(f"Swarm SELL Vetoed: Fighting Laminar Bull Trend (Tech:{tech_score})")
         
         if action:
             self.trade_count += 1

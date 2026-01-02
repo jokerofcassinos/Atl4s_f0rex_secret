@@ -1,4 +1,5 @@
-﻿import time
+﻿
+import time
 import logging
 import pandas as pd
 from datetime import datetime
@@ -6,6 +7,7 @@ import pytz
 import config
 import json
 import zmq
+import threading
 import MetaTrader5 as mt5
 
 # Core Modules
@@ -27,6 +29,7 @@ from analysis.scalper_swarm import ScalpSwarm
 from analysis.second_eye import SecondEye
 from analysis.fourth_eye import FourthEye
 from analysis.tenth_eye import TenthEye
+from analysis.eleventh_eye import EleventhEye
 from analysis.trade_manager import TradeManager
 
 # Setup Logging
@@ -122,8 +125,8 @@ def main():
         Enforces minimum StopsLevel distance relative to the correct price anchor (Bid/Ask).
         Returns (valid_sl, valid_tp) adjusted if necessary.
         """
-        # Hard Minimum Fallback: 50 points (e.g. 0.50 on Gold) to prevent ECN "0 stops" rejection
-        effective_stops_level = max(symbol_stops_level, 50) 
+        # Hard Minimum Fallback: 100 points (e.g. 1.00 on Gold) for safety
+        effective_stops_level = max(symbol_stops_level, 100) 
         min_dist = effective_stops_level * symbol_point
         
         # Add a comfortable buffer (e.g. 50 points)
@@ -166,8 +169,6 @@ def main():
                 tp = max_tp
                  
         return sl, tp
-                 
-        return sl, tp
 
     # Load Historical Data
     logger.info("Loading Historical Data...")
@@ -186,6 +187,7 @@ def main():
     sniper = SecondEye()
     whale = FourthEye() # The Consensus Commander
     tenth_eye = TenthEye() # The Holographic Architect
+    eleventh_eye = EleventhEye() # The Gap Exploiter
     trade_manager = TradeManager() # For Active Management
 
     # Dashboard Publisher
@@ -223,6 +225,22 @@ def main():
     
     # Configure Notification Manager (Zero cooldown, we control timing here)
     notif_manager.cooldown = 0 
+    
+    def refresh_data_async(loader, data_container):
+        """Helper to load data in background without blocking execution"""
+        try:
+             new_data = loader.get_data()
+             if new_data:
+                 # CRITICAL FIX: Do NOT overwrite 'M5' with YFinance data.
+                 # YFinance is delayed (15m+). Our local 'M5' built from ticks is real-time.
+                 # Overwriting it would lobotomize the bot.
+                 for key, df in new_data.items():
+                     if key == 'M5': continue # Skip M5
+                     data_container[key] = df
+                     
+                 logger.info("High-Timeframe data refreshed (Background Thread). M5 preserved.")
+        except Exception as e:
+             logger.error(f"Async Refresh Error: {e}")
 
     try:
         while True:
@@ -259,7 +277,7 @@ def main():
                      if exit_signal and exit_signal['action'] == "CLOSE_FULL":
                          ticket = exit_signal['ticket']
                          reason = exit_signal['reason']
-                         logger.info(f"⚡ INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
+                         logger.info(f"[!] INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
                          
                          # PRIMARY: Direct Python API Close (Fastest: Bypass Socket/Bridge)
                          if mt5_monitor.close_position(ticket):
@@ -295,14 +313,17 @@ def main():
                 logger.info(f"--- 5-MINUTE CYCLE TRIGGER: {now_sp.strftime('%H:%M:%S')} ---")
                 
                 try:
-                    # Refresh all timeframes
-                    new_data = data_loader.get_data()
-                    if new_data:
-                        data_map.update(new_data)
-                        df_m5 = data_map.get('M5', df_m5)
-                        logger.info("High-Timeframe data map refreshed (H1, H4, D1, W1).")
+                    # Async Refresh (Non-Blocking) allows Whale to see the new candle immediately
+                    # instead of waiting 2-3s for YFinance.
+                    t = threading.Thread(target=refresh_data_async, args=(data_loader, data_map))
+                    t.daemon = True # Ensure it doesn't hang the script on exit
+                    t.start()
+                    
+                    # Note: We do NOT update df_m5 here anymore. M5 is local-only.
+                    
+                    
                 except Exception as e:
-                    logger.error(f"Failed to refresh data map: {e}")
+                    logger.error(f"Failed to trigger async refresh: {e}")
 
             if live_tick.get('last', 0) > 0:
                 # Update Data Logic
@@ -399,6 +420,20 @@ def main():
                     architect_res = tenth_eye.deliberate(details, market_state)
                     details['Architect'] = architect_res # Inject back into details
                     
+                    # 5. Eleventh Eye (The Gap Exploiter)
+                    # Scans for divergence between Architect (Strategy) and Consensus (Body)
+                    gap_res = eleventh_eye.scan_for_divergence(
+                        architect_data=architect_res, 
+                        consensus_score=base_score, 
+                        market_state=market_state
+                    )
+                    
+                    if gap_res['action'] != "WAIT":
+                        # OVERRIDE: Trust the Gap Exploiter in Chaos
+                        final_cortex_decision = gap_res['score']
+                        logger.info(f"[!] ELEVENTH EYE OVERRIDE: {gap_res['action']} (Score: {gap_res['score']:.1f})")
+                        details['EleventhEye'] = gap_res
+                    
                     # Update Weights based on Architect
                     # (Optional: Modify 'details' weights if ConsensusEngine supported dynamic weights per tick)
                     
@@ -412,8 +447,11 @@ def main():
             # Update Account Info for Dynamic Lots
             acc_stats = mt5_monitor.get_account_summary()
             current_equity = config.INITIAL_CAPITAL
+            current_margin_free = 0 # Safety initial
+            
             if acc_stats:
                 current_equity = acc_stats.get('equity', config.INITIAL_CAPITAL)
+                current_margin_free = acc_stats.get('margin_free', 0)
                 
             # Check Margin Survival BEFORE Thinking about trading
             if not risk_manager.check_margin_survival(acc_stats):
@@ -424,6 +462,18 @@ def main():
             # Calculate Dynamic Lots
             # Note: We use the base dynamic lot here, then applying multipliers
             dynamic_base_lots = risk_manager.calculate_dynamic_lot(current_equity)
+            
+            # --- MARGIN SAFETY GUARD ---
+            # Calculate absolute max lots allowed by margin (90% usage cap of FREE MARGIN)
+            current_price = live_tick['last']
+            # We track 'live' margin free as we execute trades to avoid "Double Spend" in same tick
+            simulated_margin_free = current_margin_free
+            
+            max_safe_lots = risk_manager.calculate_safe_margin_lots(current_equity, simulated_margin_free, current_price, config.LEVERAGE)
+            
+            if dynamic_base_lots > max_safe_lots:
+                # logger.warning(f"Margin Safety: Capping Base Lots {dynamic_base_lots} -> {max_safe_lots}")
+                dynamic_base_lots = max_safe_lots
             
             micro_velocity = micro_stats.get('velocity', 0)
             
@@ -447,6 +497,14 @@ def main():
             elif abs(overlord_res.get('score', 0)) > 80:
                 lot_multiplier = 1.5
                 logger.info(">>> OVERLORD CONFIDENCE: Multiplier 1.5x Active <<<")
+            
+            # Final Margin Safety Check on Multiplied Lots
+            if (dynamic_base_lots * lot_multiplier) > max_safe_lots:
+                 # Reduce multiplier if it breaks bank
+                 max_multiplier = max_safe_lots / dynamic_base_lots if dynamic_base_lots > 0 else 1
+                 if max_multiplier < 1: max_multiplier = 1
+                 lot_multiplier = max_multiplier
+                 logger.warning(f"Margin Safety: Capping Multiplier to {lot_multiplier:.2f}x to fit {max_safe_lots} lots.")
             
 
             
@@ -506,6 +564,12 @@ def main():
                         logger.info(f">>> SWARM SENT: {swarm_reason} | {cmd_type} (Int: {mt5_type}) @ {base_price:.2f}")
                         notif_manager.send_notification("SWARM EXECUTION", f"{swarm_reason} | {cmd_type}", "TRADE")
                         
+                        # MARGIN TRACKING UPDATE
+                        used_margin = (current_price * 100 * (dynamic_base_lots * lot_multiplier)) / config.LEVERAGE
+                        simulated_margin_free -= used_margin
+                        # Re-calc safe max lots for next agent
+                        max_safe_lots = risk_manager.calculate_safe_margin_lots(current_equity, simulated_margin_free, current_price, config.LEVERAGE)
+                        
             # --- SECOND EYE (The Sniper) ---
             if config.ENABLE_SECOND_EYE:
                 sniper_action, sniper_reason, sniper_lots = sniper.process_tick(
@@ -515,6 +579,14 @@ def main():
                     tech_score=original_base_score,
                     orbit_energy=orbit_energy
                 )
+                
+                # USER REQUEST: INVERT SNIPER SIGNAL
+                if sniper_action == "BUY": 
+                    sniper_action = "SELL"
+                    sniper_reason = f"[INVERTED] {sniper_reason}"
+                elif sniper_action == "SELL": 
+                    sniper_action = "BUY"
+                    sniper_reason = f"[INVERTED] {sniper_reason}"
                 
                 if sniper_action:
                     # Execute Sniper Trade
@@ -552,6 +624,12 @@ def main():
                         logger.info(f">>> SNIPER FIRED: {sniper_reason} | {sniper_action} @ {normalize_price(curr_price)}")
                         notif_manager.send_notification("SNIPER EXECUTION", f"{sniper_reason} | {sniper_lots} Lots", "TRADE")
 
+                        # MARGIN TRACKING UPDATE
+                        # MARGIN TRACKING UPDATE
+                        used_margin = (current_price * 100 * (dynamic_base_lots * lot_multiplier)) / config.LEVERAGE
+                        simulated_margin_free -= used_margin
+                        max_safe_lots = risk_manager.calculate_safe_margin_lots(current_equity, simulated_margin_free, current_price, config.LEVERAGE)
+
             # --- FOURTH EYE (The Whale) ---
             if config.ENABLE_FOURTH_EYE:
                 # Prepare Quantum Data
@@ -563,18 +641,16 @@ def main():
                      consensus_score=original_base_score, 
                      smc_score=smc_score,
                      reality_state=reality_state if 'reality_state' in locals() else "NEUTRAL",
-                     volatility_score=vol_score
+                     volatility_score=vol_score,
+                     base_lots=dynamic_base_lots # Pass Capital-Based Lots
                 )
                 
                 if whale_action:
                     # Execute Whale Trade
-                    # --- SIGNAL INVERSION: User Requested Counter-Trend Logic ---
-                    # If Whale says BUY -> We SELL
-                    # If Whale says SELL -> We BUY
-                    inverted_action = "SELL" if whale_action == "BUY" else "BUY"
-                    mt5_type = 0 if inverted_action == "BUY" else 1
+                    # Standard Logic: Follow the Sign
+                    mt5_type = 0 if whale_action == "BUY" else 1
                     
-                    if inverted_action == "BUY":
+                    if whale_action == "BUY":
                         base_price = live_tick['ask']
                         sl_price = live_tick['bid'] - config.SCALP_SL
                         tp_price = base_price + config.SCALP_TP
@@ -584,21 +660,92 @@ def main():
                         tp_price = base_price - config.SCALP_TP
                         
                     # Validate Stops
-                    sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, inverted_action)
+                    sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, whale_action)
+                    
+                    # --- FINAL WHALE MARGIN CLAMP ---
+                    if whale_lots > max_safe_lots:
+                         logger.warning(f"Margin Safety: Capping Whale Lots {whale_lots} -> {max_safe_lots}")
+                         whale_lots = max_safe_lots
                         
                     params = [
                         config.SYMBOL, 
                         str(mt5_type), 
-                        f"{dynamic_base_lots:.2f}", # Reverted: Use Capital-Based Dynamic Lots
+                        f"{whale_lots:.2f}", # Use Whale Calculated Lots (Dynamic Scaling)
                         normalize_price(sl_price),
                         normalize_price(tp_price)
                     ]
                     
-                    logger.info(f"WHALE SIGNAL (INVERTED): {whale_reason} | Orig: {whale_action} -> Exec: {inverted_action} | Lots: {whale_lots}")
+                    logger.info(f"WHALE SIGNAL: {whale_reason} | Action: {whale_action} | Lots: {whale_lots}")
                     resp = bridge.send_command("OPEN_TRADE", params)
                     if resp == "SENT":
-                        logger.info(f">>> WHALE (INV) SURFACED: {whale_reason} | {inverted_action} @ {normalize_price(base_price)}")
-                        notif_manager.send_notification("WHALE EXECUTION (INV)", f"{whale_reason} | {inverted_action} | {whale_lots} Lots", "TRADE")
+                        logger.info(f">>> WHALE SURFACED: {whale_reason} | {whale_action} @ {normalize_price(base_price)}")
+                        notif_manager.send_notification("WHALE EXECUTION", f"{whale_reason} | {whale_action} | {whale_lots} Lots", "TRADE")
+
+                        # MARGIN TRACKING UPDATE
+                        used_margin = (current_price * 100 * whale_lots) / config.LEVERAGE
+                        simulated_margin_free -= used_margin
+                        max_safe_lots = risk_manager.calculate_safe_margin_lots(current_equity, simulated_margin_free, current_price, config.LEVERAGE)
+
+            # --- GAP EXPLOITER (Eleventh Eye) ---
+            # Re-using the analysis from earlier (lines 427+) to execution
+            # gap_res was stored in details['EleventhEye']
+            
+            gap_res = details.get('EleventhEye', {'action': 'WAIT', 'score': 0, 'reason': ''})
+            
+            if gap_res['action'] != "WAIT":
+                 gap_action = gap_res['action']
+                 gap_reason = gap_res['reason']
+                 
+                 # USER REQUEST: INVERT GAP SIGNAL
+                 if gap_action == "BUY": 
+                     gap_action = "SELL"
+                     gap_reason = f"[INVERTED] {gap_reason}"
+                 elif gap_action == "SELL": 
+                     gap_action = "BUY"
+                     gap_reason = f"[INVERTED] {gap_reason}"
+                 
+                 # Gap Exploiter Logic
+                 # High conviction -> 1.5x Base Size
+                 gap_lots = dynamic_base_lots * 1.5 
+                 
+                 # --- FINAL GAP MARGIN CLAMP ---
+                 if gap_lots > max_safe_lots:
+                      logger.warning(f"Margin Safety: Capping Gap Lots {gap_lots} -> {max_safe_lots}")
+                      gap_lots = max_safe_lots
+                 
+                 mt5_type = 0 if gap_action == "BUY" else 1
+                 
+                 if gap_action == "BUY":
+                     base_price = live_tick['ask']
+                     sl_price = live_tick['bid'] - config.SCALP_SL
+                     tp_price = base_price + config.SCALP_TP
+                 else:
+                     base_price = live_tick['bid']
+                     sl_price = live_tick['ask'] + config.SCALP_SL
+                     tp_price = base_price - config.SCALP_TP
+                     
+                 sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, gap_action)
+                 
+                 params = [
+                     config.SYMBOL, 
+                     str(mt5_type), 
+                     f"{gap_lots:.2f}", 
+                     normalize_price(sl_price),
+                     normalize_price(tp_price)
+                 ]
+                 
+                 # Only fire if not cooling down (check gap_res metadata if possible or rely on internal eye cooldown)
+                 # For now, we trust the Eye returned "BUY"/"SELL" meaning it wants to trade NOW.
+                 
+                 logger.info(f"GAP SIGNAL: {gap_reason} | Action: {gap_action} | Lots: {gap_lots}")
+                 resp = bridge.send_command("OPEN_TRADE", params)
+                 if resp == "SENT":
+                     logger.info(f">>> GAP SNIPER FIRED: {gap_reason} | {gap_action} @ {normalize_price(base_price)}")
+                     notif_manager.send_notification("GAP EXECUTION", f"{gap_reason} | {gap_lots} Lots", "TRADE")
+
+                     # MARGIN TRACKING UPDATE
+                     used_margin = (current_price * 100 * gap_lots) / config.LEVERAGE
+                     simulated_margin_free -= used_margin
             
             # 3. Account Awareness (MT5 Check)
             # Run every minute or on new candle to avoid spamming API

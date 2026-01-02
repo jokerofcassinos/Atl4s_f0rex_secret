@@ -155,4 +155,11 @@ class PatternRecon:
             logger.info(f"Pattern Detected: {pattern}")
             return score, direction, pattern
 
+        # --- Pattern 8: Micro-Momentum (Fallback) ---
+        # 3 Consecutive Candles of same color
+        if is_bullish(c1) and is_bullish(c2) and is_bullish(c3):
+            return 20, 1, "Micro-Momentum (Bull)"
+        elif is_bearish(c1) and is_bearish(c2) and is_bearish(c3):
+            return 20, -1, "Micro-Momentum (Bear)"
+
         return 0, 0, "None"

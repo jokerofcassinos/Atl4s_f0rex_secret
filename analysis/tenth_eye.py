@@ -20,7 +20,13 @@ class TenthEye:
     """
     def __init__(self):
         self.stats_file = os.path.join(config.CACHE_DIR, "eye_reliability.json")
-        self.eye_weights = {f"Eye{i}": 1.0 for i in range(1, 10)}
+        # Map Real Names to Weights
+        self.eye_weights = {
+            'Trend': 1.0, 'Sniper': 1.0, 'Quant': 1.0, 'Patterns': 1.0, 
+            'Cycle': 1.0, 'SupplyDemand': 1.0, 'Divergence': 1.0, 'Kinematics': 1.0,
+            'Fractal': 1.0, 'Game': 1.0, 'Chaos': 1.0, 'Oracle': 1.2, 
+            'Council': 1.3, 'Overlord': 1.4, 'Sovereign': 1.5, 'Singularity': 2.0
+        }
         self.current_directive = "NEUTRAL"
         self.load_stats()
         
@@ -69,22 +75,21 @@ class TenthEye:
         weights = self.eye_weights.copy()
         
         if directive == "AGGRESSIVE_TREND":
-            # Boost Trend Eyes (Whale, Trend Architect, Swarm)
-            weights['Eye1'] *= 1.5 # Swarm
-            weights['Eye3'] *= 1.2 # Trend
-            weights['Eye4'] *= 1.5 # Whale
+            # Boost Trend Eyes
+            if 'Trend' in weights: weights['Trend'] *= 1.5 
+            if 'Kinematics' in weights: weights['Kinematics'] *= 1.3
+            if 'Fractal' in weights: weights['Fractal'] *= 1.3
             
         elif directive == "SNIPER_AMBUSH":
-            # Boost Reversion Eyes (Sniper, Oscillator, Cycle)
-            weights['Eye2'] *= 1.5 # Sniper
-            weights['Eye6'] *= 1.3 # Quant
-            weights['Eye9'] *= 1.3 # Cycle
+            # Boost Reversion Eyes
+            if 'Sniper' in weights: weights['Sniper'] *= 1.5
+            if 'Quant' in weights: weights['Quant'] *= 1.3
+            if 'Cycle' in weights: weights['Cycle'] *= 1.3
             
         elif directive == "DEFENSIVE":
             # Boost Risk & Logic, Penalize Aggression
-            weights['Eye1'] *= 0.5
-            weights['Eye2'] *= 0.5
-            weights['Eye5'] *= 1.5 # Fortress (Support/Resistance)
+            if 'Sniper' in weights: weights['Sniper'] *= 0.5
+            if 'SupplyDemand' in weights: weights['SupplyDemand'] *= 1.5 
             
         elif directive == "SURVIVAL":
             # Shutdown mostly
@@ -114,7 +119,7 @@ class TenthEye:
             market_state: Dict with 'hurst', 'lyapunov', 'volatility', etc.
         """
         # 1. Determine Directive
-        hurst = market_state.get('hurst', 0.5)
+        hurst = max(0, min(1, market_state.get('hurst', 0.5))) # Clamp
         lya = market_state.get('lyapunov', 0.0)
         vol = market_state.get('volatility', 0)
         
@@ -132,20 +137,32 @@ class TenthEye:
             
             w = active_weights[name]
             
-            if isinstance(res, dict) and 'decision' in res:
-                dec = res['decision']
-                val = 0
-                if "BUY" in dec: val = 1
-                elif "SELL" in dec: val = -1
-                
+            val = 0
+            if isinstance(res, dict):
+                # Try to extract direction
+                if 'dir' in res: val = res['dir']
+                elif 'direction' in res: val = res['direction']
+                elif 'decision' in res:
+                    dec = res['decision']
+                    if "BUY" in dec: val = 1
+                    elif "SELL" in dec: val = -1
+            
+            if val != 0:
                 weighted_votes.append(val * w)
                 total_weight += w
                 
         coherence = 0
+        technical_score = 0
+        
         if total_weight > 0:
             # Coherence is the magnitude of the weighted mean vector
             net_vote = sum(weighted_votes)
-            coherence = abs(net_vote / total_weight)
+            
+            # Normalize net_vote by total_weight to get -1.0 to 1.0
+            raw_score = net_vote / total_weight
+            technical_score = raw_score * 100 # -100 to 100
+            
+            coherence = abs(raw_score)
             
         # 4. Sandbox Veto
         # If Directive is SURVIVAL, we Veto everything unless Coherence is perfect
@@ -161,6 +178,7 @@ class TenthEye:
             'directive': self.current_directive,
             'coherence': coherence,
             'health_score': health_score,
+            'score': technical_score, # The "Architect Score" (-100 to 100)
             'veto': veto,
             'eye_authorities': active_weights
         }

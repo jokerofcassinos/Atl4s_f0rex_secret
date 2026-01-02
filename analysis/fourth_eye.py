@@ -25,9 +25,9 @@ class FourthEye:
         self.trade_executed_this_candle = False
         self.threshold = 30.0 # Slightly lower base threshold because we have filters
         self.last_trade_time = 0
-        self.cooldown_seconds = 300 # 5 Minutes Hard Cooldown
+        self.cooldown_seconds = 60 # 1 Minute Cooldown for Testing
         
-    def process_tick(self, tick, df_m5, consensus_score, smc_score, reality_state, volatility_score):
+    def process_tick(self, tick, df_m5, consensus_score, smc_score, reality_state, volatility_score, base_lots=0.01):
         """
         Calculates Quantum Whale Entry.
         Args:
@@ -37,6 +37,7 @@ class FourthEye:
             smc_score: Score from SmartMoneyEngine (-100 to 100)
             reality_state: String state from HyperDimension (e.g., "DIMENSIONAL_TREND_BUY")
             volatility_score: Volatility metric (0-100)
+            base_lots: Dynamic base lot size calculated from risk manager
             
         Returns: (Action, Reason, DynamicLots)
         """
@@ -67,8 +68,8 @@ class FourthEye:
         # B. Smart Money Weight (Structure)
         # "Follow the banks."
         # smc_score comes in as -100 to 100 already.
-        # We dampen it slightly to avoid over-trading on small FVGs.
-        smc_weight = smc_score * 0.5 
+        # User Request: Boost weight to 0.6
+        smc_weight = smc_score * 0.6
         
         # C. Consensus Weight (The Crowd/Math)
         consensus_weight = consensus_score 
@@ -78,7 +79,7 @@ class FourthEye:
         # Low Volatility = Noise.
         entropy_factor = 1.0
         if volatility_score > 70: entropy_factor = 1.2 # Boost score in high energy
-        elif volatility_score < 20: entropy_factor = 0.5 # Dampen in dead market
+        elif volatility_score < 10: entropy_factor = 0.8 # Only penalize dead markets (was < 20)
         
         # 3. FINAL SYNTHESIS
         # Total Quantum Score = (Consensus + SMC + Reality) * Entropy
@@ -90,7 +91,7 @@ class FourthEye:
         # 4. DECISION LOGIC (The Singularity)
         # We need a STRONG signal to move the Whale.
         
-        whale_threshold = 45.0 # High bar for entry
+        whale_threshold = 40.0 # Lowered from 45.0 for more activity
         
         if quantum_score > whale_threshold:
             action = "BUY"
@@ -116,18 +117,60 @@ class FourthEye:
              
         if action == "SELL" and "BUY_REVERSAL" in reality_state:
              return None, "VETO: Dimensional Reversal Detected", 0
-
-
+             
+        # Veto 4: Extension Limits (The "Buy the Top" Preventer)
+        # Calculate lightweight RSI & Bollinger
+        closes = df_m5['close']
+        if len(closes) > 20:
+            # RSI 14
+            delta = closes.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs)).iloc[-1]
+            
+            # Bollinger Bands (20, 2.5) - Slightly wider to allow trends but catch extremities
+            ma20 = closes.rolling(20).mean().iloc[-1]
+            std20 = closes.rolling(20).std().iloc[-1]
+            upper_band = ma20 + (2.5 * std20)
+            lower_band = ma20 - (2.5 * std20)
+            current_price = closes.iloc[-1]
+            
+            # Logic: Don't Buy if we are screamingly overbought
+            if action == "BUY":
+                if rsi > 75:
+                    return None, f"VETO: Overbought (RSI {rsi:.1f})", 0
+                if current_price > upper_band:
+                    # Exception: If we have SUPER high momentum (SMC > 80), maybe allow it?
+                    # No, user specifically halted on this. Block it.
+                    return None, "VETO: Price Extension (Above Upper Band)", 0
+                    
+            if action == "SELL":
+                if rsi < 25:
+                    return None, f"VETO: Oversold (RSI {rsi:.1f})", 0
+                if current_price < lower_band:
+                    return None, "VETO: Price Extension (Below Lower Band)", 0
 
         if action:
             # 6. Dynamic Sizing (Quantum Scale)
-            # Base 0.01
+            # Base = base_lots (from Risk Manager)
             # Scale with Quantum Score Excess
             excess = abs(quantum_score) - whale_threshold
-            extra_lots = (excess // 10) * 0.01 # Less aggressive scaling than before
+            # 0.01 per 10 points of excess is aggressive. 
+            # We scale relative to base_lots.
+            # E.g. Excess 20 -> 2 extra increments.
             
-            dynamic_lots = round(0.01 + extra_lots, 2)
-            if dynamic_lots > 0.20: dynamic_lots = 0.20 # Cap
+            # If base_lots is 0.02 (small account), increments should be small (e.g. 0.01)
+            # If base_lots is 1.0 (large account), increments should be large (e.g. 0.1)
+            
+            scaling_factor = max(0.01, base_lots * 0.5) 
+            extra_lots = (excess // 10) * scaling_factor
+            
+            dynamic_lots = round(base_lots + extra_lots, 2)
+            
+            # Hard Safety Cap (e.g. 5x base)
+            max_lots = base_lots * 5
+            if dynamic_lots > max_lots: dynamic_lots = max_lots
             
             self.trade_executed_this_candle = True
             self.last_trade_time = time.time()
