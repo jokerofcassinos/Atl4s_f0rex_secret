@@ -181,3 +181,30 @@ class RiskManager:
             return False
             
         return True
+
+    def calculate_safe_margin_lots(self, equity, free_margin, current_price, leverage):
+        """
+        Calculates the absolute maximum lots allowed by available margin.
+        Safety Buffer: Uses only 90% of Free Margin.
+        """
+        # Standard Lot = 100 Units of Gold (for XAUUSD)
+        # Margin Required = (Price * ContractSize) / Leverage
+        contract_size = 100.0
+        margin_per_lot = (current_price * contract_size) / leverage
+        
+        # Avoid division by zero
+        if margin_per_lot <= 0: return 0.01
+        
+        # Use 90% of free margin (Safety Buffer)
+        safe_margin = free_margin * 0.90
+        
+        max_lots = safe_margin / margin_per_lot
+        
+        # Hard Floor
+        if max_lots < 0.01: max_lots = 0.0
+        
+        # Round down to 2 decimals
+        import math
+        max_lots = math.floor(max_lots * 100) / 100.0
+        
+        return max_lots

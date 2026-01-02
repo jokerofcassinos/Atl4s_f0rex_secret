@@ -1,39 +1,61 @@
-# RELATÓRIO DE ATUALIZAÇÃO: ATL4S-FOREX v2.2 (Final Polish)
-**Data:** 02 de Janeiro de 2026
-**Status:** Sistema Blindado e Otimizado
+# ATL4S-FOREX MASTER CHANGELOG
+# ==========================================
 
-Este é o relatório final da versão 2.2. O foco foi corrigir falhas de execução ("Invalid Stops/Volume") e introduzir lógica avançada de saída e entrada.
+## v2.3: The "Hyper-Scale" Upgrade (Current)
+**Date:** January 2026
+**Focus:** Dynamic Risk, Speed, and "Brain-Logic" Scaling.
 
----
+### 1. 🧬 Hyper-Dynamic Risk Engine (Quantum Sigmoid)
+The old linear risk model was too rigid. We introduced a biological scaling model:
+-   **Power Law & Sigmoid Curve**: Capital scales non-linearly (`Equity^0.65`).
+-   **Brain-Linked Risk**:
+    -   **High Confidence (>90%)**: Boosts trade size by **1.5x**.
+    -   **High Chaos (Entropy)**: Cuts trade size to protect capital.
+-   **New Capacity**: Lot sizes can now scale smoothly up to **2.50 Lots** (previously capped at 0.50), but only under perfect conditions.
 
-## 1. NOVA TECNOLOGIA DE SAÍDA: "QUANTUM RAILGUN" 🔫
-A antiga "Virtual TP" era limitada (fechava cegamente no alvo). A nova tecnologia é dinâmica:
-- **Momentum Sensing**: Se o preço atingir o Take Profit (ex: $8) mas estiver com **Alta Velocidade**, o robô **IGNORA O TP**.
-- **Resultado**: Deixa o lucro correr. Uma operação de $8 pode virar $30 ou $50 se o mercado explodir.
-- **Segurança**: Se a velocidade cai, o "Lethal TP" fecha a operação.
+### 2. ⚡ Quantum Railgun 2.0 (Strict Tuning)
+-   **"Impatient" Logic**: The extension logic was too lenient, causing waits on winning trades.
+-   **Strict Thresholds**: Now requires **Explosive Velocity (>0.7)** to justify waiting. Otherwise, it takes the profit immediately.
+-   **Greed Cap**: If profit exceeds **1.5x Target**, it force-closes instantly, preventing "round-tripping" gains.
 
-## 2. OTIMIZAÇÃO DE ENTRADA: "PROTEÇÃO DE OVERSOLD" 🛡️
-Você relatou um drawdown preocupante ("esperar 2 candles"). Isso ocorria porque o robô vendia durante um fundo (Oversold).
-- **A Solução**: Adicionamos um **Filtro de Elasticidade (Z-Score)**.
-- **Como funciona**: Se o robô quiser Vender, mas o mercado já estiver esticado para baixo (Oversold), ele **ESPERA**.
-- **Benefício**: Evita vender o fundo. Ele aguarda o repique para vender com preço melhor, eliminando aquele calor inicial.
-
-## 3. PROTOCOLOS DE SEGURANÇA MÁXIMA 🔐
-Identificamos e corrigimos os erros técnicos reportados:
-- **Invalid Volume (Erro 10014)**: Corrigido com um "Gatekeeper". O robô agora aborta trade de volume 0.00 silenciosamente em vez de erro.
-- **Invalid Stops (Erro 10016)**: Implementado um "Sledgehammer Fix" (Distância mínima de 500 pontos) para garantir aceitação em qualquer corretora.
-- **Margin Calls**: O sistema agora respeita o limite de margem e simplesmente para de operar, protegendo o saldo restante.
-
-## 4. CORREÇÃO DO "OLHO ALUCINADO" (Arquiteto) 👁️
-O "Décimo Olho" (Arquiteto) estava dando nota 100 de Compra durante quedas.
-- **A Cura**: Injetamos a "Realidade do Rio" (Tendência H1) no cérebro dele. Se o Rio está caindo, ele é **proibido** de sugerir Compra Forte.
+### 3. 🛡️ Circuit Breakers & Safety
+-   **Margin Safety**: Added explicit checks to ensure we never use >90% of free margin.
+-   **Crash Guards**: Fixed `Unicode`, `TypeError`, and `AttributeError` bugs for 100% uptime stability.
 
 ---
 
-## RESUMO
-O Atl4s v2.2 agora é um sistema que:
-1.  **Não Vende Fundo** (Espera o repique).
-2.  **Não Corta Lucro Explosivo** (Railgun deixa correr).
-3.  **Não Erra Ordens Técnicas** (Volume/Stops corrigidos).
+## v2.2: The "Precision" Upgrade
+**Focus:** Execution Accuracy and Oversold Protection.
 
-**Recomendação:** O sistema está pronto para operar em modo autônomo com supervisão mínima.
+### 1. 🛡️ Oversold/Overbought Protection
+-   **Smart Timing**: If the bot wants to Sell but the market is **Oversold (Z-Score < -2.5)**, it **WAITS**.
+-   **Benefit**: Eliminates "selling the bottom" and immediate drawdown.
+
+### 2. 🔫 Quantum Railgun (v1.0)
+-   Introduced the concept of **Velocity-Based Extension**.
+-   Allows the bot to ignore the Take Profit line if momentum is smashing through it.
+
+### 3. 🔧 Execution Fixes
+-   **Invalid Volume (10014)**: Added "Gatekeeper" to block zero-volume trades.
+-   **Invalid Stops (10016)**: Implemented "Sledgehammer" buffers (500 points) to guarantee broker acceptance.
+
+---
+
+## v2.1: The "Speed" Upgrade
+**Focus:** Latency and Conflict Resolution.
+
+### 1. ⚡ Latency Reduction
+-   Reduced Analysis Cooldown from **1.0s** to **0.1s**.
+-   Bot now reacts to price ticks in milliseconds.
+
+### 2. 🧠 Smart Inversion (Trend Veto)
+-   **River Alignment**: The "Tenth Eye" (Architect) is now forced to respect the H1 Trend.
+-   If the H1 River is Bearish, the Architect CANNOT issue strong Buy signals (preventing "Hallucinations").
+
+---
+
+## v2.0: Deep Awakening (Base)
+**Focus:** Core Architecture.
+-   **Swarm Intelligence (Unified Field)**: Physics-based trading.
+-   **Holographic Architect**: Multi-timeframe oversight.
+-   **ZeroMQ Bridge**: High-speed Python-MetaTrader link.

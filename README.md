@@ -1,15 +1,15 @@
-# 🌌 Atl4s-Forex v2.2: The Quantum Field 🦅
+# 🌌 Atl4s-Forex v2.3: The Hyper-Scale Mind 🦅
 > **"Turning Market Chaos into Predictive Certainty through Holographic Intelligence."**
 
-Welcome to **Atl4s-Forex v2.2**. This major intelligence upgrade introduces **Quantum Railgun Exits** and **Oversold Protection**, transforming the bot from a consensus engine into a fluid-dynamic prediction machine.
+Welcome to **Atl4s-Forex v2.3**. This major intelligence upgrade introduces the **Hyper-Dynamic Risk Engine** (Quantum Sigmoid) and **Railgun 2.0**, transforming the bot into a high-scale, brain-guided precision weapon.
 
 ---
 
-## 🏆 Current Status: v2.2 (Final Polish)
-The system has evolved beyond simple voting. It now models the market as a physical system:
-- **Unified Field Swarm**: Treats price as a particle moving through an "Order Flow Field", calculating Velocity, Pressure, and Gravity.
-- **Holographic Oversight**: The new "Architect" issues strategic directives (Aggressive, Defensive, Sniper) based on global market regimes.
-- **Quantum Railgun**: Dynamic exits that chase momentum rather than stopping at fixed targets.
+## 🏆 Current Status: v2.3 (Stable)
+The system has evolved beyond simple logic. It now uses **Biological Risk Scaling**:
+-   **Quantum Sigmoid Risk**: Capital scales non-linearly (`Equity^0.65`) modulated by **Brain Confidence** and **Entropy**.
+-   **Railgun 2.0**: "Impatient" exit logic that locks profits instantly unless momentum is explosive.
+-   **Circuit Breakers**: Full crash protection and margin safety layers.
 
 ---
 
@@ -28,26 +28,32 @@ Atl4s doesn't rely on simple indicators. It uses a **Swarm of 10+ Specialized Mo
 
 ---
 
-## 🚀 v2.2 Exclusive Features
+## 🚀 v2.3 Exclusive Features
 
-### 1. ⚡ Quantum Railgun Exit
-*   **Momentum Chasing**: Instead of blindly closing at a fixed TP, the bot checks **Velocity** and **Entropy**.
-*   **The Breaker**: If momentum is high, it **IGNORES** the exit, allowing the trade to smash through resistance for massive gains.
-*   **Benefits**: Turns small scalps into trend runners automatically.
+### 1. 🧬 Hyper-Dynamic Risk Engine (Quantum Sigmoid)
+*   **Bio-Scaling**: Replaced linear risk with a **Sigmoid Curve**.
+*   **Brain-Link**: If the AI Confidence is >90%, trade size creates a **1.5x Boost**.
+*   **Entropy-Link**: If the market is chaotic, trade size is automatically cut.
+*   **Result**: Massive trades on clear setups, tiny trades on noise.
 
-### 2. 🛡️ Oversold Entry Protection
+### 2. ⚡ Quantum Railgun 2.0 (High Precision)
+*   **Tuned & Strict**: The exit logic is now "Impatient".
+*   **Explosive Only**: It only waits if Velocity is >0.7 (God Candle). Normal moves result in **Instant Cash**.
+*   **Greed Cap**: Hard exit at 1.5x Target. No more round-tripping profits.
+
+### 3. 🛡️ Oversold Entry Protection
 *   **Smart Timing**: If the bot wants to Sell (Trend Continuation) but the market is **Oversold (Z-Score < -2.5)**, it **WAITS**.
 *   **No More Drawdown**: It lets the price bounce before firing, eliminating the "sweating period" of early entries.
 
-### 3. 🌌 Swarm Intelligence 2.0 (The Unified Field)
+### 4. 🌌 Swarm Intelligence 2.0 (The Unified Field)
 *   **Physics-Based Logic**: Replaces voting with vector calculus.
 *   **Laminar Flow Boost**: Automatically lowers thresholds when the market is smooth (Trending), capturing more rapid-fire trades.
 *   **Turbulence Shield**: Raises shields when Entropy is high.
 
-### 4. 🧠 Adaptive Intelligence (Zero-Point Learning)
+### 5. 🧠 Adaptive Intelligence (Zero-Point Learning)
 *   **Strategic Inversion**: Automatically detects and inverts signals from modules that are misaligned with the current regime, turning loss-leaders into profit-generators.
 
-### 5. 💰 Dynamic Margin Ledger
+### 6. 💰 Dynamic Margin Ledger
 *   **Real-Time Sub-Tick Tracking**: Calculates virtual margin usage for every potential trade in the queue before execution, preventing "Over-Leverage" errors.
 *   **Safety Floor**: Halts trading immediately if Margin Level drops below critical thresholds.
 
