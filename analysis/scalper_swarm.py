@@ -24,7 +24,7 @@ class ScalpSwarm:
         self.cooldown = config.SWARM_COOLDOWN
         self.threshold = config.SWARM_THRESHOLD # Usually 0.5
         
-    def process_tick(self, tick, df_m5, alpha_score, tech_score, phy_score, micro_stats):
+    def process_tick(self, tick, df_m5, alpha_score, tech_score, phy_score, micro_stats, forced_lots=None):
         """
         Calculates Unified Field Vector.
         Returns: (Action, Reason, Price)

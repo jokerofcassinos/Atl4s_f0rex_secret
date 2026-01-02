@@ -128,33 +128,31 @@ class TradeManager:
         profit = position['profit'] # Floating PnL in USD
         
         # 1. Virtual Take Profit (Active Grab) with Quantum Railgun Logic
+        # 1. Virtual Take Profit (Active Grab) with Quantum Railgun (TUNED)
         if profit >= hard_tp_amount:
-             # Check for Momentum Extension (Greed Protocol)
+             # Check for Momentum Extension (Greed Protocol) - STRICT MODE
              should_extend = False
              reason_ext = ""
              
-             if micro_metrics:
-                 # CRITICAL FIX: Use Raw Velocity (Signed) to check direction
+             # GREED CAP: If we already have 1.5x the Target, don't wait. Take it.
+             if profit > (hard_tp_amount * 1.5):
+                 should_extend = False
+             elif micro_metrics:
                  velocity = micro_metrics.get('velocity', 0)
                  entropy = micro_metrics.get('entropy', 1.0)
-                 trade_type = position['type'] # 0=Buy, 1=Sell
+                 trade_type = position['type']
                  
-                 # QUANTUM RAILGUN: Only extend if Momentum is FAVORABLE
-                 # Buy (0) requires Positive Velocity
-                 # Sell (1) requires Negative Velocity
-                 
+                 # QUANTUM RAILGUN: STRICTER REQUIREMENTS (User: "Wait less")
+                 # Needs Stronger Velocity (0.7) and Lower Entropy (0.4) to JUSTIFY waiting.
                  is_favorable = False
-                 if trade_type == 0 and velocity > 0.4: is_favorable = True
-                 elif trade_type == 1 and velocity < -0.4: is_favorable = True
+                 if trade_type == 0 and velocity > 0.7: is_favorable = True
+                 elif trade_type == 1 and velocity < -0.7: is_favorable = True
                  
-                 if is_favorable and entropy < 0.5:
+                 if is_favorable and entropy < 0.4:
                      should_extend = True
-                     reason_ext = f"Velocity {velocity:.2f} (Aligned) >> Entropy {entropy:.2f}"
+                     reason_ext = f"Velocity {velocity:.2f} (Explosive) >> Entropy {entropy:.2f}"
                      
              if should_extend:
-                 # Log the extension but do not close
-                 # We rely on 'Lethal TP' or Trailing Stop to catch it later
-                 # This effectively "Uncaps" the gain.
                  return {
                      "action": "EXTEND",
                      "ticket": position['ticket'],
@@ -164,7 +162,7 @@ class TradeManager:
              return {
                 "action": "CLOSE_FULL",
                 "ticket": position['ticket'],
-                "reason": f"Virtual TP Hit (${profit:.2f})"
+                "reason": f"Virtual TP Hit (${profit:.2f}) - INSTANT"
              }
              
         # 2. Virtual Stop Loss (Safety Net)
