@@ -285,3 +285,57 @@ class TradeManager:
              }
              
         return None
+
+    def check_early_abort(self, position, cortex_decision, velocity, current_time, probability=None):
+        """
+        Micro-Stop Logic (Instant Regret) + Elastic Defense.
+        Checks if we should abort the trade immediately due to:
+        1. Cortex Change of Mind (Deep Brain says we are wrong)
+        2. Velocity Crash (Physics says we are catching a knife)
+        3. Probability Collapse (Confidence drops below 20%)
+        """
+        ticket = position['ticket']
+        trade_type = position['type'] # 0=Buy, 1=Sell
+        
+        # 1. CORTEX REVERSAL (The "Oops" Factor)
+        if cortex_decision is not None:
+            if trade_type == 0 and cortex_decision < -0.6:
+                return {
+                    "action": "CLOSE_FULL",
+                    "ticket": ticket,
+                    "reason": f"Micro-Stop: Brain flipped to SELL ({cortex_decision:.2f})"
+                }
+            elif trade_type == 1 and cortex_decision > 0.6:
+                 return {
+                    "action": "CLOSE_FULL",
+                    "ticket": ticket,
+                    "reason": f"Micro-Stop: Brain flipped to BUY ({cortex_decision:.2f})"
+                }
+                
+        # 2. PHYSICS CRASH (The "Knife" Factor)
+        if trade_type == 0 and velocity < -1.5:
+             return {
+                "action": "CLOSE_FULL",
+                "ticket": ticket,
+                "reason": f"Micro-Stop: Velocity CRASH ({velocity:.2f})"
+            }
+        elif trade_type == 1 and velocity > 1.5:
+             return {
+                "action": "CLOSE_FULL",
+                "ticket": ticket,
+                "reason": f"Micro-Stop: Velocity ROCKET ({velocity:.2f})"
+            }
+            
+        # 3. PROBABILITY COLLAPSE (Elastic Defense)
+        # If confidence drops below 20%, we are gambling. Fold.
+        if probability is not None:
+            # Normalized probability 0.0 - 1.0 (or 0-100, checking range)
+            # Assuming 0-100 based on score
+            if probability < 20.0:
+                 return {
+                    "action": "CLOSE_FULL",
+                    "ticket": ticket,
+                    "reason": f"Elastic Defense: Probability Collapse ({probability:.1f}%)"
+                }
+            
+        return None

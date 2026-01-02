@@ -80,23 +80,28 @@ class TrendArchitect:
                 current_price_h1 = df_h1['close'].iloc[-1]
                 
                 # Logic: River is primarily defined by EMA50, but qualified by EMA20 alignment
-                if current_price_h1 > ema50_h1:
-                    if ema20_h1 > ema50_h1:
-                        river_dir = 1 # Strong Bullish Flow
-                    else:
-                        river_dir = 0 # Neutral/Weak Bullish (Possible Correction)
+                # REFINED LOGIC (User Feedback: "Trend is Up" but bot saw Bearish)
+                # If Price is above EMA20 (Short Term H1 Trend), we treat it as BULLISH even if below EMA50 (Recovery/Pullback)
                 
-                elif current_price_h1 < ema50_h1:
-                    if ema20_h1 < ema50_h1:
-                        river_dir = -1 # Strong Bearish Flow
+                if current_price_h1 > ema20_h1:
+                    if current_price_h1 > ema50_h1:
+                        river_dir = 1 # Strong Bullish (Above Both)
                     else:
-                        river_dir = 0 # Neutral/Weak Bearish
+                        river_dir = 1 # Weak Bullish (Recovery Phase - Price above fast EMA)
                 
-                # Price Action Override: If we crashed below EMA20 sharply, downgrade to Neutral/Bearish
-                if current_price_h1 < ema20_h1 and river_dir == 1:
-                     river_dir = 0 # Warning
-                     
-                logger.info(f"The River (H1 Trend): {'BULLISH' if river_dir == 1 else 'BEARISH' if river_dir == -1 else 'NEUTRAL'}")
+                elif current_price_h1 < ema20_h1:
+                    if current_price_h1 < ema50_h1:
+                        river_dir = -1 # Strong Bearish (Below Both)
+                    else:
+                        river_dir = -1 # Weak Bearish (Correction Phase - Price below fast EMA)
+                
+                # EMA Cross Confirmation (Gold & Death Cross)
+                if ema20_h1 > ema50_h1 and river_dir == 1:
+                     river_dir = 1 # Confirmed Bullish
+                elif ema20_h1 < ema50_h1 and river_dir == -1:
+                     river_dir = -1 # Confirmed Bearish
+
+                logger.info(f"The River (H1 Trend): {'BULLISH' if river_dir == 1 else 'BEARISH' if river_dir == -1 else 'NEUTRAL'} | P: {current_price_h1:.2f} | EMA20: {ema20_h1:.2f} | EMA50: {ema50_h1:.2f}")
             except Exception as e:
                 logger.error(f"Error calculating H1 River: {e}")
 

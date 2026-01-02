@@ -24,7 +24,28 @@ class ScalpSwarm:
         self.cooldown = config.SWARM_COOLDOWN
         self.threshold = config.SWARM_THRESHOLD # Usually 0.5
         
-    def process_tick(self, tick, df_m5, alpha_score, tech_score, phy_score, micro_stats, forced_lots=None):
+    def check_resonance(self, df_m5, df_m1):
+        """
+        Fractal Resonance Verification.
+        Checks if M5 and M1 are singing the same note (Trend Alignment).
+        Returns: (is_resonant, direction)
+        """
+        if df_m5.empty or df_m1.empty: return False, 0
+        
+        # M5 Trend (EMA 20 vs EMA 50)
+        # We need to calculate if not present, but usually we assume trend_architect handles big trend.
+        # Let's do a quick slope check on Close
+        m5_slope = df_m5['close'].iloc[-1] - df_m5['close'].iloc[-5]
+        m1_slope = df_m1['close'].iloc[-1] - df_m1['close'].iloc[-5]
+        
+        # Resonance = Both Slopes Strong and Same Sign
+        if abs(m5_slope) > 0.5 and abs(m1_slope) > 0.1: # Thresholds for "Slope"
+             if np.sign(m5_slope) == np.sign(m1_slope):
+                 return True, np.sign(m5_slope)
+                 
+        return False, 0
+
+    def process_tick(self, tick, df_m5, df_m1, alpha_score, tech_score, phy_score, micro_stats, forced_lots=None):
         """
         Calculates Unified Field Vector.
         Returns: (Action, Reason, Price)
@@ -130,20 +151,100 @@ class ScalpSwarm:
         elif regime == "LAMINAR":
             needed_threshold -= 0.15 # Aggressive Boost for Trend Following
         
-        # Base sensitivity boost
-        needed_threshold = max(0.35, needed_threshold) # Hard floor
+        # FRACTAL RESONANCE (PROJECT TACHYON)
+        # If M5 and M1 align perfectly, we drop threshold to near zero (0.15) for immediate entry
+        is_resonant, res_dir = self.check_resonance(df_m5, df_m1)
+        if is_resonant:
+             # Check if Resonance Direction matches Vector S
+             if np.sign(S) == res_dir:
+                 needed_threshold = 0.15 # TACHYON MODE
+                 regime += "_RESONANCE"
+        
+        # Base sensitivity boost (User Request: "Execute something!")
+        needed_threshold = max(0.15, needed_threshold) # Hard floor lowered from 0.25 for Tachyon
         
         if S > needed_threshold: 
             # MOMENTUM SAFETY: Don't BUY if we are actively crashing
             if v > -0.1: 
-                 action = "BUY"
+                # FOMO GUARD (Avg Reversion)
+                # FOMO GUARD (Avg Reversion)
+                is_safe_entry = True
+                
+                # Check for 13th Eye Override (Alpha Score extreme)
+                # If Score is 100/-100, we BYPASS filters (Sniper Shot)
+                is_override = abs(alpha_score) >= 99.0
+                
+                if is_override:
+                     # Skip Wick/Density checks
+                     pass
+                else: 
+                    # 1. Wick Rejection Logic (Buying into resistance?)
+                    # If High - Close > Body * 1.5 -> Large Upper Wick (Rejection)
+                    if not df_m1.empty:
+                        last_candle = df_m1.iloc[-1]
+                        c_open = last_candle['open']
+                        c_close = last_candle['close']
+                        c_high = last_candle['high']
+                        c_low = last_candle['low']
+                        body = abs(c_close - c_open)
+                        rng = c_high - c_low
+                        upper_wick = c_high - max(c_open, c_close)
+                          
+                        # Wick Rejection (Relaxed for M1)
+                        # Allow larger wicks if Momentum is very strong (v > 0.5)
+                        wick_ratio = 2.0 if v > 0.5 else 1.5
+                        if upper_wick > (body * wick_ratio) and upper_wick > 0.15: # Raised min wick size
+                            logger.warning(f"Swarm BUY Vetoed: Wick Rejection (Wick {upper_wick:.2f})")
+                            is_safe_entry = False
+
+                        # Body Density Logic (Relaxed)
+                        density = body / rng if rng > 0 else 0
+                        if density < 0.15 and rng > 0.30: # Only veto huge dojis
+                            logger.warning(f"Swarm BUY Vetoed: Low Body Density ({density:.2f})")
+                            is_safe_entry = False
+
+                if is_safe_entry:
+                    action = "BUY"
             else:
                  logger.debug(f"Swarm BUY Vetoed: Negative Velocity ({v:.2f})")
 
         elif S < -needed_threshold: 
-            # MOMENTUM SAFETY: Don't SELL if we are mooning
             if v < 0.1: 
-                action = "SELL"
+                # FOMO GUARD (Avg Reversion)
+                is_safe_entry = True
+                
+                # Check for 13th Eye Override (Alpha Score extreme)
+                # If Score is 100/-100, we BYPASS filters (Sniper Shot)
+                is_override = abs(alpha_score) >= 99.0
+                
+                if is_override:
+                     # Skip Wick/Density checks
+                     pass
+                else: 
+                    # 1. Wick Rejection Logic (Selling into support?)
+                    if not df_m1.empty:
+                        last_candle = df_m1.iloc[-1]
+                        c_open = last_candle['open']
+                        c_close = last_candle['close']
+                        c_low = last_candle['low']
+                        c_high = last_candle['high']
+                        body = abs(c_close - c_open)
+                        rng = c_high - c_low
+                        lower_wick = min(c_open, c_close) - c_low
+                          
+                        # Wick Rejection
+                        if lower_wick > (body * 1.5) and lower_wick > 0.10: # Significant rejection
+                            logger.warning(f"Swarm SELL Vetoed: Wick Rejection (Wick {lower_wick:.2f} > Body {body:.2f} * 1.5)")
+                            is_safe_entry = False
+                               
+                        # Body Density Logic (Conviction Check)
+                        density = body / rng if rng > 0 else 0
+                        if density < 0.25 and rng > 0.20:
+                            logger.warning(f"Swarm SELL Vetoed: Low Body Density ({density:.2f}). Indecision.")
+                            is_safe_entry = False
+
+                if is_safe_entry:
+                    action = "SELL"
             else:
                  logger.debug(f"Swarm SELL Vetoed: Positive Velocity ({v:.2f})")
         
@@ -157,6 +258,15 @@ class ScalpSwarm:
             elif action == "SELL" and tech_score > 10:
                 action = None
                 logger.debug(f"Swarm SELL Vetoed: Fighting Laminar Bull Trend (Tech:{tech_score})")
+
+        # 8. HYPER-SCALP EXTENSION (Distance from M1 EMA)
+        # If buying, price should not be > 2.0 SD from M1 EMA (Overbought)
+        # We can approximate SD if not available via simple percent distance
+        if action:
+             if not df_m1.empty:
+                 # Check last 5 candles volatility to estimate SD
+                 # This is computationally cheap
+                 pass # Placeholder for v2.1 (Micro-Bollinger)
         
         if action:
             self.trade_count += 1
@@ -167,6 +277,8 @@ class ScalpSwarm:
             
         # Log Vector state
         if abs(S) > 0.2:
-             logger.info(f"Swarm Field: {S:.2f} (Req: {needed_threshold:.2f}) | {regime} | v:{v:.2f} P:{P:.2f} A:{A:.2f}")
+             # Only log if action is None (prevent double logging)
+             if not action:
+                 logger.info(f"Swarm Field: {S:.2f} (Req: {needed_threshold:.2f}) | {regime} | v:{v:.2f} P:{P:.2f} A:{A:.2f}")
 
         return None, None, 0

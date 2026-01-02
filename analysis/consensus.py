@@ -566,67 +566,81 @@ class ConsensusEngine:
              confluence_boost += 15
              logger.info(f"CONFLUENCE: Supply Chain Shock Bias ({sc_impact:.2f}) provides macro tailwind.")
 
-        # Calculate Base Vector (Foundational Modules)
-        v_trend = t_score * t_dir * w_trend
-        v_sniper = s_score * s_dir * w_sniper
-        v_quant = q_score * q_dir * w_quant
-        v_pattern = (p_score + confluence_boost) * p_dir * w_pattern
-        v_cycle = c_score * c_dir * w_cycle
-        v_sd = sd_score * sd_dir * w_sd
-        v_div = d_score * d_dir * w_div
-        v_kin = abs(k_score) * k_dir * w_kin
-        v_fractal = abs(f_score) * f_dir * w_fractal
+        # --- HOLOGRAPHIC VECTOR LOGIC (v3.0) ---
         
-        prelim_vector = v_trend + v_sniper + v_quant + v_pattern + v_cycle + v_sd + v_div + v_kin + v_fractal + (sc_impact * 20)
+        # 1. Momentum Vector (The "Push")
+        # Components: Trend, Kinematics, Fractal, Volatility(if Expansion), SupplyChain
+        # Weights normalized for this vector
+        v_momentum = (
+            (t_score * t_dir * 1.0) +
+            (abs(k_score) * k_dir * 0.8) +
+            (abs(f_score) * f_dir * 0.5) +
+            (sc_impact * 20)
+        )
         
-        # --- PHASE 8: MULTI-EYE ALIGNMENT BOOSTS (Contextual Authority) ---
-        # 15. Oracle Swing Alignment
-        if oracle_dir != 0:
-            if (oracle_dir == 1 and prelim_vector > 0) or (oracle_dir == -1 and prelim_vector < 0):
-                prelim_vector += 30 * oracle_dir
-                logger.info(f"CONFLUENCE: Oracle Swing Alignment! Global Bias {oracle_res['decision']} confirms trade.")
-            else:
-                prelim_vector -= 20 * oracle_dir
-                logger.warning(f"DIVERGENCE: Oracle Swing Bias {oracle_res['decision']} opposes prelim vector. Reducing confidence.")
+        # 2. Reversion Vector (The "Pull")
+        # Components: Quant (Mean Rev), Cycle, Divergence, Nash, Topology (Loop)
+        # Note: Reversion pulls AGAINST the current price extremity
+        v_reversion = (
+            (q_score * q_dir * 1.0) +
+            (c_score * c_dir * 0.7) +
+            (d_score * d_dir * 0.8) +
+            (topo_score * (1 if regime=="RANGING" else 0) * 0.5) # Loop implies reversion in range
+        )
+        
+        # 3. Structure Vector (The "Map")
+        # Components: Sniper (FVG), SupplyDemand, Patterns, Fortress (Levels)
+        # Note: Structure dictates WHERE trade is valid
+        v_structure = (
+            (s_score * s_dir * 1.2) + # Sniper is King
+            (sd_score * sd_dir * 0.8) +
+            (p_score * p_dir * 0.6)
+        )
+        
+        # --- HOLOGRAPHIC DECISION MATRIX ---
+        
+        final_decision = "WAIT"
+        final_score = 0
+        holographic_reason = "Neutral"
 
-        # 16. Council Position Alignment (The Macro Anchor)
-        if council_dir != 0:
-            if (council_dir == 1 and prelim_vector > 0) or (council_dir == -1 and prelim_vector < 0):
-                boost = 50 if "STRONG" in council_anchor else 30
-                prelim_vector += boost * council_dir
-                logger.info(f"CONFLUENCE: Council Position Alignment! Secular Anchor {council_anchor} confirms direction.")
-            else:
-                penalty = 40 if "STRONG" in council_anchor else 20
-                prelim_vector -= penalty * council_dir
-                logger.warning(f"DANGER: Major Divergence! Secular Anchor {council_anchor} opposes trade direction.")
-                
-        # 17. Overlord Meta-Directive
-        if overlord_dir != 0:
-            if (overlord_dir == 1 and prelim_vector > 0) or (overlord_dir == -1 and prelim_vector < 0):
-                boost = 60 if abs(overlord_score) > 80 else 30
-                prelim_vector += boost * overlord_dir
-                logger.info(f"CONFLUENCE: Overlord Master Directive {overlord_res['decision']} confirms trade. Authority Boost: {boost}")
-            else:
-                prelim_vector -= 40 * overlord_dir
-                logger.warning(f"CRITICAL DIVERGENCE: Overlord Directive {overlord_res['decision']} opposes consensus! Reducing power.")
-                
-        # 18. Sovereign Alignment (The Universal Law)
-        if sov_dir != 0:
-            if (sov_dir == 1 and prelim_vector > 0) or (sov_dir == -1 and prelim_vector < 0):
-                boost = 80 if "STRONG" in sovereign_res['decision'] else 40
-                prelim_vector += boost * sov_dir
-                logger.info(f"SOVEREIGN ALIGNMENT: {sovereign_res['decision']}. Universal coherence triggers major confidence boost (+{boost}).")
-            else:
-                 prelim_vector -= 60 * sov_dir
-                 logger.warning(f"SOVEREIGN VETO: Multi-scale fractals oppose entry direction! DANGER.")
+        # Logic A: MOMENTUM BREAKOUT
+        # Momentum is Strong AND Structure Supports (or is Neutral) AND Reversion is Weak
+        if abs(v_momentum) > 50:
+             mom_dir = 1 if v_momentum > 0 else -1
+             # Check alignment
+             if (v_structure * mom_dir) >= 0: # Structure doesn't oppose
+                 if (v_reversion * mom_dir) > -30: # Reversion doesn't excessively oppose
+                     final_decision = "BUY" if mom_dir == 1 else "SELL"
+                     final_score = abs(v_momentum) + abs(v_structure)
+                     holographic_reason = "MOMENTUM_BREAKOUT"
+
+        # Logic B: REVERSION TRADE (Sniper Entry)
+        # Reversion is Strong AND Structure Supports
+        if abs(v_reversion) > 40:
+             rev_dir = 1 if v_reversion > 0 else -1
+             if (v_structure * rev_dir) > 20: # Structure MUST support Reversion (Confluence)
+                 final_decision = "BUY" if rev_dir == 1 else "SELL"
+                 final_score = abs(v_reversion) + abs(v_structure)
+                 holographic_reason = "REVERSION_SNIPER"
                  
-        # 19. Singularity Convergence
-        if is_singularity:
-            prelim_vector += 100 * (1 if prelim_vector > 0 else -1 if prelim_vector < 0 else 0)
-            logger.info("SINGULARITY DETECTED: Geometric Manifold has folded. Absolute Certainty Surge (+100).")
-
-        total_vector = prelim_vector
-
+        # Logic C: STRUCTURE BOUNCE (Laminar Flow)
+        # Structure is Strong + Trend is Laminar Flow (Low Entropy)
+        if abs(v_structure) > 60 and entropy < 1.0:
+             struc_dir = 1 if v_structure > 0 else -1
+             if (v_momentum * struc_dir) >= 0:
+                 final_decision = "BUY" if struc_dir == 1 else "SELL"
+                 final_score = abs(v_structure) + abs(v_momentum)
+                 holographic_reason = "STRUCTURE_FLOW"
+                 
+        # Override with Golden Setups (The Royal Flush) logic preserved below...
+        total_vector = v_momentum + v_reversion + v_structure # Legacy compatibility
+        details['Vectors'] = {
+            'Momentum': v_momentum,
+            'Reversion': v_reversion,
+            'Structure': v_structure,
+            'Reason': holographic_reason
+        }
+        
         # Volatility Gatekeeper
         if v_score == 0:
             logger.info("Volatility Guard: Market too quiet. Veto.")
@@ -643,9 +657,12 @@ class ConsensusEngine:
         
         # Breakdown Log for Debugging Stagnation
         health_score = architect_audit.get('health_score', 100)
-        logger.debug(f"Consensus Breakdown: Trend={v_trend:.2f} Sniper={v_sniper:.2f} Quant={v_quant:.2f} Pat={v_pattern:.2f} Cycle={v_cycle:.2f} SD={v_sd:.2f} Div={v_div:.2f} Kin={v_kin:.2f} Frac={v_fractal:.2f} | Health={health_score}")
+        # Use details['Vectors'] for breakdown
         
-        final_score = abs(total_vector)
+        # Normalize Score (Prevent 100.0 Saturation)
+        # Total Vector can be ~300. We map it to 0-100 logic.
+        raw_score = abs(total_vector)
+        final_score = min(99.9, raw_score * 0.4) # Scaling Factor 0.4 (250 -> 100)
         
         # --- ADAPTIVE THRESHOLD (Scalping Mode) ---
         threshold = self.params['threshold']
@@ -689,7 +706,17 @@ class ConsensusEngine:
             logger.info(f"Adaptive Threshold: LOWERED to {threshold} (High Probability Regime)")
         
         decision = "WAIT"
-        if final_score > threshold: 
+        
+        # 1. HOLOGRAPHIC PRIORITY
+        if final_decision != "WAIT":
+            decision = final_decision
+            # APPLY NORMALIZATION HERE for Holographic Score too
+            final_score = min(99.9, final_score * 0.4) 
+            logger.info(f"HOLOGRAPHIC CONSENSUS: {decision} | Reason: {holographic_reason}")
+            
+        # 2. LEGACY FALLBACK (If Holographic matrix was inconclusive)
+        elif final_score > threshold: 
+            # Normalization already applied to final_score (from total_vector) in previous step
             if total_vector > 0:
                 decision = "BUY"
             else:

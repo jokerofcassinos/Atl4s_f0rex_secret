@@ -98,3 +98,59 @@ class PredictionEngine:
             'expected_price': expected_price,
             'volatility': volatility
         }
+
+    def rapid_forecast(self, df, steps=10, simulations=2000):
+        """
+        Quantum Short-Path: High-Frequency Prediction.
+        Focuses on immediate price trajectory (next 10 candles).
+        Returns: {prob_up, prob_down, velocity_score}
+        """
+        if df is None or len(df) < 50:
+            return {'prob_up': 0.5, 'prob_down': 0.5, 'velocity': 0}
+            
+        current_price = df.iloc[-1]['close']
+        
+        # Calculate Short-Term Drift/Vol (Last 20 candles)
+        subset = df.iloc[-20:]
+        closes = subset['close'].values
+        log_returns = np.diff(np.log(closes))
+        
+        if len(log_returns) == 0: return {'prob_up': 0.5, 'prob_down': 0.5, 'velocity': 0}
+        
+        drift = np.mean(log_returns)
+        volatility = np.std(log_returns)
+        
+        # Fast Vectorized Monte Carlo
+        # Shape: (simulations, steps)
+        shocks = np.random.normal(0, 1, (simulations, steps))
+        returns = drift + volatility * shocks
+        
+        # Cumulative returns -> Price paths
+        # P_t = P_0 * exp(cumsum(returns)) approx P_0 * prod(1+r)
+        # Using cumprod(1+r)
+        price_paths = current_price * np.cumprod(1 + returns, axis=1)
+        
+        # Analyze Final State (at step 10)
+        final_prices = price_paths[:, -1]
+        
+        bullish_count = np.sum(final_prices > current_price)
+        bearish_count = np.sum(final_prices < current_price)
+        
+        prob_up = bullish_count / simulations
+        prob_down = bearish_count / simulations
+        
+        # Calculate Probability Velocity (Acceleration of Probability)
+        # Check step 5 vs step 10
+        mid_prices = price_paths[:, steps // 2]
+        prob_up_mid = np.sum(mid_prices > current_price) / simulations
+        
+        # If prob increases from mid to final, we have conviction
+        # Velocity = (Prob_Final - Prob_Mid) / Steps
+        velocity = (prob_up - prob_up_mid) * 100 # Scaled score
+        
+        return {
+            'prob_up': prob_up,
+            'prob_down': prob_down,
+            'velocity': velocity,
+            'volatility': volatility
+        }

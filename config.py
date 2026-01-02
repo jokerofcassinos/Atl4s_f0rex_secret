@@ -40,9 +40,9 @@ CACHE_DIR = os.path.join(DATA_DIR, "cache")
 ZMQ_PORT = 5555
 
 # --- SWARM SETTINGS ---
-SWARM_MAX_TRADES = 20 # Increased for Swarm Scalping
-SWARM_COOLDOWN = 15 # Seconds (HFT Agility)
-SWARM_THRESHOLD = 0.55 # Execution Confidence Floor
+SWARM_MAX_TRADES = 50 # Increased Max Trades
+SWARM_COOLDOWN = 10 # Seconds (Faster)
+SWARM_THRESHOLD = 0.30 # Execution Confidence Floor (Lowered for Activity)
 
 # --- LEGACY / ADVANCED ANALYSIS ---
 INVERT_TECHNICALS = False # For Contrarian Testing

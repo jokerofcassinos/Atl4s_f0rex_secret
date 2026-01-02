@@ -4,9 +4,61 @@ import logging
 
 logger = logging.getLogger("Atl4s-Sniper")
 
+class LevelMemory:
+    """
+    Holographic Memory for Support/Resistance.
+    Decays levels over time or touches.
+    """
+    def __init__(self):
+        self.levels = [] # List of dicts: {'price': float, 'type': int, 'strength': float, 'created_at': int}
+        self.max_levels = 20
+        
+    def add_level(self, price, l_type, strength, timestamp):
+        # Check for duplicates (nearby levels)
+        for lvl in self.levels:
+            if abs(lvl['price'] - price) < 0.5: # 50 cents tolerance (Gold)
+                lvl['strength'] = max(lvl['strength'], strength) # Reinforce
+                lvl['created_at'] = timestamp # Refresh
+                return
+        
+        self.levels.append({
+            'price': price, 
+            'type': l_type, # 1=Support, -1=Resistance
+            'strength': strength, 
+            'created_at': timestamp,
+            'touches': 0
+        })
+        
+        # Keep memory clean
+        if len(self.levels) > self.max_levels:
+            # Remove weakest/oldest
+            self.levels.sort(key=lambda x: x['strength'], reverse=True)
+            self.levels.pop()
+            
+    def decay(self, current_price, current_time):
+        # Decay logic: 
+        # 1. Time Decay (Linear)
+        # 2. Touch Decay (Each touch reduces strength)
+        active_levels = []
+        for lvl in self.levels:
+            # Check Touch (Price wicks into level)
+            dist = abs(current_price - lvl['price'])
+            if dist < 1.0: # Close proximity
+                 lvl['touches'] += 1
+                 lvl['strength'] -= 5.0 # Reduce strength per touch
+                 
+            # Time Decay (e.g. -1 strength per minute approx, assuming logic runs per candle)
+            lvl['strength'] -= 0.1 
+            
+            if lvl['strength'] > 10.0:
+                active_levels.append(lvl)
+                
+        self.levels = active_levels
+        return self.levels
+
 class Sniper:
     def __init__(self):
-        pass
+        self.memory = LevelMemory()
 
     def analyze(self, df):
         """
@@ -20,76 +72,75 @@ class Sniper:
 
         score = 0
         direction = 0
+        current_time = df.index[-1].timestamp() if hasattr(df.index[-1], 'timestamp') else 0
+        current_price = df.iloc[-1]['close']
 
-        # Identify Fair Value Gaps (FVG)
-        # Bullish FVG: High[i-2] < Low[i] (Gap between candle i-2 and i)
-        # Bearish FVG: Low[i-2] > High[i]
+        # 1. Update Holographic Memory
+        self.memory.decay(current_price, current_time)
         
-        # We look at the last completed 3 candles (excluding current forming candle if live)
-        # Assuming df includes current candle at -1, we look at -2, -3, -4
-        
-        # Scan last 20 candles for FVG zones
-        lookback = 20
+        # 2. Identify New FVGs & Breakaway Gaps
+        # Bullish FVG: Low[i] > High[i-2]
+        lookback = 10
         start_idx = max(0, len(df) - lookback)
         
-        fvgs = []
-        
         for i in range(start_idx + 2, len(df)):
-             # Bullish FVG: Low[i] > High[i-2]
-             if df.iloc[i]['low'] > df.iloc[i-2]['high']:
-                 gap = df.iloc[i]['low'] - df.iloc[i-2]['high']
-                 if gap > 0:
-                     fvgs.append({'type': 1, 'top': df.iloc[i]['low'], 'bottom': df.iloc[i-2]['high'], 'idx': i})
-                     
-             # Bearish FVG: High[i] < Low[i-2]
-             elif df.iloc[i]['high'] < df.iloc[i-2]['low']:
-                 gap = df.iloc[i-2]['low'] - df.iloc[i]['high']
-                 if gap > 0:
-                     fvgs.append({'type': -1, 'top': df.iloc[i-2]['low'], 'bottom': df.iloc[i]['high'], 'idx': i})
-
-        current_price = df.iloc[-1]['close']
-        
-        # Evaluate Active FVGs
-        for fvg in fvgs:
-            # Check if price is arguably testing this FVG (or inside it)
-            # Bullish FVG (Support)
-            if fvg['type'] == 1:
-                # If price is near/in the gap
-                if fvg['bottom'] <= current_price <= fvg['top'] * 1.05:
-                    score += 40
-                    direction = 1
-                    logger.info(f"Sniper: Price in Bullish FVG Zone ({fvg['bottom']:.2f}-{fvg['top']:.2f})")
-            
-            # Bearish FVG (Resistance)
-            if fvg['type'] == -1:
-                if fvg['bottom'] * 0.95 <= current_price <= fvg['top']:
-                    score += 40
-                    direction = -1
-                    logger.info(f"Sniper: Price in Bearish FVG Zone ({fvg['bottom']:.2f}-{fvg['top']:.2f})")
-                    
-        # If score > 0, we found something.
-        # Cap score
-        if score > 0:
-             if score > 100: score = 100
-             return score, direction
-
-        # --- Liquidity Sweep (Fallback) ---
-        # Did we just grab liquidity (Tortue Soup)?
-        # Look back 10 candles for a high/low
-        subset = df.iloc[-15:-2] 
-        recent_low = subset['low'].min()
-        recent_high = subset['high'].max()
-        
-        last_low = df.iloc[-1]['low']
-        last_high = df.iloc[-1]['high']
-        last_close = df.iloc[-1]['close']
-        
-        # Bullish Sweep: Price went below recent low but closed above it
-        if last_low < recent_low and last_close > recent_low:
-             return 30, 1
+             # Calculate Candle Velocity (Kinematics approximation)
+             # Body size / time? Just use Body Size as proxy for now.
+             body = abs(df.iloc[i-1]['close'] - df.iloc[i-1]['open'])
+             avg_body = (df.iloc[start_idx:i]['high'] - df.iloc[start_idx:i]['low']).mean()
+             is_high_velocity = body > (avg_body * 1.5)
              
-        # Bearish Sweep: Price went above recent high but closed below it
-        if last_high > recent_high and last_close < recent_high:
-             return 30, -1
+             # Bullish FVG
+             if df.iloc[i]['low'] > df.iloc[i-2]['high']:
+                 gap_size = df.iloc[i]['low'] - df.iloc[i-2]['high']
+                 if gap_size > 0.05:
+                     strength = 50 if is_high_velocity else 30 # Breakaway Gaps are stronger
+                     # Add Support Level (Bottom of Gap and Top of Gap are both levels, mostly Top)
+                     self.memory.add_level(df.iloc[i-2]['high'], 1, strength, current_time)
+                     self.memory.add_level(df.iloc[i]['low'], 1, strength, current_time) # Top of support zone
 
-        return 0, 0
+             # Bearish FVG
+             elif df.iloc[i]['high'] < df.iloc[i-2]['low']:
+                 gap_size = df.iloc[i-2]['low'] - df.iloc[i]['high']
+                 if gap_size > 0.05:
+                     strength = 50 if is_high_velocity else 30
+                     self.memory.add_level(df.iloc[i-2]['low'], -1, strength, current_time)
+                     self.memory.add_level(df.iloc[i]['high'], -1, strength, current_time)
+
+        # 3. Evaluate Price vs Memory
+        # Check if we are bouncing off a memory level
+        for lvl in self.memory.levels:
+            dist = abs(current_price - lvl['price'])
+            
+            if dist < 1.0: # Interaction Zone
+                if lvl['type'] == 1: # Support
+                    # Price at Support -> Buy Signal
+                    # Only if we are NOT smashing through it (Velocity check needed externally or via micro)
+                    score += lvl['strength']
+                    direction = 1
+                    logger.info(f"Sniper: HOLOGRAPHIC SUPPORT at {lvl['price']:.2f} (Str {lvl['strength']:.1f})")
+                    
+                elif lvl['type'] == -1: # Resistance
+                    # Price at Resistance -> Sell Signal
+                    score += lvl['strength']
+                    direction = -1
+                    logger.info(f"Sniper: HOLOGRAPHIC RESISTANCE at {lvl['price']:.2f} (Str {lvl['strength']:.1f})")
+
+        # Cap score
+        score = min(score, 100)
+        
+        # Fallback: Liquidity Sweep (Turtle Soup)
+        if score < 20: 
+             subset = df.iloc[-15:-2] 
+             recent_low = subset['low'].min()
+             recent_high = subset['high'].max()
+             last_low = df.iloc[-1]['low']
+             last_high = df.iloc[-1]['high']
+             last_close = df.iloc[-1]['close']
+             
+             if last_low < recent_low and last_close > recent_low:
+                 return 30, 1 # Bullish Sweep
+             if last_high > recent_high and last_close < recent_high:
+                 return 30, -1 # Bearish Sweep
+
+        return score, direction

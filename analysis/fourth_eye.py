@@ -77,13 +77,17 @@ class FourthEye:
         # D. Volatility Multiplier (Entropy)
         # High Volatility = Higher Risk but Higher conviction if aligned.
         # Low Volatility = Noise.
+        # E. Iceberg Weight (Hidden Volume) - NEW v3.1
+        iceberg_score, iceberg_dir = self.analyze_icebergs(df_m5)
+        iceberg_weight = iceberg_score * iceberg_dir * 0.8 # Strong weight
+        
         entropy_factor = 1.0
         if volatility_score > 70: entropy_factor = 1.2 # Boost score in high energy
         elif volatility_score < 10: entropy_factor = 0.8 # Only penalize dead markets (was < 20)
         
         # 3. FINAL SYNTHESIS
-        # Total Quantum Score = (Consensus + SMC + Reality) * Entropy
-        quantum_score = (consensus_weight + smc_weight + reality_weight) * entropy_factor
+        # Total Quantum Score = (Consensus + SMC + Reality + Iceberg) * Entropy
+        quantum_score = (consensus_weight + smc_weight + reality_weight + iceberg_weight) * entropy_factor
         
         action = None
         reason = None
@@ -91,7 +95,7 @@ class FourthEye:
         # 4. DECISION LOGIC (The Singularity)
         # We need a STRONG signal to move the Whale.
         
-        whale_threshold = 40.0 # Lowered from 45.0 for more activity
+        whale_threshold = 30.0 # Lowered from 40.0 for more activity (User Request)
         
         if quantum_score > whale_threshold:
             action = "BUY"
@@ -177,3 +181,62 @@ class FourthEye:
             return action, reason, dynamic_lots
             
         return None, None, 0
+
+    def analyze_icebergs(self, df):
+        """
+        Detects Hidden Volume (Icebergs).
+        Logic: High Volume + Low Range = Absorption.
+        Returns: (Score, Direction)
+        """
+        if len(df) < 20: return 0, 0
+        
+        # 1. Prepare Data
+        # Calculate Range first so it's in 'last'
+        df['range'] = df['high'] - df['low']
+        
+        last = df.iloc[-1]
+        
+        # 2. Relative Volume
+        # Handle different column names (tick_volume vs Volume)
+        vol_col = 'tick_volume' if 'tick_volume' in df.columns else 'Volume' if 'Volume' in df.columns else 'volume'
+        
+        if vol_col not in df.columns:
+             # No volume data available
+             return 0, 0
+             
+        avg_vol = df[vol_col].rolling(20).mean().iloc[-1]
+        curr_vol = last[vol_col]
+        
+        # 3. Relative Range
+        avg_range = df['range'].rolling(20).mean().iloc[-1]
+        curr_range = last['range']
+        
+        if avg_range == 0: return 0, 0
+        
+        # ICEBERG RATIO: (Vol / AvgVol) / (Range / AvgRange)
+        # If Vol is 2.0x and Range is 0.5x, Ratio is 4.0 (Huge Absorption)
+        vol_ratio = curr_vol / avg_vol if avg_vol > 0 else 0
+        range_ratio = curr_range / avg_range if avg_range > 0 else 1.0
+        
+        iceberg_score = 0
+        direction = 0
+        
+        if vol_ratio > 1.5 and range_ratio < 0.7:
+             # Absorption Detected
+             # Direction? Look at Close vs Open
+             # If Close > Open, absorption was likely Buying (Demand absorbing Supply)
+             # Actually, if price didn't move much, we look at the 'Close' relative to 'Low'/'High'
+             # Pinbar logic basically
+             
+             iceberg_score = 50 * (vol_ratio / range_ratio) # Dynamic score
+             iceberg_score = min(iceberg_score, 100)
+             
+             # Determine nature of absorption
+             if last['close'] > last['open']:
+                 direction = 1 # Buying Absorption
+                 logger.info(f"WHALE: Iceberg Buying Detected (Ratio {vol_ratio/range_ratio:.1f})")
+             else:
+                 direction = -1 # Selling Absorption (Blocking)
+                 logger.info(f"WHALE: Iceberg Selling Detected (Ratio {vol_ratio/range_ratio:.1f})")
+                 
+        return iceberg_score, direction

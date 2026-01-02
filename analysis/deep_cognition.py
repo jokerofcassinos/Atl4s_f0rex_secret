@@ -39,14 +39,9 @@ class DeepCognition:
         # "Neurons that fire together, wire together."
         pass # Placeholder for v2.1 Feedback Learning loop
 
-    def consult_subconscious(self, trend_score, volatility_score, pattern_score, smc_score, df_m5=None, live_tick=None, details=None):
+    def consult_subconscious(self, trend_score, volatility_score, pattern_score, smc_score, df_m5=None, df_m1=None, live_tick=None, details=None):
         """
-        Weighted consensus of different 'brain' parts, augmented by:
-        - Cortex (Memory)
-        - Quantum (Entropy/Kalman)
-        - Microstructure (Flow)
-        - Kinematics (Physical Force)
-        - Oracle (Pre-Cognition)
+        Deep Neural Analysis (Now with M1 Micro-Fidelity).
         """
         
         # 0. Update Microstructure (Fast Brain)
@@ -55,6 +50,14 @@ class DeepCognition:
             
         micro_metrics = self.micro.analyze()
         
+        # 0.5 M1 Micro-Sentiment (New Layer)
+        m1_sentiment = 0
+        if df_m1 is not None and not df_m1.empty:
+            # Simple Impulse Check (Last 3 candles)
+            closes = df_m1['close'].values[-3:]
+            if closes[-1] > closes[0]: m1_sentiment = 20
+            else: m1_sentiment = -20
+            
         # 1. Base Instincts (Using Adaptive Weights)
         w = self.weights
         

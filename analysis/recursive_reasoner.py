@@ -77,12 +77,31 @@ class RecursiveReasoner:
                     
             # 3. Refine
             if adversarial_veto:
-                current_score *= 0.8 # Reduce confidence
-                history.append(f"Iter {i}: Conflict detected. {reason}")
-                if current_score < 40: # If confidence drops below threshold
-                    current_decision = "WAIT"
-                    history.append("Result: Veto Entry.")
+                # ENLIGHTENED PIVOT PROTOCOL
+                # If the Debate proves the original decision wrong, we don't just stop.
+                # We align with the stronger truth (The Future Path).
+                
+                # Check magnitude of disagreement
+                path_delta = (avg_future - last_price) / last_price
+                
+                if abs(path_delta) > 0.0002: # Significant drift (2 bps)
+                    history.append(f"Iter {i}: Conflict detected. {reason}")
+                    history.append("Result: ENLIGHTENED PIVOT. Switching Decision.")
+                    
+                    # Flip Decision
+                    current_decision = "SELL" if current_decision == "BUY" else "BUY"
+                    current_score = max(50.0, current_score) # Reset score to baseline confidence
+                    
+                    # Break loop, we found a new truth
                     break
+                else:
+                    # Weak conflict, just reduce score (Caution)
+                    current_score *= 0.8 
+                    history.append(f"Iter {i}: Minor Conflict ({reason}). Reducing confidence.")
+                    if current_score < 40:
+                         current_decision = "WAIT"
+                         history.append("Result: Veto Entry (Weak Conviction).")
+                         break
             else:
                 current_score *= 1.1 # Reinforce confidence
                 history.append(f"Iter {i}: Path confirms direction.")

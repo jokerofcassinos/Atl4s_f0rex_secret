@@ -22,6 +22,7 @@ class DataLoader:
         
         # Timeframes to fetch
         timeframes = [
+            ("M1", "1m", 7), # High-Fidelity Micro-Structure (7 Days)
             ("M5", "5m", 59), 
             ("H1", "1h", 720), 
             ("D1", "1d", 3650), # 10 years for swing context

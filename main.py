@@ -31,7 +31,11 @@ from analysis.second_eye import SecondEye
 from analysis.fourth_eye import FourthEye
 from analysis.tenth_eye import TenthEye
 from analysis.eleventh_eye import EleventhEye
+from analysis.tenth_eye import TenthEye
+from analysis.eleventh_eye import EleventhEye
+from analysis.thirteenth_eye import ThirteenthEye # Quantum Grid Scalper
 from analysis.trade_manager import TradeManager
+
 
 # Setup Logging
 logging.basicConfig(
@@ -191,8 +195,11 @@ def main():
     sniper = SecondEye()
     whale = FourthEye() # The Consensus Commander
     tenth_eye = TenthEye() # The Holographic Architect
+    tenth_eye = TenthEye() # The Holographic Architect
     eleventh_eye = EleventhEye() # The Gap Exploiter
+    thirteenth_eye = ThirteenthEye() # The Time-Knife
     trade_manager = TradeManager() # For Active Management
+
 
     # Dashboard Publisher
     context = zmq.Context()
@@ -226,7 +233,9 @@ def main():
     details = {}
     phy_state = "INITIALIZING"
     future_prob = 0.5
+    future_prob = 0.5
     lot_multiplier = 1.0
+    current_equity = config.INITIAL_CAPITAL # Initialize globally for Thirteenth Eye
     
     sp_tz = pytz.timezone('America/Sao_Paulo')
     
@@ -270,7 +279,7 @@ def main():
             
             # --- STARTUP WARMUP PROTOCOL ---
             is_warming_up = False
-            if time.time() - bot_start_time < 120: # 2 Minute Warmup
+            if time.time() - bot_start_time < 10: # Reduced to 10s (User Request: Immediate Action)
                  is_warming_up = True
             
             # This ensures we hit Virtual TPs immediately upon tick arrival.
@@ -309,7 +318,8 @@ def main():
                               pos_dict, 
                               final_cortex_decision, 
                               micro_stats.get('velocity', 0), 
-                              time.time()
+                              time.time(),
+                              probability=abs(original_base_score)
                           )
                           if abort_signal:
                                ticket = abort_signal['ticket']
@@ -434,6 +444,7 @@ def main():
                         pattern_score=reality_score,
                         smc_score=smc_score,
                         df_m5=df_m5,
+                        df_m1=data_map.get('M1'), # NEW: High Scale Input
                         live_tick=live_tick,
                         details=details
                     )
@@ -464,6 +475,29 @@ def main():
                         final_cortex_decision = gap_res['score']
                         logger.info(f"[!] ELEVENTH EYE OVERRIDE: {gap_res['action']} (Score: {gap_res['score']:.1f})")
                         details['EleventhEye'] = gap_res
+                        
+                    # 6. Thirteenth Eye (Quantum Grid) - HIGHEST PRIORITY (M1 Scalp)
+                    # "Executes various minimum slots in the same candle"
+                    quantum_grid = thirteenth_eye.scan_for_reversal(
+                        data_map.get('M1'), 
+                        current_equity, 
+                        time.time()
+                    )
+                    
+                    if quantum_grid:
+                        # Override EVERYTHING. This is a sniper shot.
+                        direction = 1 if quantum_grid['action'] == "BUY" else -1
+                        # Force Score to 100 or -100
+                        final_cortex_decision = 100.0 * direction
+                        # Inject Volume info
+                        details['QuantumGrid'] = quantum_grid
+                        
+                        # CRITICAL: Update Base Scores so Whale/Swarm see the Override
+                        original_base_score = 100.0 * direction
+                        base_score = 100.0 * direction
+                        
+                        logger.info(f"[!!!] THIRTEENTH EYE TRIGGER: {quantum_grid['reason']}. FULL OVERRIDE (Score: {final_cortex_decision}).")
+
                     
                     # Update Weights based on Architect
                     # (Optional: Modify 'details' weights if ConsensusEngine supported dynamic weights per tick)
@@ -532,19 +566,26 @@ def main():
             # User Feedback: "Wrong orders" in crash start (Low ADX).
             # If River says UP/DOWN, we align with it.
             # EXCEPTION: If Market is Vertical, we ignore Trend (Physics Overrides History)
+            # FORCE INVERSION if River is Active (Ignore ADX Lag)
+            # User Feedback: "Wrong orders" in crash start (Low ADX).
+            # But "blocking 100.0 score" is too strict.
+            # EXCEPTION: If Market is Vertical OR Score is Extreme (>80), we override Trend.
             if h1_river != 0 and not is_vertical_crash and not is_vertical_rocket:
                 quant_z = details.get('Quant', {}).get('z_score', 0)
                 
-                # 1. Bearish Trend + Buy Signal -> FLIP TO SELL
-                # 1. Bearish Trend + Buy Signal -> BLOCK (VETO)
-                if h1_river == -1 and final_cortex_decision > 0:
-                    logger.info(f"[SMART] VETO: Blocking BUY ({final_cortex_decision:.1f}) due to BEARISH RIVER. Waiting for Trend Alignment.")
-                    final_cortex_decision = 0 # NEUTRAL (Do not Invert)
-                    
-                # 2. Bullish Trend + Sell Signal -> BLOCK (VETO)
-                elif h1_river == 1 and final_cortex_decision < 0:
-                    logger.info(f"[SMART] VETO: Blocking SELL ({final_cortex_decision:.1f}) due to BULLISH RIVER. Waiting for Trend Alignment.")
-                    final_cortex_decision = 0 # NEUTRAL (Do not Invert)
+                # Allow Counter-Trend if Singularity/Extreme Conviction
+                is_extreme_conviction = abs(final_cortex_decision) > 80
+                
+                if not is_extreme_conviction:
+                    # 1. Bearish Trend + Buy Signal -> BLOCK (VETO)
+                    if h1_river == -1 and final_cortex_decision > 0:
+                        logger.info(f"[SMART] VETO: Blocking BUY ({final_cortex_decision:.1f}) due to BEARISH RIVER. Waiting for Trend Alignment.")
+                        final_cortex_decision = 0 # NEUTRAL (Do not Invert)
+                        
+                    # 2. Bullish Trend + Sell Signal -> BLOCK (VETO)
+                    elif h1_river == 1 and final_cortex_decision < 0:
+                        logger.info(f"[SMART] VETO: Blocking SELL ({final_cortex_decision:.1f}) due to BULLISH RIVER. Waiting for Trend Alignment.")
+                        final_cortex_decision = 0 # NEUTRAL (Do not Invert)
 
             # --- CRASH GUARD (Falling Knife Protection) ---
             # If the last closed candle was a huge crash (> 3x ATR), forbid BUYs for safety.
@@ -625,10 +666,10 @@ def main():
             block_buys = False
             block_sells = False
             
-            if micro_velocity < -0.6:
+            if micro_velocity < -1.5:
                 logger.warning(f"CRASH DETECTED (v={micro_velocity:.2f}): BLOCKING ALL BUYS.")
                 block_buys = True
-            elif micro_velocity > 0.6:
+            elif micro_velocity > 1.5:
                 logger.warning(f"ROCKET DETECTED (v={micro_velocity:.2f}): BLOCKING ALL SELLS.")
                 block_sells = True
             
@@ -650,6 +691,7 @@ def main():
                 swarm_action, swarm_reason, swarm_price = swarm.process_tick(
                     tick=live_tick,
                     df_m5=df_m5,
+                    df_m1=data_map.get('M1'), # Unified Field Input
                     alpha_score=final_cortex_decision, # SmartBrain
                     tech_score=original_base_score,    # Retail Technical
                     phy_score=orbit_energy,            # Physics Energy
@@ -1003,8 +1045,24 @@ def main():
                 pass
                 
     
-            # Reduce Latency: Sleep significantly less to catch ticks
-            time.sleep(0.01)
+            # --- CHRONOS DILATOR (Project Tachyon) ---
+            # Dynamic Time Dilation based on Market Entropy.
+            # High Entropy/Vol -> Dilate Time (Slow down to prevent noise? No, Speed UP to catch volatility?)
+            # Wait: High Volatility = Fast Moves = Need FASTER polling.
+            # Low Volatility = Dead Market = SLEEP longer to save CPU.
+            
+            vol_s = details.get('Volatility', {}).get('score', 10) # Default low
+            # Map Vol 0-100 to Sleep 2.0s - 0.001s
+            # Linear or Exponential?
+            # Vol 100 -> Sleep 0.001
+            # Vol 0   -> Sleep 2.0
+            
+            # sleep = 2.0 * (1 - (vol/120)) ... simplified
+            target_sleep = max(0.001, 2.0 - (vol_s / 50.0))
+            if vol_s > 80: target_sleep = 0.001 # Hyper-speed
+            
+            # Reduce Latency
+            time.sleep(target_sleep)
 
     except KeyboardInterrupt:
         logger.info("Shutdown Signal.")

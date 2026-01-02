@@ -170,13 +170,13 @@ class RiskManager:
         margin_free = account_info.get('margin_free', 0)
         margin_level = account_info.get('margin_level', 9999)
         
-        # Critical Stop if Margin Level < 150%
-        if margin_level < 150:
+        # Critical Stop if Margin Level < 100% (Lowered for 1:3000)
+        if margin_level < 100:
             logger.warning(f"CRITICAL MARGIN: Level {margin_level:.2f}% too low. No new trades.")
             return False
             
-        # Absolute buffer (e.g. need at least $10 free)
-        if margin_free < 10:
+        # Absolute buffer (Lowered to $1.50 for Micro-Accounts)
+        if margin_free < 1.5:
             logger.warning(f"CRITICAL MARGIN: Free Margin ${margin_free:.2f} too low.")
             return False
             
@@ -185,7 +185,7 @@ class RiskManager:
     def calculate_safe_margin_lots(self, equity, free_margin, current_price, leverage):
         """
         Calculates the absolute maximum lots allowed by available margin.
-        Safety Buffer: Uses only 90% of Free Margin.
+        Safety Buffer: Uses 95% of Free Margin.
         """
         # Standard Lot = 100 Units of Gold (for XAUUSD)
         # Margin Required = (Price * ContractSize) / Leverage
@@ -195,10 +195,22 @@ class RiskManager:
         # Avoid division by zero
         if margin_per_lot <= 0: return 0.01
         
-        # Use 90% of free margin (Safety Buffer)
-        safe_margin = free_margin * 0.90
+        # Use 95% of free margin (Safety Buffer)
+        safe_margin = free_margin * 0.95
         
         max_lots = safe_margin / margin_per_lot
+        
+        # Debug Log
+        # logger.debug(f"Margin Calc: Free=${free_margin:.2f} | 1 Lot=${margin_per_lot:.2f} | Max Lots={max_lots:.2f}")
+        
+        # Hard Floor
+        if max_lots < 0.01: max_lots = 0.0
+        
+        # Round down to 2 decimals
+        import math
+        max_lots = math.floor(max_lots * 100) / 100.0
+        
+        return max_lots
         
         # Hard Floor
         if max_lots < 0.01: max_lots = 0.0
