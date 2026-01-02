@@ -113,28 +113,49 @@ class RiskManager:
             
         return tp
 
-    def calculate_dynamic_lot(self, current_equity):
+    def calculate_quantum_lots(self, current_equity, confidence_score=0.0, entropy=0.5):
         """
-        Calculates lot size based on linear scaling.
-        OLD: (Equity / 30) * 0.02 -> Too Aggressive ($5k = 3.3 lots).
-        NEW: (Equity / 500) * 0.05 -> Safer ($5k = 0.50 lots).
+        Hyper-Dynamic Risk Engine (Quantum Sigmoid Scaling).
+        User Request: "Dynamic, Ultra-Complex, High Scale".
+        
+        Logic:
+        1. Base Power Law: Equity^0.65 (Diminishing returns but infinite growth).
+        2. Brain Factor: Confidence Score (-100 to 100) boosts/cuts size.
+        3. Entropy Factor: High Chaos -> Lower Size.
+        4. Sigmoid Cap: Smooth limit approaching 2.5 Lots.
         """
-        # Conservative Scaling
-        base_runs = current_equity / 500.0 # How many '500 blocks' do we have?
-        base_lots = 0.05 # Per $500
+        if current_equity < 30: return 0.01
+
+        # 1. Base Power Law Scaling
+        # $5000 ^ 0.65 = 253.
+        # Divisor = 350. -> Base = 0.72 Lots.
+        base_lots = (pow(current_equity, 0.65)) / 350.0
         
-        raw_lots = base_runs * base_lots
+        # 2. Confidence Multiplier (Brain)
+        # Score 0 -> 1.0x
+        # Score 100 -> 1.5x
+        # Score -50 -> 0.75x
+        conf_factor = 1.0 + (abs(confidence_score) / 200.0) # Max 1.5x at 100 score
         
-        # Minimum Floor
-        if raw_lots < 0.01: raw_lots = 0.01
+        # 3. Entropy Damper (Chaos)
+        # Entropy 0.0 (Pure) -> 1.2x
+        # Entropy 1.0 (Chaos) -> 0.8x
+        entropy_factor = 1.2 - (entropy * 0.4)
         
-        # Round to 2 decimals
-        final_lots = round(raw_lots, 2)
+        raw_lots = base_lots * conf_factor * entropy_factor
         
-        # Hard Safety Cap (User "Scared" of 3.3)
-        # We cap Base Lots at 0.40. 
-        # With Singularity (3x), this becomes 1.2 lots (Max Aggression).
-        if final_lots > 0.40: final_lots = 0.40
+        # 4. Sigmoid Soft Cap (Asymptote at 2.5)
+        # Formula: L = Max * tanh(raw / Max)
+        # This allows linear growth initially but curves flat as it approaches Max.
+        MAX_CEILING = 2.5
+        import math
+        final_lots = MAX_CEILING * math.tanh(raw_lots / MAX_CEILING)
+        
+        # 5. Floors and Rounding
+        if final_lots < 0.01: final_lots = 0.01
+        final_lots = round(final_lots, 2)
+        
+        logger.info(f"Quantum Risk: Eq ${current_equity:.0f} -> Base {base_lots:.2f} * Conf {conf_factor:.2f} * Ent {entropy_factor:.2f} = {raw_lots:.2f} -> Sigmoid {final_lots:.2f}")
         
         return final_lots
 

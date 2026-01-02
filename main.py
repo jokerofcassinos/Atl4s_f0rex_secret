@@ -518,9 +518,13 @@ def main():
                         final_cortex_decision = 0
             except: pass 
                 
-            # Calculate Dynamic Lots
-            # Note: We use the base dynamic lot here, then applying multipliers
-            dynamic_base_lots = risk_manager.calculate_dynamic_lot(current_equity)
+            # Calculate Dynamic Lots (QUANTUM SIGMOID LOGIC)
+            # Scaling with Equity, Brain Confidence, and Chaos
+            dynamic_base_lots = risk_manager.calculate_quantum_lots(
+                current_equity, 
+                confidence_score=final_cortex_decision,
+                entropy=micro_stats.get('entropy', 0.5)
+            )
             
             # --- MARGIN SAFETY GUARD ---
             # Calculate absolute max lots allowed by margin (90% usage cap of FREE MARGIN)
