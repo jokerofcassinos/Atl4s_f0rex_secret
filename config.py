@@ -1,72 +1,55 @@
+
+# Configuration for Atl4s-Forex Bot V2.0
+# "Deep Awakening"
+
 import os
-from datetime import time
 
-# --- Global Configuration ---
-PROJECT_NAME = "Atl4s-Forex"
-VERSION = "1.0.0"
+# --- BROKER SETTINGS ---
+SYMBOL = "XAUUSD" # Gold
+TIMEFRAME = 5 # M5
+MAGIC_NUMBER = 123456
+LEVERAGE = 3000 # UPGRADED: 1:3000 (Ultra High Leverage)
 
-# --- Timezone Settings ---
-TIMEZONE = "America/Sao_Paulo"  # Brasilia Time
-TRADING_START_TIME = time(0, 0)
-TRADING_LAST_ENTRY_TIME = time(23, 59) # Don't enter new trades after this
-TRADING_END_TIME = time(23, 59)
+# --- RISK MANAGEMENT ---
+INITIAL_CAPITAL = 30.0 # Default fallback
+RISK_PER_TRADE = 0.02 # 2% per trade (Standard)
+MAX_LOTS_PER_TRADE = 5.0 # Increased absolute Cap
+DYNAMIC_LOT_SCALING = True # Use Quantum Lot Sizing
 
-# --- Paths ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
+# --- OPERATION WINDOW ---
+START_HOUR = 10 # 10:00 (London/NY Overlap)
+END_HOUR = 16 # 16:00 (End of active session)
+
+# --- MODULE TOGGLES ---
+ENABLE_FIRST_EYE = True # Scalp Swarm (HFT)
+ENABLE_SECOND_EYE = True # The Sniper (FVG)
+ENABLE_FOURTH_EYE = True # The Whale (Consensus)
+
+# --- SCALPING PARAMETERS (XAUUSD) ---
+SCALP_TP = 2.00 # $2.00 Gold Move (200 points)
+SCALP_SL = 1.50 # $1.50 Gold Move (150 points) - Tighter Stop
+TRAILING_STOP = True
+TRAILING_START = 1.00 # Start trailing after $1 profit
+TRAILING_STEP = 0.50
+
+# --- DATA PATHS ---
+DATA_DIR = "data"
 CACHE_DIR = os.path.join(DATA_DIR, "cache")
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
-REPORTS_DIR = os.path.join(BASE_DIR, "reports")
-MT5_PATH = r"C:\Users\pichau\AppData\Roaming\MetaQuotes\Terminal\776D2ACDFA4F66FAF3C8985F75FA9FF6"
 
-# --- Trading Parameters ---
-SYMBOL = "XAUUSD"
-TIMEFRAME = "M5"
-INITIAL_CAPITAL = 390.0
-RISK_PER_TRADE = 0.05  # 5% risk per trade (Reduced from 10% for survivability)
-LEVERAGE = 500  # Assumed leverage, adjust as needed
-INVERT_TECHNICALS = True # Set to True to fade the retail trend (Buy becomes Sell)
+# --- NETWORK ---
+ZMQ_PORT = 5555
 
-# --- First Eye (Auto-Scalper) Settings ---
-ENABLE_FIRST_EYE = True
-ENABLE_SECOND_EYE = True # The Sniper
-ENABLE_FOURTH_EYE = True # The Whale (Consensus > 33)
-ENABLE_FIFTH_EYE = True # The Oracle (Swing/Intermarket)
-ENABLE_SIXTH_EYE = True # The Council (Secular/Position)
-SCALP_SL = 20.0 # Stop Loss ($20.00 USD Risk per 0.01) - User Request
-SCALP_TP = 0.70 # Take Profit ($0.70 USD Gain per 0.01)
-SCALP_LOTS = 0.13 # Fixed Lot Size
-SWING_LOTS = 0.26 # For Fifth Eye
-POSITION_LOTS = 0.52 # For Sixth Eye (Senior Council)
-POSITION_LOTS = 0.52 # For Sixth Eye (Senior Council)
-MAX_LOTS_PER_TRADE = 2.50 # HYPER-DYNAMIC CAP (Sigmoid Curve Limit)
+# --- SWARM SETTINGS ---
+SWARM_MAX_TRADES = 20 # Increased for Swarm Scalping
+SWARM_COOLDOWN = 15 # Seconds (HFT Agility)
+SWARM_THRESHOLD = 0.55 # Execution Confidence Floor
 
-# --- Intermarket Symbols ---
+# --- LEGACY / ADVANCED ANALYSIS ---
+INVERT_TECHNICALS = False # For Contrarian Testing
 INTERMARKET_SYMBOLS = {
-    "DXY": "DX-Y.NYB",     # US Dollar Index
-    "US10Y": "^TNX",       # 10Y Treasury Yield
-    "SPX": "^GSPC",        # S&P 500
-    "OIL": "CL=F"          # Crude Oil
+    'DXY': 'DX-Y.NYB',
+    'US10Y': '^TNX',
+    'SPX': '^GSPC',
+    'OIL': 'CL=F'
 }
 
-# --- Swarm Settings ---
-SWARM_MAX_TRADES = 5
-SWARM_COOLDOWN = 10 # Seconds
-SWARM_EYE_WEIGHTS = {
-    'hybrid': 0.2,
-    'pullback': 0.2,
-    'momentum': 0.2,
-    'ofi': 0.2,
-    'hurst_climax': 0.2
-}
-SWARM_THRESHOLD = 0.5 # Consensus required to fire
-SWARM_ENTROPY_LIMITS = (0.2, 2.5) # Min/Max Entropy for execution
-
-# --- ZeroMQ Settings ---
-# --- ZeroMQ Settings ---
-ZMQ_REQ_PORT = 5557  # Request/Reply port (Changed to avoid conflict)
-ZMQ_SUB_PORT = 5558  # Publish/Subscribe port
-
-# --- Ensure Directories Exist ---
-for path in [DATA_DIR, CACHE_DIR, LOGS_DIR, REPORTS_DIR]:
-    os.makedirs(path, exist_ok=True)

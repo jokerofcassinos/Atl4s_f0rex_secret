@@ -54,6 +54,7 @@ def check_market_status():
 
 def main():
     logger.info("--- Atl4s-Forex System 2.0: Deep Awakening ---")
+    bot_start_time = time.time() # Startup Timer for Warmup Protocol
     
     if not check_market_status():
         print("\n" + "!"*50)
@@ -266,6 +267,12 @@ def main():
                  
             # --- ACTIVE POSITION MANAGEMENT (High Priority: <10ms latency) ---
             # Moves 0: Monitor & Close BEFORE Thinking or Analyzing
+            
+            # --- STARTUP WARMUP PROTOCOL ---
+            is_warming_up = False
+            if time.time() - bot_start_time < 120: # 2 Minute Warmup
+                 is_warming_up = True
+            
             # This ensures we hit Virtual TPs immediately upon tick arrival.
             open_positions = mt5_monitor.get_open_positions() 
             if open_positions:
@@ -296,7 +303,23 @@ def main():
                          notif_manager.send_notification("INSTANT PROFIT", f"{reason}", "PROFIT")
                          continue # Skip other checks for this position if closed
 
-                     # 2. Trailing Stop
+                     # 2. Micro-Stop (Instant Regret) - NEW
+                     if config.ENABLE_FIRST_EYE: # Assuming we use Deep Brain score which is mapped to 'final_cortex_decision'
+                          abort_signal = trade_manager.check_early_abort(
+                              pos_dict, 
+                              final_cortex_decision, 
+                              micro_stats.get('velocity', 0), 
+                              time.time()
+                          )
+                          if abort_signal:
+                               ticket = abort_signal['ticket']
+                               reason = abort_signal['reason']
+                               logger.warning(f"[!] MICRO-STOP: {reason} | Closing Ticket {ticket}...")
+                               mt5_monitor.close_position(ticket)
+                               notif_manager.send_notification("MICRO-STOP", f"{reason}", "PROTECT")
+                               continue
+                     
+                     # 3. Trailing Stop
                      new_sl = trade_manager.check_trailing_stop(pos_dict, live_tick['last'], struc_low, struc_high)
                      if new_sl:
                          bridge.send_command("MODIFY_TRADE", [str(pos_dict['ticket']), normalize_price(new_sl), str(pos_dict['tp'])])
@@ -462,10 +485,39 @@ def main():
                 current_margin_free = acc_stats.get('margin_free', 0)
                 
             # Check Margin Survival BEFORE Thinking about trading
-            if not risk_manager.check_margin_survival(acc_stats):
+            if is_warming_up:
+                logger.info(f"WARMUP: Calibrating Neural Pathways... ({int(120 - (time.time() - bot_start_time))}s left)")
+                final_cortex_decision = 0
+            
+            elif not risk_manager.check_margin_survival(acc_stats):
                 # Force "Wait" state if margin is critical
                 logger.warning("SKIPPING TRADES: Low Margin Protection Active.")
                 final_cortex_decision = 0 
+                
+            # --- QUANTUM VERTICALITY PROTOCOL (Twelfth Eye) ---
+            # User Request: "Complex Reasoning for Vertical Markets".
+            # If Velocity is Extreme, we DISABLE Mean Reversion and FORCE Momentum.
+            
+            micro_velocity = micro_stats.get('velocity', 0)
+            is_vertical_crash = micro_velocity < -0.8
+            is_vertical_rocket = micro_velocity > 0.8
+            
+            if is_vertical_crash:
+                 # If Brain wants to BUY (Reversion) during a Crash, we FORCE alignment with Gravity.
+                 if final_cortex_decision > 0.1: 
+                     logger.warning(f"[!] VERTICAL CRASH (v={micro_velocity:.2f}): Overriding Reversion BUY -> Momentum SELL.")
+                     final_cortex_decision = -abs(final_cortex_decision) # Force Sell
+                 # If Brain already wants to Sell, we Boost it.
+                 elif final_cortex_decision < -0.1:
+                     final_cortex_decision *= 1.5 # Boost Conviction
+                 
+            elif is_vertical_rocket:
+                 # If Brain wants to SELL (Reversion) during a Rocket, we FORCE alignment with Thrust.
+                 if final_cortex_decision < -0.1:
+                     logger.warning(f"[!] VERTICAL ROCKET (v={micro_velocity:.2f}): Overriding Reversion SELL -> Momentum BUY.")
+                     final_cortex_decision = abs(final_cortex_decision) # Force Buy
+                 elif final_cortex_decision > 0.1:
+                     final_cortex_decision *= 1.5 # Boost Conviction 
                 
             # --- TREND ALIGNMENT PROTOCOL (Smart Inversion) ---
             # User Request: "Reverse the wrong signal" using advanced reasoning.
@@ -479,30 +531,20 @@ def main():
             # FORCE INVERSION if River is Active (Ignore ADX Lag)
             # User Feedback: "Wrong orders" in crash start (Low ADX).
             # If River says UP/DOWN, we align with it.
-            if h1_river != 0:
+            # EXCEPTION: If Market is Vertical, we ignore Trend (Physics Overrides History)
+            if h1_river != 0 and not is_vertical_crash and not is_vertical_rocket:
                 quant_z = details.get('Quant', {}).get('z_score', 0)
                 
                 # 1. Bearish Trend + Buy Signal -> FLIP TO SELL
+                # 1. Bearish Trend + Buy Signal -> BLOCK (VETO)
                 if h1_river == -1 and final_cortex_decision > 0:
-                    # OVERSOLD PROTECTION (User: "Wait 2 candles").
-                    # Don't Sell if Z-Score is already crashing (< -2.5)
-                    if quant_z < -2.5:
-                        logger.warning(f"📉 SMART WAIT: Inversion wants to SELL, but Market is OVERSOLD (Z {quant_z:.2f}). Waiting for Bounce.")
-                        final_cortex_decision = 0
-                    else:
-                        logger.info(f"[SMART] INVERSION: Flipping BUY ({final_cortex_decision:.1f}) -> SELL due to BEARISH RIVER.")
-                        final_cortex_decision = -abs(final_cortex_decision) # Force Negative
+                    logger.info(f"[SMART] VETO: Blocking BUY ({final_cortex_decision:.1f}) due to BEARISH RIVER. Waiting for Trend Alignment.")
+                    final_cortex_decision = 0 # NEUTRAL (Do not Invert)
                     
-                # 2. Bullish Trend + Sell Signal -> FLIP TO BUY
+                # 2. Bullish Trend + Sell Signal -> BLOCK (VETO)
                 elif h1_river == 1 and final_cortex_decision < 0:
-                    # OVERBOUGHT PROTECTION
-                    # Don't Buy if Z-Score is already parabolic (> 2.5)
-                    if quant_z > 2.5:
-                         logger.warning(f"📈 SMART WAIT: Inversion wants to BUY, but Market is OVERBOUGHT (Z {quant_z:.2f}). Waiting for Dip.")
-                         final_cortex_decision = 0
-                    else:
-                        logger.info(f"🧠 SMART INVERSION: Flipping SELL ({final_cortex_decision:.1f}) -> BUY due to BULLISH RIVER.")
-                        final_cortex_decision = abs(final_cortex_decision) # Force Positive
+                    logger.info(f"[SMART] VETO: Blocking SELL ({final_cortex_decision:.1f}) due to BULLISH RIVER. Waiting for Trend Alignment.")
+                    final_cortex_decision = 0 # NEUTRAL (Do not Invert)
 
             # --- CRASH GUARD (Falling Knife Protection) ---
             # If the last closed candle was a huge crash (> 3x ATR), forbid BUYs for safety.
@@ -737,6 +779,14 @@ def main():
                      volatility_score=vol_score,
                      base_lots=dynamic_base_lots # Pass Capital-Based Lots
                 )
+                
+                # APPLY PHYSICS GUARD (Fix for "Ultra Wrong Buy")
+                if block_buys and whale_action == "BUY": 
+                     whale_action = "WAIT"
+                     logger.warning(f"Whale BLOCKED by Crash Guard (v={micro_velocity:.2f})")
+                if block_sells and whale_action == "SELL": 
+                     whale_action = "WAIT"
+                     logger.warning(f"Whale BLOCKED by Rocket Guard (v={micro_velocity:.2f})")
                 
                 if whale_action:
                     # Execute Whale Trade
