@@ -126,49 +126,49 @@ def main():
         Enforces minimum StopsLevel distance relative to the correct price anchor (Bid/Ask).
         Returns (valid_sl, valid_tp) adjusted if necessary.
         """
-        # Hard Minimum Fallback: 500 points (5.00 on Gold) to force valid distance
-        # Error 10016 means we are too close or pricing is invalid.
-        # We enforce a HUGE gap to ensure acceptance.
-        effective_stops_level = max(symbol_stops_level, 500) 
+        # Hard Minimum Fallback: 200 points ($2.00 on Gold) - Safer for scalping but valid
+        # Error 10016 = Stops too close. 
+        effective_stops_level = max(symbol_stops_level, 200) 
         min_dist = effective_stops_level * symbol_point
         
-        # Add a massive operational buffer (e.g. 300 points) to survive volatility/slippage
-        safe_dist = min_dist + (300 * symbol_point) 
+        # Buffer: Add 50 points ($0.50) breathing room
+        safe_dist = min_dist + (50 * symbol_point) 
         
+        # LOGGING FOR DEBUGGING
+        # logger.debug(f"Validate SL/TP: Bid={current_bid}, Ask={current_ask}, SL={sl}, TP={tp}, Cmd={cmd_type}, SafeDist={safe_dist}")
+
         if cmd_type == "BUY":
             # BUY Order:
             # SL must be below Bid: (Bid - SL) >= safe_dist  =>  SL <= Bid - safe_dist
-            # TP must be above Ask (Exec at Ask, Target Price > Ask) 
-            # Note: MT5 checks TP distance from Bid for Buy? No, usually Bid->Ask close.
-            # Safest: TP >= Ask + safe_dist
+            # TP must be above Ask (Exec at Ask, Target Price > Ask) -> TP >= Ask + safe_dist
             
             # 1. Validate SL (Anchor: BID)
             max_sl = current_bid - safe_dist
             if sl > max_sl:
-                logger.warning(f"BUY SL too close to Bid ({sl} > {max_sl}). Pushing down.")
+                # logger.warning(f"BUY SL too close to Bid ({sl} > {max_sl}). Pushing down.")
                 sl = max_sl
                 
             # 2. Validate TP (Anchor: ASK)
             min_tp = current_ask + safe_dist
             if tp < min_tp:
-                logger.warning(f"BUY TP too close to Ask ({tp} < {min_tp}). Pushing up.")
+                # logger.warning(f"BUY TP too close to Ask ({tp} < {min_tp}). Pushing up.")
                 tp = min_tp
 
         else: # SELL
             # SELL Order:
             # SL must be above Ask: (SL - Ask) >= safe_dist  =>  SL >= Ask + safe_dist
-            # TP must be below Bid (Exec at Bid, Target Price < Bid)
+            # TP must be below Bid (Exec at Bid, Target Price < Bid) -> TP <= Bid - safe_dist
             
             # 1. Validate SL (Anchor: ASK)
             min_sl = current_ask + safe_dist
             if sl < min_sl:
-                logger.warning(f"SELL SL too close to Ask ({sl} < {min_sl}). Pushing up.")
+                # logger.warning(f"SELL SL too close to Ask ({sl} < {min_sl}). Pushing up.")
                 sl = min_sl
                 
             # 2. Validate TP (Anchor: BID)
             max_tp = current_bid - safe_dist
             if tp > max_tp:
-                logger.warning(f"SELL TP too close to Bid ({tp} > {max_tp}). Pushing down.")
+                # logger.warning(f"SELL TP too close to Bid ({tp} > {max_tp}). Pushing down.")
                 tp = max_tp
                  
         return sl, tp
@@ -575,6 +575,21 @@ def main():
                  logger.warning(f"Margin Safety: Capping Lots to {max_safe_lots:.2f} due to Free Margin.")
                  final_raw_lots = max_safe_lots
             
+            # --- FALLING KNIFE / ROCKET GUARD (Physics Protection) ---
+            # User Report: "Wrong purchase in downtrend" (Catching a knife).
+            # If Velocity is extreme, we BAN counter-trend entries.
+            # v < -0.5: Crashing -> NO BUYS.
+            # v > 0.5: Rocketing -> NO SELLS.
+            block_buys = False
+            block_sells = False
+            
+            if micro_velocity < -0.6:
+                logger.warning(f"CRASH DETECTED (v={micro_velocity:.2f}): BLOCKING ALL BUYS.")
+                block_buys = True
+            elif micro_velocity > 0.6:
+                logger.warning(f"ROCKET DETECTED (v={micro_velocity:.2f}): BLOCKING ALL SELLS.")
+                block_sells = True
+            
             # --- SCALP SWARM (High Frequency Tick Execution) ---
             # User Request: "Inverse of Inverse" -> Use Original Technical Score (The 'Retail' Score)
             if config.ENABLE_FIRST_EYE:
@@ -583,6 +598,12 @@ def main():
                 swarm_tech_dir = "WAIT"
                 if original_base_score > 5: swarm_tech_dir = "BUY"
                 elif original_base_score < -5: swarm_tech_dir = "SELL"
+                
+                # APPLY PHYSICS GUARD
+                if block_buys and swarm_tech_dir == "BUY":
+                    swarm_tech_dir = "WAIT" 
+                if block_sells and swarm_tech_dir == "SELL":
+                    swarm_tech_dir = "WAIT"
                 
                 swarm_action, swarm_reason, swarm_price = swarm.process_tick(
                     tick=live_tick,
@@ -645,13 +666,17 @@ def main():
                         
             # --- SECOND EYE (The Sniper) ---
             if config.ENABLE_SECOND_EYE:
-                sniper_action, sniper_reason, sniper_lots = sniper.process_tick(
+                sniper_action, sniper_lots, sniper_reason = sniper.process_tick(
                     tick=live_tick,
                     df_m5=df_m5,
-                    alpha_score=final_cortex_decision,
-                    tech_score=original_base_score,
-                    orbit_energy=orbit_energy
+                    market_state=details
                 )
+                
+                # APPLY PHYSICS GUARD
+                if block_buys and sniper_action == "BUY":
+                    sniper_action = "WAIT"
+                if block_sells and sniper_action == "SELL":
+                    sniper_action = "WAIT"
                 
                 # USER REQUEST: INVERT SNIPER SIGNAL REMOVED
                 # if sniper_action == "BUY": ...
@@ -736,6 +761,20 @@ def main():
                          logger.warning(f"Safety Cap: Reducing Whale Lots {whale_lots:.2f} -> {config.MAX_LOTS_PER_TRADE}")
                          whale_lots = config.MAX_LOTS_PER_TRADE
 
+                # 3.2 OVERSOLD/OVERBOUGHT PROTECTION (The "Don't Sell Low" Guard)
+                # If we are flipping to SELL, check if we are already Oversold
+                if whale_action == "SELL": # We are about to SELL
+                    z_score = micro_stats.get('z_score', 0)
+                    if z_score < -2.0: # TIGHTENED to 2.0 (User feedback: "Wrong Decision")
+                         logger.warning(f"[SMART] OVERSOLD PROTECT: Blocking SELL (Z:{z_score:.2f}). Waiting for bounce.")
+                         whale_action = "WAIT" # ABORT
+
+                elif whale_action == "BUY": # We are about to BUY
+                    z_score = micro_stats.get('z_score', 0)
+                    if z_score > 2.0: # TIGHTENED to 2.0
+                         logger.warning(f"[SMART] OVERBOUGHT PROTECT: Blocking BUY (Z:{z_score:.2f}). Waiting for dip.")
+                         whale_action = "WAIT" # ABORT
+
                     if whale_lots > max_safe_lots:
                          logger.warning(f"Margin Safety: Capping Whale Lots {whale_lots} -> {max_safe_lots}")
                          whale_lots = max_safe_lots
@@ -772,6 +811,16 @@ def main():
             if gap_res['action'] != "WAIT":
                  gap_action = gap_res['action']
                  gap_reason = gap_res['reason']
+                 
+                 # APPLY PHYSICS GUARD
+                 if block_buys and gap_action == "BUY": 
+                     gap_action = "WAIT"
+                     logger.warning(f"Gap Exploiter BLOCKED by Crash Guard (v={micro_velocity:.2f})")
+                 if block_sells and gap_action == "SELL": 
+                     gap_action = "WAIT"
+                     logger.warning(f"Gap Exploiter BLOCKED by Rocket Guard (v={micro_velocity:.2f})")
+                     
+                 if gap_action == "WAIT": continue # Abort safely
                  
                  # USER REQUEST: INVERT GAP SIGNAL REMOVED
                  # if gap_action == "BUY": ...

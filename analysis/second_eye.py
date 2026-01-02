@@ -18,13 +18,13 @@ class SecondEye:
         self.trade_executed_this_candle = False
         self.risk_factor = 0.5 # Default Risk Multiplier (can be config)
         
-    def process_tick(self, tick, df_m5, alpha_score, tech_score, orbit_energy):
+    def process_tick(self, tick, df_m5, market_state={}, **kwargs):
         """
         Decides if the Sniper should fire.
-        Returns: (Action, Reason, DynamicLots)
+        Returns: (Action, Lots, Reason) -> ORDER CHANGED to match main.py expectation [Action, Lots, Reason]
         """
         # 1. Candle Check
-        if df_m5.empty: return None, None, 0
+        if df_m5.empty: return None, 0, None
         
         latest_candle_time = df_m5.index[-1]
         if self.last_candle_time != latest_candle_time:
@@ -32,22 +32,35 @@ class SecondEye:
             self.trade_executed_this_candle = False
             
         if self.trade_executed_this_candle:
-            return None, "Candle Limit", 0
+            return None, 0, "Candle Limit"
             
-        # 2. Sniper Logic (Stricter than Swarm)
-        # We require Deep Brain (Alpha) to be VERY sure.
+        # 2. Extract Intelligence from Holographic State
+        # Overlord = Deep Brain (Alpha)
+        # Swarm = Technical (Tech)
+        # Micro = Physics (Energy)
+        
+        overlord = market_state.get('Overlord', {})
+        micro = market_state.get('Micro', {})
+        
+        # Normalize Alpha Score (-100 to 100 -> -1.0 to 1.0)
+        raw_alpha = overlord.get('score', 0)
+        alpha_score = raw_alpha / 100.0 
+        
+        # Tech Score (Base Swarm)
+        # tech_score = market_state.get('Swarm', {}).get('score', 0)
+        
+        # Physics
+        orbit_energy = micro.get('energy', 0)
         
         action = None
         reason = None
         confidence = 0.0
         
-        # Mode: Smart Predator (Only) - The Second Eye doesn't Bait. It Hunts.
-        # It waits for the Brain to identify a clear imbalance.
-        
-        if abs(alpha_score) > 0.60: # High Confidence Threshold
-             # Check Confluence with Physics (Energy)
-             # If High Energy, we trust the Brain more.
-             if orbit_energy > 2.0 or abs(tech_score) > 10.0:
+        # Mode: Smart Predator
+        # Threshold: High Confidence (> 0.60 -> > 60 Score)
+        if abs(alpha_score) > 0.60: 
+             # Check Confluence with Physics
+             if orbit_energy > 2.0 or abs(raw_alpha) > 80:
                  action = "BUY" if alpha_score > 0 else "SELL"
                  confidence = abs(alpha_score)
                  reason = f"Sniper Shot (Conf: {confidence:.2f})"
@@ -55,16 +68,14 @@ class SecondEye:
         if action:
             # 3. Dynamic Sizing
             # Base Lots = 0.01
-            # Multiplier = Confidence * 10 
-            # 0.60 -> 6x -> 0.06 lots
-            # 0.90 -> 9x -> 0.09 lots
-            # Max Cap at 0.10 for safety
-            
+            # Multiplier = Confidence * 10 (0.6 -> 0.06, 0.9 -> 0.09)
             dynamic_lots = round(confidence * 10 * 0.01, 2)
             if dynamic_lots < 0.01: dynamic_lots = 0.01
             if dynamic_lots > 0.10: dynamic_lots = 0.10
             
             self.trade_executed_this_candle = True
-            return action, reason, dynamic_lots
+            return action, dynamic_lots, reason # Returns (Action, Lots, Reason)
+            
+        return None, 0, None
             
         return None, None, 0
