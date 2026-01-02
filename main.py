@@ -236,6 +236,49 @@ def main():
                  time.sleep(0.01)
                  continue # Skip loop if no tick data
                  
+            # --- ACTIVE POSITION MANAGEMENT (High Priority: <10ms latency) ---
+            # Moves 0: Monitor & Close BEFORE Thinking or Analyzing
+            # This ensures we hit Virtual TPs immediately upon tick arrival.
+            open_positions = mt5_monitor.get_open_positions() 
+            if open_positions:
+                 # Ensure we have data for trailing
+                 atr = df_m5.iloc[-1]['ATR'] if not df_m5.empty and 'ATR' in df_m5.columns else 1.0
+                 struc_low = df_m5.iloc[-20:]['low'].min() if not df_m5.empty else 0
+                 struc_high = df_m5.iloc[-20:]['high'].max() if not df_m5.empty else 0
+
+                 for pos in open_positions:
+                     pos_dict = pos._asdict() if hasattr(pos, '_asdict') else pos
+                     
+                     # 1. Hard Exit (Virtual TP/SL) - PRIORITY 1: CLOSE INSTANTLY
+                     # Logic: Check PnL -> Close via Direct API -> Fallback to Bridge
+                     exit_signal = trade_manager.check_hard_exit(pos_dict, config.SCALP_TP, config.SCALP_SL)
+                     if exit_signal and exit_signal['action'] == "CLOSE_FULL":
+                         ticket = exit_signal['ticket']
+                         reason = exit_signal['reason']
+                         logger.info(f"⚡ INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
+                         
+                         # PRIMARY: Direct Python API Close (Fastest: Bypass Socket/Bridge)
+                         if mt5_monitor.close_position(ticket):
+                             logger.info(f"Direct Python Close confirmed for Ticket {ticket}.")
+                         else:
+                             # FALLBACK: Send Bridge Command (Slower)
+                             logger.warning(f"Direct Python Close failed. Sending Bridge Command fallback...")
+                             bridge.send_command("CLOSE_TRADE", [str(ticket)])
+                             
+                         notif_manager.send_notification("INSTANT PROFIT", f"{reason}", "PROFIT")
+                         continue # Skip other checks for this position if closed
+
+                     # 2. Trailing Stop
+                     new_sl = trade_manager.check_trailing_stop(pos_dict, live_tick['last'], struc_low, struc_high)
+                     if new_sl:
+                         bridge.send_command("MODIFY_TRADE", [str(pos_dict['ticket']), normalize_price(new_sl), str(pos_dict['tp'])])
+                     
+                     # 3. Partial TP
+                     partial_action = trade_manager.check_partial_tp(pos_dict, live_tick['last'])
+                     if partial_action:
+                         bridge.send_command("CLOSE_PARTIAL", [str(pos_dict['ticket']), str(partial_action['volume'])])
+                         notif_manager.send_notification("PARTIAL PROFIT", f"Ticket {pos_dict['ticket']} closed {partial_action['volume']} lots", "PROFIT")
+                 
             # Smart Time Check (Sao Paulo)
             now_sp = datetime.now(sp_tz)
             current_minute = now_sp.minute
@@ -373,46 +416,7 @@ def main():
                 lot_multiplier = 1.5
                 logger.info(">>> OVERLORD CONFIDENCE: Multiplier 1.5x Active <<<")
             
-            # --- ACTIVE POSITION MANAGEMENT (TradeManager) ---
-            open_positions = mt5_monitor.get_open_positions() 
-            if open_positions:
-                 # Standard Indicators needed for TradeManager if available
-                 atr = df_m5.iloc[-1]['ATR'] if 'ATR' in df_m5.columns else 1.0
-                 struc_low = df_m5.iloc[-20:]['low'].min()
-                 struc_high = df_m5.iloc[-20:]['high'].max()
 
-                 for pos in open_positions:
-                     pos_dict = pos._asdict() if hasattr(pos, '_asdict') else pos
-                     
-                     # 1. Trailing Stop
-                     new_sl = trade_manager.check_trailing_stop(pos_dict, live_tick['last'], struc_low, struc_high)
-                     if new_sl:
-                         bridge.send_command("MODIFY_TRADE", [str(pos_dict['ticket']), normalize_price(new_sl), str(pos_dict['tp'])])
-                     
-                     # 2. Partial TP
-                     partial_action = trade_manager.check_partial_tp(pos_dict, live_tick['last'])
-                     if partial_action:
-                         bridge.send_command("CLOSE_PARTIAL", [str(pos_dict['ticket']), str(partial_action['volume'])])
-                         notif_manager.send_notification("PARTIAL PROFIT", f"Ticket {pos_dict['ticket']} closed {partial_action['volume']} lots", "PROFIT")
-
-                     # 3. Hard Exit (Virtual TP/SL)
-                     exit_signal = trade_manager.check_hard_exit(pos_dict, config.SCALP_TP, config.SCALP_SL)
-                     if exit_signal and exit_signal['action'] == "CLOSE_FULL":
-                         ticket = exit_signal['ticket']
-                         reason = exit_signal['reason']
-                         logger.info(f"⚡ INSTANT EXIT: {reason} | Closing Ticket {ticket}...")
-                         
-                         # PRIMARY: Send Bridge Command (Legacy)
-                         bridge.send_command("CLOSE_TRADE", [str(ticket)])
-                         
-                         # SECONDARY/FALLBACK: Direct Python API Close (Faster & More Reliable)
-                         # This allows closing even if Bridge is stuck or MQL5 fails to execute.
-                         if mt5_monitor.close_position(ticket):
-                             logger.info(f"Direct Python Close confirmed for Ticket {ticket}.")
-                         else:
-                             logger.warning(f"Direct Python Close failed for Ticket {ticket}. Bridge command sent as backup.")
-                             
-                         notif_manager.send_notification("INSTANT PROFIT", f"{reason}", "PROFIT")
             
             # --- SCALP SWARM (High Frequency Tick Execution) ---
             # User Request: "Inverse of Inverse" -> Use Original Technical Score (The 'Retail' Score)
