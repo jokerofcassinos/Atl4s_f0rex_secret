@@ -54,8 +54,11 @@ class SixthEye:
         
         if df_mn is not None and len(df_mn) > 12:
             # Check 12-month Rolling Mean (1-year cycle)
-            ma12 = df_mn['close'].rolling(12).mean()
-            if df_mn['close'].iloc[-1] > ma12.iloc[-1]:
+            close_mn = df_mn['close']
+            if isinstance(close_mn, pd.DataFrame): close_mn = close_mn.iloc[:, 0]
+            
+            ma12 = close_mn.rolling(12).mean()
+            if close_mn.iloc[-1] > ma12.iloc[-1]:
                 score += 25 # Secular Bullish
                 details['MN_SECULAR'] = "BULLISH"
             else:
@@ -64,8 +67,11 @@ class SixthEye:
                 
         if df_w1 is not None and len(df_w1) > 52:
             # Check 52-week Rolling Mean (1-year trend)
-            ma52 = df_w1['close'].rolling(52).mean()
-            current_w = df_w1['close'].iloc[-1]
+            close_w1 = df_w1['close']
+            if isinstance(close_w1, pd.DataFrame): close_w1 = close_w1.iloc[:, 0]
+            
+            ma52 = close_w1.rolling(52).mean()
+            current_w = close_w1.iloc[-1]
             if current_w > ma52.iloc[-1]:
                 score += 15
                 details['W1_SECULAR'] = "BULLISH"

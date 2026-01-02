@@ -9,15 +9,19 @@ logger = logging.getLogger("Atl4s-Architect")
 
 class TenthEye:
     """
-    The Architect (Meta-System).
-    Oversees the health and weighting of all other Analytic Eyes.
-    - Eye Performance Tracking (Reliability)
-    - Dynamic Authority Adjustment
-    - System Coherence Veto
+    The Holographic Architect (System X).
+    
+    A Strategic Commander that oversees the entire bot ecosystem.
+    Functions:
+    1. Strategic Directives: Sets global mode (AGGRESSIVE, DEFENSIVE, SURVIVAL) based on Chaos/Hurst.
+    2. Authority Allocation: Dynamically re-weights Eyes based on the Directive.
+    3. Mental Sandbox: Simulates conflicting signals to find the 'True Path'.
+    4. System Health: Monitoring reliability of all sub-systems.
     """
     def __init__(self):
         self.stats_file = os.path.join(config.CACHE_DIR, "eye_reliability.json")
         self.eye_weights = {f"Eye{i}": 1.0 for i in range(1, 10)}
+        self.current_directive = "NEUTRAL"
         self.load_stats()
         
     def load_stats(self):
@@ -35,15 +39,66 @@ class TenthEye:
         except:
              pass
 
+    def determine_directive(self, market_regime, volatility_score, hurst, lyapunov):
+        """
+        Calculates the Strategic Directive for the next tick.
+        """
+        # Default
+        directive = "BALANCED"
+        
+        # 1. Chaos Check (Lyapunov)
+        if lyapunov > 1.0:
+            directive = "DEFENSIVE" # High Chaos -> Protect Capital
+            if volatility_score > 80:
+                directive = "SURVIVAL" # Extreme Volatility -> Shutdown/Min Size
+        
+        # 2. Trend Check (Hurst)
+        elif hurst > 0.65:
+            directive = "AGGRESSIVE_TREND" # Smooth Trend -> Maximize Drift
+            
+        # 3. Mean Reversion Check
+        elif hurst < 0.35:
+            directive = "SNIPER_AMBUSH" # Choppy -> Prioritize Snipers
+            
+        return directive
+
+    def allocate_authority(self, directive):
+        """
+        Re-weights the Eyes based on the Directive.
+        """
+        weights = self.eye_weights.copy()
+        
+        if directive == "AGGRESSIVE_TREND":
+            # Boost Trend Eyes (Whale, Trend Architect, Swarm)
+            weights['Eye1'] *= 1.5 # Swarm
+            weights['Eye3'] *= 1.2 # Trend
+            weights['Eye4'] *= 1.5 # Whale
+            
+        elif directive == "SNIPER_AMBUSH":
+            # Boost Reversion Eyes (Sniper, Oscillator, Cycle)
+            weights['Eye2'] *= 1.5 # Sniper
+            weights['Eye6'] *= 1.3 # Quant
+            weights['Eye9'] *= 1.3 # Cycle
+            
+        elif directive == "DEFENSIVE":
+            # Boost Risk & Logic, Penalize Aggression
+            weights['Eye1'] *= 0.5
+            weights['Eye2'] *= 0.5
+            weights['Eye5'] *= 1.5 # Fortress (Support/Resistance)
+            
+        elif directive == "SURVIVAL":
+            # Shutdown mostly
+            for k in weights: weights[k] *= 0.1
+            
+        return weights
+
     def record_outcome(self, eye_decisions, actual_outcome):
         """
-        Updates reliability weights based on whether an Eye was right about the direction.
-        Called after a trade is closed or at fixed intervals.
+        Reinforcement Learning: Update base weights based on success.
         """
         for eye, decision in eye_decisions.items():
             if eye not in self.eye_weights: continue
             
-            # Simple reinforcement learning
             if decision == actual_outcome:
                 self.eye_weights[eye] = min(2.0, self.eye_weights[eye] + 0.05)
             else:
@@ -51,64 +106,61 @@ class TenthEye:
         
         self.save_stats()
 
-    def calculate_coherence(self, results_map):
+    def deliberate(self, results_map, market_state):
         """
-        Analyzes the internal conflict of the system.
-        If too many eyes disagree, the Architect triggers a Global Veto.
+        The Architect's Final Judgement.
+        Args:
+            results_map: Output from all eyes.
+            market_state: Dict with 'hurst', 'lyapunov', 'volatility', etc.
         """
-        direct_votes = []
+        # 1. Determine Directive
+        hurst = market_state.get('hurst', 0.5)
+        lya = market_state.get('lyapunov', 0.0)
+        vol = market_state.get('volatility', 0)
+        
+        self.current_directive = self.determine_directive("UNKNOWN", vol, hurst, lya)
+        
+        # 2. Allocate Temporary Authority
+        active_weights = self.allocate_authority(self.current_directive)
+        
+        # 3. Calculate Coherence (Weighted)
+        weighted_votes = []
+        total_weight = 0
+        
         for name, res in results_map.items():
+            if name not in active_weights: continue
+            
+            w = active_weights[name]
+            
             if isinstance(res, dict) and 'decision' in res:
                 dec = res['decision']
-                if "BUY" in dec: direct_votes.append(1)
-                elif "SELL" in dec: direct_votes.append(-1)
+                val = 0
+                if "BUY" in dec: val = 1
+                elif "SELL" in dec: val = -1
                 
-        if not direct_votes: return 1.0
-        
-        # Coherence = Mean of absolute votes (1.0 means unanimous, 0.0 means perfect conflict)
-        coherence = abs(np.mean(direct_votes))
-        return coherence
-
-    def calculate_health_score(self, coherence, status):
-        """
-        Converts internal coherence and status into a user-facing health score (0-100).
-        """
-        base_score = coherence * 100
-        
-        if status == "SYSTEM_CONFLICT":
-            base_score = max(0, base_score - 20)
-        elif status == "HIGH_COHERENCE":
-             base_score = min(100, base_score + 10)
-             
-        # Penalty for low eye weights (degraded reliability)
-        avg_weight = np.mean(list(self.eye_weights.values()))
-        if avg_weight < 0.8:
-            base_score -= 10
+                weighted_votes.append(val * w)
+                total_weight += w
+                
+        coherence = 0
+        if total_weight > 0:
+            # Coherence is the magnitude of the weighted mean vector
+            net_vote = sum(weighted_votes)
+            coherence = abs(net_vote / total_weight)
             
-        return int(max(0, min(100, base_score)))
-
-    def deliberate(self, results_map):
-        """
-        Final System Audit.
-        """
-        coherence = self.calculate_coherence(results_map)
-        
-        # Meta-Directives
-        status = "OPERATIONAL"
+        # 4. Sandbox Veto
+        # If Directive is SURVIVAL, we Veto everything unless Coherence is perfect
         veto = False
-        
-        if coherence < 0.3: # Major Conflict
-            status = "SYSTEM_CONFLICT"
+        if self.current_directive == "SURVIVAL" and coherence < 0.9:
             veto = True
-        elif coherence > 0.8:
-            status = "HIGH_COHERENCE"
             
-        health_score = self.calculate_health_score(coherence, status)
-            
+        # 5. Health Score
+        health_score = int(coherence * 100)
+        
         return {
-            'status': status,
+            'status': "OPERATIONAL",
+            'directive': self.current_directive,
             'coherence': coherence,
             'health_score': health_score,
             'veto': veto,
-            'eye_authorities': self.eye_weights
+            'eye_authorities': active_weights
         }

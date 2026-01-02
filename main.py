@@ -26,6 +26,7 @@ from analysis.hyper_dimension import HyperDimension
 from analysis.scalper_swarm import ScalpSwarm
 from analysis.second_eye import SecondEye
 from analysis.fourth_eye import FourthEye
+from analysis.tenth_eye import TenthEye
 from analysis.trade_manager import TradeManager
 
 # Setup Logging
@@ -125,8 +126,8 @@ def main():
         effective_stops_level = max(symbol_stops_level, 50) 
         min_dist = effective_stops_level * symbol_point
         
-        # Add a comfortable buffer (e.g. 20 points)
-        safe_dist = min_dist + (20 * symbol_point) 
+        # Add a comfortable buffer (e.g. 50 points)
+        safe_dist = min_dist + (50 * symbol_point) 
         
         if cmd_type == "BUY":
             # BUY Order:
@@ -165,6 +166,8 @@ def main():
                 tp = max_tp
                  
         return sl, tp
+                 
+        return sl, tp
 
     # Load Historical Data
     logger.info("Loading Historical Data...")
@@ -182,6 +185,7 @@ def main():
     swarm = ScalpSwarm()
     sniper = SecondEye()
     whale = FourthEye() # The Consensus Commander
+    tenth_eye = TenthEye() # The Holographic Architect
     trade_manager = TradeManager() # For Active Management
 
     # Dashboard Publisher
@@ -347,8 +351,19 @@ def main():
 
             current_time = time.time()
 
+            # Initialize Analysis Variables (Safe Defaults)
+            final_cortex_decision = 0
+            original_base_score = 0
+            base_score = 0
+            smc_score = 0
+            orbit_energy = 0
+            micro_stats = {}
+            reality_state = "NEUTRAL"
+            details = {}
+
             if len(df_m5) >= 50 and (current_time - last_analysis_time >= analysis_cooldown or is_report_time):
                 try:
+                    # 1. Consensus Deliberation (Standard Eyes)
                     base_decision, base_score, details = consensus.deliberate(data_map, verbose=False)
                     
                     # --- INVERSE MODE LOGIC ---
@@ -358,9 +373,11 @@ def main():
                         base_score = -base_score 
                         tech_label_suffix = " (Inv)"
                     
+                    # 2. Advanced Analysis
                     reality_score, reality_state = third_eye.analyze_reality(df_m5)
                     smc_score = smc_engine.analyze(df_m5)
 
+                    # 3. Deep Brain (Physics & Subconscious)
                     final_cortex_decision, phy_state, future_prob, orbit_energy, micro_stats = deep_brain.consult_subconscious(
                         trend_score=base_score,
                         volatility_score=details.get('Volatility', {}).get('score', 0),
@@ -371,10 +388,25 @@ def main():
                         details=details
                     )
                     
-                    last_analysis_time = current_time
+                    # 4. Tenth Eye (The Holographic Architect)
+                    # Needs Market State (Hurst, Lyapunov, Volatility)
+                    market_state = {
+                        'hurst': micro_stats.get('micro_hurst', 0.5),
+                        'lyapunov': micro_stats.get('lyapunov', 0.0),
+                        'volatility': details.get('Volatility', {}).get('score', 0)
+                    }
+                    
+                    architect_res = tenth_eye.deliberate(details, market_state)
+                    details['Architect'] = architect_res # Inject back into details
+                    
+                    # Update Weights based on Architect
+                    # (Optional: Modify 'details' weights if ConsensusEngine supported dynamic weights per tick)
+                    
                     last_analysis_time = current_time
                 except Exception as e:
                     logger.error(f"Analysis Block Error: {e}")
+                    # Keep using defaults or previous values
+            
             
             # --- RISK MANAGEMENT v2.0 ---
             # Update Account Info for Dynamic Lots
@@ -522,10 +554,16 @@ def main():
 
             # --- FOURTH EYE (The Whale) ---
             if config.ENABLE_FOURTH_EYE:
+                # Prepare Quantum Data
+                vol_score = details.get('Volatility', {}).get('score', 0)
+                
                 whale_action, whale_reason, whale_lots = whale.process_tick(
                      tick=live_tick,
                      df_m5=df_m5,
-                     consensus_score=original_base_score # Use Retail Base Score which tracks Consensus
+                     consensus_score=original_base_score, 
+                     smc_score=smc_score,
+                     reality_state=reality_state if 'reality_state' in locals() else "NEUTRAL",
+                     volatility_score=vol_score
                 )
                 
                 if whale_action:
@@ -551,7 +589,7 @@ def main():
                     params = [
                         config.SYMBOL, 
                         str(mt5_type), 
-                        f"{(dynamic_base_lots * lot_multiplier):.2f}", 
+                        f"{dynamic_base_lots:.2f}", # Reverted: Use Capital-Based Dynamic Lots
                         normalize_price(sl_price),
                         normalize_price(tp_price)
                     ]

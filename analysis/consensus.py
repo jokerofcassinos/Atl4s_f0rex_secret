@@ -315,7 +315,12 @@ class ConsensusEngine:
         is_singularity = singularity_res['decision'] == "SINGULARITY_REACHED"
         
         # --- AUDIT FLAGS ---
-        architect_audit = self.architect.deliberate(details)
+        market_state = {
+            'hurst': hurst,
+            'lyapunov': lyapunov,
+            'volatility': v_score
+        }
+        architect_audit = self.architect.deliberate(details, market_state)
         system_veto = False
         veto_msg = ""
         

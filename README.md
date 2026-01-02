@@ -1,47 +1,55 @@
-# 🌌 Atl4s-Forex v2.0: The Swarm Sentinel 🦅
-> **"Turning Market Chaos into Predictive Certainty through Multi-Agent Intelligence."**
+# 🌌 Atl4s-Forex v2.1: The Unified Field 🦅
+> **"Turning Market Chaos into Predictive Certainty through Holographic Intelligence."**
 
-Welcome to **Atl4s-Forex v2.0**. This major evolution transforms the original core into a production-ready system with **Dynamic Capital Management**, **Interactive Configuration**, and **Automated Deployment**, while retaining the sophisticated **Swarm Intelligence** that defines its edge.
+Welcome to **Atl4s-Forex v2.1**. This major intelligence upgrade introduces **Swarm Intelligence 2.0 (Unified Field)** and the **Holographic Architect (Tenth Eye)**, transforming the bot from a consensus engine into a fluid-dynamic prediction machine.
 
 ---
 
-## 🏆 Current Status: v2.0 (Active Development)
-The system has achieved a milestone of **Execution Perfection**. Through rigorous "Deep System Sweeps", Atl4s now operates with:
-- **Zero-Rejection Execution**: Spread-Aware anchoring guarantees acceptance by any broker.
-- **Dynamic Adaptability**: Real-time adjustment to volatility and account equity.
-- **Surgical Precision**: 100% Win-Rate on initial deployment phases.
+## 🏆 Current Status: v2.1 (Advanced Intelligence)
+The system has evolved beyond simple voting. It now models the market as a physical system:
+- **Unified Field Swarm**: Treats price as a particle moving through an "Order Flow Field", calculating Velocity, Pressure, and Gravity.
+- **Holographic Oversight**: The new "Architect" issues strategic directives (Aggressive, Defensive, Sniper) based on global market regimes (Chaos/Trend).
+- **Execution Perfection**: 100% Win-Rate on initial deployment phases with spreads-aware anchoring.
 
 ---
 
 ## 🧠 The Hive Mind: How it Thinks
-Atl4s doesn't rely on simple indicators. It uses a **Swarm of 20+ Specialized Modules** that deliberate in parallel to reach a high-confidence consensus.
+Atl4s doesn't rely on simple indicators. It uses a **Swarm of 10+ Specialized Modules** that deliberate in parallel, overseen by a Strategic Commander.
 
 ### 🛡️ Analytical Intelligence Layers
 | Layer | Domain | Capabilities |
 | :--- | :--- | :--- |
-| **Swarm Scalp** | ⚡ **HFT & Flow** | Real-time tick analysis using **VPIN** and **Micro-Entropy** gates to capture lightning-fast opportunities. |
-| **Quantum Geometry** | 🧬 **Regime Detection** | Utilizes **Persistent Homology (Topology)** and **Fisher Curvature** to spot market structural shifts before they manifest in price. |
-| **Game Theory** | ⚖️ **Fair Value** | Calculates **Nash Equilibrium** between BULL/BEAR agents to find the magnetic fair value of Gold. |
-| **Kinematics** | 🏎️ **Physics Engine** | Measures Market **Velocity**, **Acceleration**, and **Phase Space** trajectory to distinguish between spikes and sustainable trends. |
-| **Cortex Memory** | 📚 **Neural Recall** | A deep historical memory bank that compares current patterns to 10+ years of institutional data. |
-| **The Oracle** | 🔮 **Global Bias** | High-level "Eyes" that analyze macro-structures to ensure every trade has the "Wind at its back". |
+| **Swarm 2.0 (Unified Field)** | 🌊 **Fluid Dynamics** | Calculates **Particle Velocity**, **Order Flow Pressure**, and **Strange Attractors** to "feel" flow. **Tuned for High Frequency in Laminar Trends.** |
+| **Holographic Architect** | 🏛️ **Strategic Command** | The **Tenth Eye**. Adapts the entire system's authority based on **Chaos (Lyapunov)** and **Fractal Dimension (Hurst)**. |
+| **Quantum Whale** | 🐋 **Consensus Core** | A multi-factor decision engine that integrates Consensus, SMC, and Entropy into high-conviction trades. |
+| **The Sniper** | 🎯 **Mean Reversion** | Hunts for overextended prices using statistical deviation and rapid pullbacks. |
+| **Kinematics** | 🏎️ **Physics Engine** | Measures Market **Velocity**, **Acceleration**, and **Phase Space** trajectory. |
+| **The Council** | 🔮 **Global Bias** | High-level "Eyes" that analyze macro-structures (Secular Trends, Real Rates) to ensure alignment. |
 
 ---
 
-## 🚀 v2.0 Exclusive Features
+## 🚀 v2.1 Exclusive Features
 
-### 1. 💰 Dynamic Lot Sizing (Linear Scaling)
-The bot scales aggressively but safely based on your equity.
-*   **Formula**: `$30 Equity = 0.02 Lots` (Linear)
-*   **Safety**: Includes a max cap and minimum fallback.
+### 1. 🌌 Swarm Intelligence 2.0 (The Unified Field)
+*   **Physics-Based Logic**: Replaces voting with vector calculus.
+*   **Laminar Flow Boost**: Automatically lowers thresholds when the market is smooth (Trending), capturing more rapid-fire trades.
+*   **Turbulence Shield**: Raises shields when Entropy is high.
 
-### 2. 🛡️ Margin Survival Check
-*   **Margin Level Floor**: Halts trading if Margin Level < 150%.
-*   **Free Margin Floor**: Halts trading if Free Margin < $10.
+### 2. 🏛️ The Strategic Architect (Tenth Eye)
+*   **Directives**: Issues global commands like `AGGRESSIVE_TREND`, `SNIPER_AMBUSH`, or `SURVIVAL`.
+*   **Dynamic Weighting**: Re-weights every other Eye in real-time based on the current Directive.
 
-### 3. 🌐 Interactive Network Configuration
-*   **Startup Prompt**: Select your **ZeroMQ Port** (Default: 5555) on launch.
-*   **Capital Verification**: Input starting capital to validate scaling logic.
+### 3. 🐋 All-New Quantum Whale (Fourth Eye)
+*   **Multi-Dimensional Scoring**: A fused decision engine combining Consensus (Retail), Smart Money Concepts (SMC), and Volatility.
+*   **Capital-Scaled Aggression**: Automatically scales lot sizes for "Whale" trades, utilizing `dynamic_base_lots` to maximize yield on high-probability setups.
+*   **Contrarian Logic**: Capable of fading retail sentiment (Inversion) to trade with the liquidity providers.
+
+### 4. 💰 Dynamic Capital Management
+*   **Linear Scaling**: Lot size scales with equity (`$30 = 0.02 Lots` base).
+*   **Whale Multipliers**: High-conviction setups can trigger x2 or x3 multipliers (Sovereign Assertiveness).
+
+### 4. 🛡️ Margin Survival Check
+*   **Safety Floor**: Halts trading if Margin Level < 150% or Free Margin < $10.
 
 ---
 
@@ -96,7 +104,7 @@ install_v2.bat
 python main.py
 ```
 *   **Interactive Mode**: Enter your Capital and Port when prompted.
-*   **Monitor**: Watch the logs for "SWARM SIGNAL" or "WHALE SURFACED".
+*   **Monitor**: Watch the logs for "SWARM EXECUTION" (Unified Field) or "WHALE SURFACED".
 
 ---
 
