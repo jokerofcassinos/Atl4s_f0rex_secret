@@ -74,15 +74,29 @@ class TrendArchitect:
         river_dir = 0 # 0: Neutral, 1: Bullish, -1: Bearish
         if df_h1 is not None and not df_h1.empty:
             try:
-                # Calculate H1 EMA 200
-                ema200_h1 = ta.trend.EMAIndicator(df_h1['close'], window=200).ema_indicator().iloc[-1]
+                # Calculate H1 EMA 50 (Faster) and EMA 20 (Fastest) for River Flow
+                ema50_h1 = ta.trend.EMAIndicator(df_h1['close'], window=50).ema_indicator().iloc[-1]
+                ema20_h1 = ta.trend.EMAIndicator(df_h1['close'], window=20).ema_indicator().iloc[-1]
                 current_price_h1 = df_h1['close'].iloc[-1]
                 
-                if current_price_h1 > ema200_h1:
-                    river_dir = 1
-                else:
-                    river_dir = -1
-                logger.info(f"The River (H1 Trend): {'BULLISH' if river_dir == 1 else 'BEARISH'}")
+                # Logic: River is primarily defined by EMA50, but qualified by EMA20 alignment
+                if current_price_h1 > ema50_h1:
+                    if ema20_h1 > ema50_h1:
+                        river_dir = 1 # Strong Bullish Flow
+                    else:
+                        river_dir = 0 # Neutral/Weak Bullish (Possible Correction)
+                
+                elif current_price_h1 < ema50_h1:
+                    if ema20_h1 < ema50_h1:
+                        river_dir = -1 # Strong Bearish Flow
+                    else:
+                        river_dir = 0 # Neutral/Weak Bearish
+                
+                # Price Action Override: If we crashed below EMA20 sharply, downgrade to Neutral/Bearish
+                if current_price_h1 < ema20_h1 and river_dir == 1:
+                     river_dir = 0 # Warning
+                     
+                logger.info(f"The River (H1 Trend): {'BULLISH' if river_dir == 1 else 'BEARISH' if river_dir == -1 else 'NEUTRAL'}")
             except Exception as e:
                 logger.error(f"Error calculating H1 River: {e}")
 

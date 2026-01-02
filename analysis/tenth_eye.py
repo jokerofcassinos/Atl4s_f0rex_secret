@@ -173,6 +173,24 @@ class TenthEye:
         # 5. Health Score
         health_score = int(coherence * 100)
         
+        # --- ARCHITECT FIX (User Report: 100 Score Hallucination) ---
+        # Inject H1 River Logic to ground the Architect in reality.
+        # If the Macro Trend (River) is opposing the Architect's dream, we wake him up.
+        
+        river_trend = market_state.get('river', 0)
+        
+        if river_trend == -1 and technical_score > 10:
+             # River is Bearish, Architect is Bullish -> VETO/CAP
+             logger.warning(f"Architect Hallucination Detected (Score {technical_score} vs Bearish River). Capping.")
+             technical_score = 10 # Cap at Neutral/Weak Buy
+             veto = True # Force review
+             
+        elif river_trend == 1 and technical_score < -10:
+             # River is Bullish, Architect is Bearish -> VETO/CAP
+             logger.warning(f"Architect Hallucination Detected (Score {technical_score} vs Bullish River). Capping.")
+             technical_score = -10
+             veto = True
+
         return {
             'status': "OPERATIONAL",
             'directive': self.current_directive,

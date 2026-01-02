@@ -5,6 +5,7 @@ logger = logging.getLogger("Atl4s-TradeManager")
 class TradeManager:
     def __init__(self):
         self.partial_tp_done = {} # Track if partial TP has been taken for a ticket
+        self.peak_profits = {} # Track Max Profit for Trailing Protection
 
     def check_trailing_stop(self, position, current_price, structure_low, structure_high):
         """
@@ -118,17 +119,48 @@ class TradeManager:
         
         return base_tp
 
-    def check_hard_exit(self, position, hard_tp_amount, hard_sl_amount):
+    def check_hard_exit(self, position, hard_tp_amount, hard_sl_amount, micro_metrics=None):
         """
-        Instant Exit Logic (Virtual TP/SL).
+        Instant Exit Logic (Virtual TP/SL) with Quantum Railgun Upgrade.
         Checks if floating profit/loss exceeds hard dollar thresholds.
         Returns: Action Dict or None
         """
         profit = position['profit'] # Floating PnL in USD
         
-        # 1. Virtual Take Profit (Active Grab)
-        # If profit >= 0.70 (or configured amount), Close Instantly.
+        # 1. Virtual Take Profit (Active Grab) with Quantum Railgun Logic
         if profit >= hard_tp_amount:
+             # Check for Momentum Extension (Greed Protocol)
+             should_extend = False
+             reason_ext = ""
+             
+             if micro_metrics:
+                 # CRITICAL FIX: Use Raw Velocity (Signed) to check direction
+                 velocity = micro_metrics.get('velocity', 0)
+                 entropy = micro_metrics.get('entropy', 1.0)
+                 trade_type = position['type'] # 0=Buy, 1=Sell
+                 
+                 # QUANTUM RAILGUN: Only extend if Momentum is FAVORABLE
+                 # Buy (0) requires Positive Velocity
+                 # Sell (1) requires Negative Velocity
+                 
+                 is_favorable = False
+                 if trade_type == 0 and velocity > 0.4: is_favorable = True
+                 elif trade_type == 1 and velocity < -0.4: is_favorable = True
+                 
+                 if is_favorable and entropy < 0.5:
+                     should_extend = True
+                     reason_ext = f"Velocity {velocity:.2f} (Aligned) >> Entropy {entropy:.2f}"
+                     
+             if should_extend:
+                 # Log the extension but do not close
+                 # We rely on 'Lethal TP' or Trailing Stop to catch it later
+                 # This effectively "Uncaps" the gain.
+                 return {
+                     "action": "EXTEND",
+                     "ticket": position['ticket'],
+                     "reason": f"⚡ QUANTUM RAILGUN: Smashing TP (${profit:.2f}) | {reason_ext}" 
+                 }
+            
              return {
                 "action": "CLOSE_FULL",
                 "ticket": position['ticket'],
@@ -136,63 +168,91 @@ class TradeManager:
              }
              
         # 2. Virtual Stop Loss (Safety Net)
-        # If loss > 1.00 (negative profit < -1.00), Close Instantly.
-        # Note: profit is negative for loss.
         # if profit <= -hard_sl_amount:
-        #      return {
-        #         "action": "CLOSE_FULL",
-        #         "ticket": position['ticket'],
-        #         "reason": f"Virtual SL Hit (${profit:.2f})"
-        #      }
-             
+        #      return { ... }
+              
         return None
+
+    def __init__(self):
+        self.partial_tp_done = {} # Track if partial TP has been taken for a ticket
+        self.peak_profits = {} # Track Max Profit per ticket for Trailing Exit
+
+    # ... (other methods unchanged) ...
 
     def check_exhaustion_exit(self, position, micro_metrics):
         """
-        Lethal TP logic (User Request):
-        Detects "Struggle/Oscillation" while in profit to secure gains before reversal.
-        
-        Args:
-            position (dict): MT5 Position Data
-            micro_metrics (dict): Velocity, Entropy, etc. from ScaplerSwarm/MicroStructure
-            
-        Returns:
-            action (dict) or None
+        Lethal TP logic (Exhaustion & Profit Erosion Protection).
         """
         profit = position['profit']
+        ticket = position['ticket']
+        
+        # Track Peak Profit
+        current_peak = self.peak_profits.get(ticket, 0.0)
+        if profit > current_peak:
+            self.peak_profits[ticket] = profit
+            current_peak = profit
+            
         if profit <= 5.0: return None # Ignore small/negative profits
         
         # Metrics
-        velocity = abs(micro_metrics.get('velocity', 0))
+        velocity = micro_metrics.get('velocity', 0) # Raw Velocity (Signed)
+        abs_velocity = abs(velocity)
         entropy = micro_metrics.get('entropy', 0)
         
         reason = ""
         should_close = False
         
-        # 1. Stagnation Exit (Price stuck in mud)
-        # If we have decent profit ($15+) but velocity is dead, close it.
-        if profit > 15.0 and velocity < 0.15:
-            should_close = True
-            reason = f"Lethal TP: Stagnation Detected (Vel {velocity:.2f}) at ${profit:.2f}"
+        # --- 1. PROFIT EROSION PROTECTION (Secure the Bag) ---
+        # User Report: "Profit 170 -> 10". We must lock it in.
+        
+        drop_percent = 0.0
+        if current_peak > 0:
+            drop_percent = (current_peak - profit) / current_peak
             
-        # 2. Chaos Protection (Oscillation/Choppiness)
-        # User: "Oscilando muito... descendo novamente"
-        # If Entropy is High (Choppy) and we have good profit ($20+), don't gamble.
-        elif profit > 20.0 and entropy > 0.6:
+        # Tier 1: Peak > $50 -> Allow 50% Drop (Secure $25)
+        if current_peak > 50.0 and drop_percent > 0.50:
             should_close = True
-            reason = f"Lethal TP: Chaos/Oscillation (Ent {entropy:.2f}) at ${profit:.2f}"
+            reason = f"Lethal TP: Profit Erosion 50% (Peak ${current_peak:.2f} -> ${profit:.2f})"
             
-        # 3. Momentum Decay (Reversal Risk)
-        # If profit is HUGE ($30+) but momentum drops, SECURE IT ($34 example).
-        elif profit > 30.0 and velocity < 0.3:
+        # Tier 2: Peak > $100 -> Allow 30% Drop (Secure $70)
+        elif current_peak > 100.0 and drop_percent > 0.30:
+            should_close = True
+            reason = f"Lethal TP: Profit Erosion 30% (Peak ${current_peak:.2f} -> ${profit:.2f})"
+            
+        # Tier 3: Peak > $150 -> Allow 20% Drop (Secure $120)
+        elif current_peak > 150.0 and drop_percent > 0.20:
              should_close = True
-             reason = f"Lethal TP: Momentum Fading (Vel {velocity:.2f}) at ${profit:.2f}"
+             reason = f"Lethal TP: Profit Erosion 20% (Peak ${current_peak:.2f} -> ${profit:.2f})"
+
+        if should_close:
+             logger.info(f"🛡️ {reason}")
+             return {
+                "action": "CLOSE_FULL",
+                "ticket": ticket,
+                "reason": reason
+             }
+        
+        # --- 2. PHYSICS EXHAUSTION ---
+        # 1. Stagnation Exit
+        if profit > 6.0 and abs_velocity < 0.15:
+            should_close = True
+            reason = f"Lethal TP: Stagnation (Vel {abs_velocity:.2f}) at ${profit:.2f}"
+            
+        # 2. Chaos Protection
+        elif profit > 10.0 and entropy > 0.6:
+            should_close = True
+            reason = f"Lethal TP: Chaos (Ent {entropy:.2f}) at ${profit:.2f}"
+            
+        # 3. Momentum Decay
+        elif profit > 20.0 and abs_velocity < 0.3:
+             should_close = True
+             reason = f"Lethal TP: Momentum Fading at ${profit:.2f}"
              
         if should_close:
              logger.info(f"🔫 {reason}")
              return {
                 "action": "CLOSE_FULL",
-                "ticket": position['ticket'],
+                "ticket": ticket,
                 "reason": reason
              }
              

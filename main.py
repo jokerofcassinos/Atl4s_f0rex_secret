@@ -125,12 +125,14 @@ def main():
         Enforces minimum StopsLevel distance relative to the correct price anchor (Bid/Ask).
         Returns (valid_sl, valid_tp) adjusted if necessary.
         """
-        # Hard Minimum Fallback: 100 points (e.g. 1.00 on Gold) for safety
-        effective_stops_level = max(symbol_stops_level, 100) 
+        # Hard Minimum Fallback: 500 points (5.00 on Gold) to force valid distance
+        # Error 10016 means we are too close or pricing is invalid.
+        # We enforce a HUGE gap to ensure acceptance.
+        effective_stops_level = max(symbol_stops_level, 500) 
         min_dist = effective_stops_level * symbol_point
         
-        # Add a comfortable buffer (e.g. 50 points)
-        safe_dist = min_dist + (50 * symbol_point) 
+        # Add a massive operational buffer (e.g. 300 points) to survive volatility/slippage
+        safe_dist = min_dist + (300 * symbol_point) 
         
         if cmd_type == "BUY":
             # BUY Order:
@@ -208,7 +210,10 @@ def main():
     last_candle_minute = -1
     last_log_print = 0
     last_analysis_time = 0
-    analysis_cooldown = 1.0 # Run heavy analysis at most once per second
+    last_candle_minute = -1
+    last_log_print = 0
+    last_analysis_time = 0
+    analysis_cooldown = 0.1 # FAST: 10x faster reaction time (User complained about latency)
     
     # Pre-initialize metrics for Swarm safety
     final_cortex_decision = 0
@@ -459,6 +464,58 @@ def main():
                 logger.warning("SKIPPING TRADES: Low Margin Protection Active.")
                 final_cortex_decision = 0 
                 
+            # --- TREND ALIGNMENT PROTOCOL (Smart Inversion) ---
+            # User Request: "Reverse the wrong signal" using advanced reasoning.
+            # Logic: If Market is TRENDING, Reversion Signals (Sniper) are mostly wrong (Counter-Trend).
+            # We FLIP them to align with the River.
+            
+            trend_data = details.get('Trend', {})
+            h1_river = trend_data.get('river', 0)
+            regime = trend_data.get('regime', "RANGING")
+            
+            # FORCE INVERSION if River is Active (Ignore ADX Lag)
+            # User Feedback: "Wrong orders" in crash start (Low ADX).
+            # If River says UP/DOWN, we align with it.
+            if h1_river != 0:
+                quant_z = details.get('Quant', {}).get('z_score', 0)
+                
+                # 1. Bearish Trend + Buy Signal -> FLIP TO SELL
+                if h1_river == -1 and final_cortex_decision > 0:
+                    # OVERSOLD PROTECTION (User: "Wait 2 candles").
+                    # Don't Sell if Z-Score is already crashing (< -2.5)
+                    if quant_z < -2.5:
+                        logger.warning(f"📉 SMART WAIT: Inversion wants to SELL, but Market is OVERSOLD (Z {quant_z:.2f}). Waiting for Bounce.")
+                        final_cortex_decision = 0
+                    else:
+                        logger.info(f"🧠 SMART INVERSION: Flipping BUY ({final_cortex_decision:.1f}) -> SELL due to BEARISH RIVER.")
+                        final_cortex_decision = -abs(final_cortex_decision) # Force Negative
+                    
+                # 2. Bullish Trend + Sell Signal -> FLIP TO BUY
+                elif h1_river == 1 and final_cortex_decision < 0:
+                    # OVERBOUGHT PROTECTION
+                    # Don't Buy if Z-Score is already parabolic (> 2.5)
+                    if quant_z > 2.5:
+                         logger.warning(f"📈 SMART WAIT: Inversion wants to BUY, but Market is OVERBOUGHT (Z {quant_z:.2f}). Waiting for Dip.")
+                         final_cortex_decision = 0
+                    else:
+                        logger.info(f"🧠 SMART INVERSION: Flipping SELL ({final_cortex_decision:.1f}) -> BUY due to BULLISH RIVER.")
+                        final_cortex_decision = abs(final_cortex_decision) # Force Positive
+
+            # --- CRASH GUARD (Falling Knife Protection) ---
+            # If the last closed candle was a huge crash (> 3x ATR), forbid BUYs for safety.
+            # (If Smart Inversion already flipped it to Sell, this won't trigger, which is GOOD).
+            try:
+                last_open = df_m5.iloc[-2]['open']
+                last_close = df_m5.iloc[-2]['close']
+                last_atr = df_m5.iloc[-2]['ATR'] if 'ATR' in df_m5.columns else 1.0
+                
+                crash_size = last_open - last_close
+                if crash_size > (3 * last_atr): # Massive Red Candle
+                    if final_cortex_decision > 0: # Still Trying to Buy?
+                        logger.critical(f"CRASH GUARD: Blocking BUY Signal (Score {final_cortex_decision}) during Market Crash Phase.")
+                        final_cortex_decision = 0
+            except: pass 
+                
             # Calculate Dynamic Lots
             # Note: We use the base dynamic lot here, then applying multipliers
             dynamic_base_lots = risk_manager.calculate_dynamic_lot(current_equity)
@@ -545,12 +602,17 @@ def main():
                     # Validate Stops
                     sl_price, tp_price = validate_sl_tp(live_tick['bid'], live_tick['ask'], sl_price, tp_price, cmd_type)
                         
-                    # Protocol: OPEN_TRADE|SYMBOL|TYPE(Int)|VOLUME|SL|TP
-                    # Note: Volume is index 3 in EA, SL is 4, TP is 5.
+                    # PROTOCOL: OPEN_TRADE|SYMBOL|TYPE(Int)|VOLUME|SL|TP
+                    final_volume = round(dynamic_base_lots * lot_multiplier, 2)
+                    
+                    if final_volume < 0.01:
+                        logger.warning(f"Trade Aborted: Calculated Volume {final_volume} is too small (Margin Restriction?).")
+                        continue # Skip execution
+                    
                     params = [
                         config.SYMBOL, 
                         str(mt5_type), 
-                        f"{(dynamic_base_lots * lot_multiplier):.2f}", 
+                        f"{final_volume:.2f}", 
                         normalize_price(sl_price),
                         normalize_price(tp_price)
                     ]
@@ -580,13 +642,8 @@ def main():
                     orbit_energy=orbit_energy
                 )
                 
-                # USER REQUEST: INVERT SNIPER SIGNAL
-                if sniper_action == "BUY": 
-                    sniper_action = "SELL"
-                    sniper_reason = f"[INVERTED] {sniper_reason}"
-                elif sniper_action == "SELL": 
-                    sniper_action = "BUY"
-                    sniper_reason = f"[INVERTED] {sniper_reason}"
+                # USER REQUEST: INVERT SNIPER SIGNAL REMOVED
+                # if sniper_action == "BUY": ...
                 
                 if sniper_action:
                     # Execute Sniper Trade
@@ -666,6 +723,10 @@ def main():
                     if whale_lots > max_safe_lots:
                          logger.warning(f"Margin Safety: Capping Whale Lots {whale_lots} -> {max_safe_lots}")
                          whale_lots = max_safe_lots
+
+                    if whale_lots < 0.01:
+                        logger.warning(f"Whale Trade Aborted: Calculated Volume {whale_lots} is too small.")
+                        continue
                         
                     params = [
                         config.SYMBOL, 
@@ -696,13 +757,8 @@ def main():
                  gap_action = gap_res['action']
                  gap_reason = gap_res['reason']
                  
-                 # USER REQUEST: INVERT GAP SIGNAL
-                 if gap_action == "BUY": 
-                     gap_action = "SELL"
-                     gap_reason = f"[INVERTED] {gap_reason}"
-                 elif gap_action == "SELL": 
-                     gap_action = "BUY"
-                     gap_reason = f"[INVERTED] {gap_reason}"
+                 # USER REQUEST: INVERT GAP SIGNAL REMOVED
+                 # if gap_action == "BUY": ...
                  
                  # Gap Exploiter Logic
                  # High conviction -> 1.5x Base Size
@@ -713,6 +769,10 @@ def main():
                       logger.warning(f"Margin Safety: Capping Gap Lots {gap_lots} -> {max_safe_lots}")
                       gap_lots = max_safe_lots
                  
+                 if gap_lots < 0.01:
+                      logger.warning(f"Gap Trade Aborted: Calculated Volume {gap_lots} is too small.")
+                      continue
+
                  mt5_type = 0 if gap_action == "BUY" else 1
                  
                  if gap_action == "BUY":
