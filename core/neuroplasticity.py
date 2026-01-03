@@ -61,7 +61,9 @@ class NeuroplasticityLoop:
             'Maxwell_Swarm': 2.2, # ELECTRODYNAMICS (Back-EMF Rejection)
             'Heisenberg_Swarm': 2.6, # UNCERTAINTY PRINCIPLE (Particle vs Wave State)
             'Riemann_Swarm': 2.7, # DIFFERENTIAL GEOMETRY (Metric Curvature)
-            'Penrose_Swarm': 2.8 # TWISTOR THEORY (Aeon Transition)
+            'Penrose_Swarm': 2.8, # TWISTOR THEORY (Aeon Transition)
+            'Game_Swarm': 2.9, # EVOLUTIONARY GAME THEORY (Replicator Dynamics)
+            'Godel_Swarm': 3.0 # META-LOGIC (Incompleteness Veto)
         }
         
         # Performance Trackers (Rolling Accuracy)

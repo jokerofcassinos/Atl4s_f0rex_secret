@@ -87,6 +87,7 @@ from analysis.swarm.maxwell_swarm import MaxwellSwarm
 from analysis.swarm.heisenberg_swarm import HeisenbergSwarm
 from analysis.swarm.riemann_swarm import RiemannSwarm
 from analysis.swarm.penrose_swarm import PenroseSwarm
+from analysis.swarm.godel_swarm import GodelSwarm
 
 # Meta-Cognition
 from analysis.swarm.attention_swarm import AttentionSwarm
@@ -220,6 +221,8 @@ class SwarmOrchestrator:
         self.active_agents.append(HeisenbergSwarm())
         self.active_agents.append(RiemannSwarm())
         self.active_agents.append(PenroseSwarm())
+        self.active_agents.append(GameSwarm())
+        self.active_agents.append(GodelSwarm())
         
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         

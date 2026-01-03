@@ -65,20 +65,22 @@ class OmegaSystem:
                     positions_guard = tick.get('positions', 0)
                     
                     if positions_guard > 0:
-                        # Global Take Profit (Lowered to $3.00 for protection)
-                        if current_profit_guard > 3.0:
-                            logger.critical(f"⚡ GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $3.00. BYPASSING CORTEX. CLOSING ALL.")
-                            self.executor.close_all(self.symbol)
-                            await asyncio.sleep(0.5)
-                            continue
-
-                        # Surgical Take Profit
+                        # 1. SURGICAL PRIORITY: Close the big winner first.
+                        # This avoids closing small nascent trades (e.g. $1 profit) when a big one hits ($30).
                         if best_profit_guard > 3.0:
                              best_ticket = tick.get('best_ticket')
                              logger.critical(f"⚡ GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > $3.00. CLOSING TICKET {best_ticket}.")
                              self.executor.close_trade(best_ticket, self.symbol)
                              await asyncio.sleep(0.2) 
-                             # Don't continue, let it run in case others need managing, but we secured the bag.
+                             continue # Continue loop to refresh tick and check next best
+
+                        # 2. GLOBAL SAFETY: Only Close All if total profit is massive or protecting a large basket.
+                        # Raised from 3.0 to 15.0 to prevent premature closure of small baskets.
+                        if current_profit_guard > 15.0:
+                            logger.critical(f"⚡ GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $15.00. BASKET EXIT.")
+                            self.executor.close_all(self.symbol)
+                            await asyncio.sleep(0.5)
+                            continue
 
                     # 2. Fetch/Update Context (Dataframes)
                     # Ideally, data_loader handles live updates via tick injection
