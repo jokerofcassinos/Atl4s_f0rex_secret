@@ -122,7 +122,8 @@ class ExecutionEngine:
     def close_trade(self, ticket: int, symbol: str):
         logger.info(f"EXECUTION: Closing Trade {ticket} ({symbol})")
         if self.bridge:
-            self.bridge.send_command("CLOSE_TRADE", [str(ticket)])
+            # FIX: Must include symbol for ZmqBridge routing
+            self.bridge.send_command("CLOSE_TRADE", [str(ticket), symbol])
     def close_all(self, symbol: str):
         """Emergency Exit / Strategic Close"""
         logger.warning(f"EXECUTION: CLOSE ALL POSITIONS for {symbol}")

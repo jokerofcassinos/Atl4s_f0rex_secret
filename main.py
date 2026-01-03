@@ -1,4 +1,4 @@
-﻿
+
 import asyncio
 import logging
 import pandas as pd
@@ -69,7 +69,7 @@ class OmegaSystem:
                         # This avoids closing small nascent trades (e.g. $1 profit) when a big one hits ($30).
                         if best_profit_guard > 3.0:
                              best_ticket = tick.get('best_ticket')
-                             logger.critical(f"⚡ GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > $3.00. CLOSING TICKET {best_ticket}.")
+                             logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > $3.00. CLOSING TICKET {best_ticket}.")
                              self.executor.close_trade(best_ticket, self.symbol)
                              await asyncio.sleep(0.2) 
                              continue # Continue loop to refresh tick and check next best
@@ -77,7 +77,7 @@ class OmegaSystem:
                         # 2. GLOBAL SAFETY: Only Close All if total profit is massive or protecting a large basket.
                         # Raised from 3.0 to 15.0 to prevent premature closure of small baskets.
                         if current_profit_guard > 15.0:
-                            logger.critical(f"⚡ GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $15.00. BASKET EXIT.")
+                            logger.critical(f"[!] GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $15.00. BASKET EXIT.")
                             self.executor.close_all(self.symbol)
                             await asyncio.sleep(0.5)
                             continue
