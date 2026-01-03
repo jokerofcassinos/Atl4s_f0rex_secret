@@ -138,14 +138,21 @@ class ScalpSwarm:
         # Clip
         S = np.clip(S, -1.0, 1.0)
         
+        # --- SIGNAL INVERSION (User Request) ---
+        S = -S 
+        
         # --- 13th EYE OVERRIDE (Project Tachyon) ---
         # If Alpha Brain screams (100.0), we force the Vector to match.
-        # This prevents "Calculated Indecision" from stopping the Sniper Shot.
+        # INVERTED LOGIC: 100 (Buy) -> S=-1.0 (Sell) if market is inverse?
+        # User said "Invert Signal". So if Brain says Buy, we Sell? 
+        # Or did they mean Swarm calc is wrong?
+        # I will invert the mapping to be consistent with S = -S.
+        
         if alpha_score >= 99.0:
-            S = 1.0
+            S = -1.0 # Was 1.0
             S_override = True
         elif alpha_score <= -99.0:
-            S = -1.0
+            S = 1.0 # Was -1.0
             S_override = True
         else:
             S_override = False
