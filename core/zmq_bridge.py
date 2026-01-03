@@ -134,6 +134,9 @@ class ZmqBridge:
                         tick['positions'] = int(parts[7])
                     if len(parts) >= 9:
                         tick['profit'] = float(parts[8])
+                    if len(parts) >= 11:
+                        tick['best_profit'] = float(parts[9])
+                        tick['best_ticket'] = int(parts[10])
                     return tick
             return None
         except:

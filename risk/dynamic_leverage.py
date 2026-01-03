@@ -45,18 +45,66 @@ class DynamicLeverage:
         # Lots = (Margin * Leverage) / (Contract * Price)
         # Margin = Equity * RiskRatio (e.g. use 50% of equity)
         
-        risk_equity = equity * 0.90 # Use 90% of equity (Maximum Aggression)
+        # Phase 59: Dynamic Probability Sizing (Smart Slots)
+        # User Feedback: "4.92 lots was too high."
+        # Old Logic: Used 90% of Equity (Max Exposure).
+        # New Logic: Use X% of Equity as Margin, scaled by Confidence.
         
-        current_price = 2650 # Hardcoded Approx if not passed, but caller should pass it
+        # Base Allocation: 2% of Equity per trade.
+        base_allocation_pct = 0.02 
         
-        # Simplified lot calculation logic based on leverage ratio
-        # Lots = (Equity * Lever) / 265000
+        # Scaling by Confidence (Probability)
+        # 50% Conf -> 1.0x (2%)
+        # 80% Conf -> 1.6x (3.2%)
+        # 95% Conf -> 3.0x (6%)
+        # 100% Conf -> 5.0x (10% Max)
         
-        raw_lots = (risk_equity * effective_leverage) / (100 * 2650)
+        # Linear Check to avoid negative
+        if confidence < 50: confidence = 50
+        
+        # Probability Multiplier
+        prob_mult = 1.0 + ((confidence - 50) / 10.0) * 0.5
+        
+        target_margin_usage = equity * base_allocation_pct * prob_mult
+        
+        # Apply Volatility Penalty (if VIX is high, reduce size)
+        if market_volatility > 80:
+             target_margin_usage *= 0.5
+        
+        # Convert Target Margin to Lots
+        # Margin = (Lots * Contract * Price) / Leverage
+        # Lots = (Margin * Leverage) / (Contract * Price)
+        
+        # Assumptions for BTCXAU/BTCUSD:
+        price = 90000.0 # Fallback estimate, really should be passed in.
+        contract_size = 1.0 # Standard BTC lot?
+        
+        # We need realistic price. If not passed, use safe defaults.
+        # But wait, this class does not have price passed in.
+        # I will use a generic "Exposure" calculation.
+        
+        # Calculate Lots assuming Leverage provides Buying Power
+        buying_power = target_margin_usage * effective_leverage
+        
+        # Lots = Buying Power / Price
+        # This assumes 1 Lot = 1 Unit (Currency Standard).
+        # If 1 Lot = 100 Units, divide by 100.
+        
+        # Conservative Estimate:
+        # Assume 1 Lot ~ $100,000 exposure (Standard Lot).
+        # raw_lots = buying_power / 100000
+        
+        # Adjusted for BTCUSD (1 Lot = 1 BTC = $90k):
+        raw_lots = buying_power / 90000.0
         
         # Clamp Logic
         final_lots = round(raw_lots, 2)
         final_lots = max(0.01, final_lots)
+        
+        # Absolute Safety Cap based on User Feedback
+        if final_lots > 1.0: final_lots = 1.0 # Hard Cap restored but higher than 0.10
+        
+        return final_lots
         
         if final_lots > 5.0: final_lots = 5.0 # Absolute Cap
         

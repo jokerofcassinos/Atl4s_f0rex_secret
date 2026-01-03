@@ -2,126 +2,101 @@
 import logging
 import numpy as np
 import pandas as pd
-from typing import Dict, Any
-from core.interfaces import SwarmSignal, SubconsciousUnit
+from typing import Dict, Any, List
+from core.interfaces import SubconsciousUnit, SwarmSignal
+import time
+from scipy.spatial.distance import pdist, squareform
 
-logger = logging.getLogger("HDCSwarm")
+logger = logging.getLogger("HyperdimensionalSwarm")
 
 class HyperdimensionalSwarm(SubconsciousUnit):
     """
-    The Hyperdimensional Brain (Vector Symbolic Architecture).
-    Phase 43 Innovation.
+    Phase 64: The Hyperdimensional Hedge.
+    
+    Uses Phase Space Reconstruction (Takens' Embedding) to analyze market stability.
+    It embeds the Price Time Series into an M-dimensional Manifold.
+    Then it calculates the 'Correlation Dimension' and 'Lyapunov Divergence' in that space.
+    
     Logic:
-    1. Projects low-dimensional features (Price, RSI, Vol) into 10,000-dim Hypervectors.
-    2. Operations:
-       - MAP (Encoding): Feature Value -> Hypervector.
-       - BUNDLE (Superposition): Combining features into a State Vector.
-       - BIND (XOR): Binding Variable to Value.
-    3. Reasoning:
-       - Compare State Vector with "Archetypes" (Ideal Bull, Ideal Bear).
-       - Metric: Cosine Similarity (or Hamming Distance).
+    - If Trajectories in Phase Space are parallel (Low Divergence) -> Buy/Sell Trend is Real.
+    - If Trajectories are orthogonal/scrambled (High Divergence) -> Trend is Fake/Exhausted.
     """
     def __init__(self):
-        super().__init__("HyperdimensionalSwarm")
-        self.dim = 10000
-        # Initialize Random Projection Matrix (Orthogonal Memory)
-        # We need simpler approach efficiently in Python.
-        # Fixed Codebook for features.
-        np.random.seed(42)
-        self.archetypes = {
-            "BULL": self._random_hv(),
-            "BEAR": self._random_hv(),
-            "CHAOS": self._random_hv()
-        }
-        
-        # We need Item Memories for encoding continuous values
-        # We'll use a simple bucket method: 10 levels of RSI, 10 levels of Trend.
-        self.rsi_memory = [self._random_hv() for _ in range(10)]
-        self.trend_memory = [self._random_hv() for _ in range(10)]
-        
-        # Learn Superposition (Bundling)
-        # Ideally we learn these over time, but we pre-seed them for now.
-        # "Ideal Bull" = High RSI + Positive Trend
-        # We manually construct the archetypes by bundling properties.
-        
-        # Construct BULL Archetype: RSI > 70 (indices 7,8,9) + Trend Positive (indices 6-9)
-        bull_props = self.rsi_memory[7] + self.rsi_memory[8] + self.trend_memory[7] + self.trend_memory[8]
-        self.archetypes['BULL'] = self._binarize(bull_props)
-        
-        # Construct BEAR Archetype: RSI < 30 (indices 0,1,2) + Trend Negative (indices 0-3)
-        bear_props = self.rsi_memory[1] + self.rsi_memory[2] + self.trend_memory[1] + self.trend_memory[2]
-        self.archetypes['BEAR'] = self._binarize(bear_props)
+        super().__init__("Hyperdimensional_Swarm")
+        self.embedding_dim = 3 # 3D Phase Space
+        self.time_delay = 2 # Tau
 
-    def _random_hv(self):
-        # Bipolar {-1, 1} is better for bundling than {0, 1}
-        return np.random.choice([-1, 1], size=self.dim)
+    async def process(self, context) -> SwarmSignal:
+        df_m1 = context.get('df_m1')
+        if df_m1 is None or len(df_m1) < 100: return None
         
-    def _binarize(self, vector):
-        # Threshold at 0 for bipolar
-        return np.where(vector > 0, 1, -1)
+        # 1. Prepare Data
+        # We use a sliding window of recent prices
+        window = 60
+        data = df_m1['close'].values[-window:]
         
-    def _cosine_sim(self, v1, v2):
-        # For bipolar vectors, cosine sim is related to Hamming distance
-        return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
-
-    async def process(self, context: Dict[str, Any]) -> SwarmSignal:
-        df = context.get('df_m5')
-        if df is None or len(df) < 50: return None
+        # Normalize
+        data = (data - np.mean(data)) / (np.std(data) + 1e-9)
         
-        # Feature Extraction
-        # 1. RSI (Approximate)
-        closes = df['close'].values
-        deltas = np.diff(closes)
-        gain = deltas[deltas > 0].mean() if len(deltas[deltas > 0]) > 0 else 0
-        loss = -deltas[deltas < 0].mean() if len(deltas[deltas < 0]) > 0 else 1e-9
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
+        # 2. Embed in Phase Space (Time Delay Embedding)
+        # X(t) = [x(t), x(t-tau), x(t-2tau)]
+        embedded = []
+        for i in range(len(data) - (self.embedding_dim - 1) * self.time_delay):
+            point = [data[i + j * self.time_delay] for j in range(self.embedding_dim)]
+            embedded.append(point)
+            
+        embedded = np.array(embedded)
+        if len(embedded) < 10: return None
         
-        # 2. Trend Slope (Normalized)
-        slope = (closes[-1] - closes[-10]) / (closes[-10] + 1e-9) * 100
-        # Normalize slope roughly -0.5% to +0.5%
+        # 3. Analyze Trajectory Divergence (Simplified Lyapunov)
+        # We measure the average distance between consecutive vectors in phase space.
+        # If distance is increasing rapidly, we are bifurcating (Reversal/Chaos).
         
-        # Encoding (Mapping to Indices 0-9)
-        rsi_idx = int(np.clip(rsi / 10, 0, 9))
+        # Calculate Euclidean distances between adjacent points in time
+        steps = np.diff(embedded, axis=0)
+        step_sizes = np.linalg.norm(steps, axis=1)
         
-        # Slope mapping: -0.2 to 0.2
-        # -0.2 -> 0, 0 -> 5, +0.2 -> 9
-        slope_norm = (slope + 0.2) / 0.4 * 10
-        slope_idx = int(np.clip(slope_norm, 0, 9))
+        avg_step = np.mean(step_sizes)
+        recent_step = step_sizes[-1]
         
-        # Construct Query Vector
-        # Q = RSI_Vec + Trend_Vec
-        query_raw = self.rsi_memory[rsi_idx] + self.trend_memory[slope_idx]
-        query_hv = self._binarize(query_raw)
+        # Growth Ratio
+        divergence_ratio = recent_step / (avg_step + 1e-9)
         
-        # Associative Search (Compare with Archetypes)
-        sim_bull = self._cosine_sim(query_hv, self.archetypes['BULL'])
-        sim_bear = self._cosine_sim(query_hv, self.archetypes['BEAR'])
-        
+        # 4. Attractor Classification
         signal = "WAIT"
         confidence = 0.0
+        reason = ""
         
-        # Similarity threshold for HDC (High dimensionality implies orthogonality is ~0)
-        # Similar vectors will have > 0.4 similarity clearly.
+        # If Divergence is extreme (> 2.5x normal), the Attractor is breaking.
+        if divergence_ratio > 2.5:
+             # Instability Detected.
+             # If Price is rising but Phase Space is exploring new volumne rapidly => BLOW OFF TOP.
+             current_trend = data[-1] - data[-5]
+             
+             if current_trend > 0:
+                 signal = "SELL" # Rejection of the High
+                 confidence = 88.0
+                 reason = f"HYPERDIMENSIONAL: Attractor Divergence (Ratio {divergence_ratio:.2f}) on Uptrend -> Blow-off Top."
+             elif current_trend < 0:
+                 signal = "BUY" # Rejection of the Low
+                 confidence = 88.0
+                 reason = f"HYPERDIMENSIONAL: Attractor Divergence (Ratio {divergence_ratio:.2f}) on Downtrend -> Panic Bottom."
+                 
+        # If Divergence is very low (< 0.5), we are in a Limit Cycle (Ranging/Stuck).
+        elif divergence_ratio < 0.5:
+             signal = "WAIT"
+             confidence = 0.0
+             reason = "Phase Space Contraction (Range)"
+             
+        # If Divergence is normal (1.0), Trend follows momentum (handled by KinematicSwarm).
         
-        if sim_bull > 0.3 and sim_bull > sim_bear:
-            signal = "BUY"
-            confidence = float(sim_bull * 100.0) + 20 # HDC is robust
-        elif sim_bear > 0.3 and sim_bear > sim_bull:
-            signal = "SELL"
-            confidence = float(sim_bear * 100.0) + 20
-            
         if signal != "WAIT":
-             return SwarmSignal(
-                source="HyperdimensionalSwarm",
+            return SwarmSignal(
+                source=self.name,
                 signal_type=signal,
-                confidence=min(100.0, confidence),
-                timestamp=0,
-                meta_data={
-                    "hdc_bull_sim": float(sim_bull),
-                    "hdc_bear_sim": float(sim_bear),
-                    "concept": "Bullish State" if signal == "BUY" else "Bearish State"
-                }
+                confidence=confidence,
+                timestamp=time.time(),
+                meta_data={'divergence': divergence_ratio, 'reason': reason}
             )
             
         return None

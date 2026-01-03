@@ -46,42 +46,14 @@ class ExecutionEngine:
         cmd_type = 0 if command == 'BUY' else 1
         price = ask if cmd_type == 0 else bid
         
-        # Crypto Adaptation: Wider stops for BTC/ETH
-        # For XAUUSD: 200/500 points (20/50 pips)
-        # For BTC: 2000/5000 points (20/50 USD)
-        
-        point = 0.01 if "USD" in symbol and "BTC" not in symbol else 1.0 # Rough heuristic
-        if "BTC" in symbol: point = 1.0
-        if "ETH" in symbol: point = 0.1
-        if "XAU" in symbol and "BTC" not in symbol: point = 0.01 # Gold standard
-        
-        # BTCXAU is ~90k, so point=1.0 is correct (same as BTCUSD)
-        
-        sl_points = 500 * point # $5 on Gold, $500 on BTC? Need calibration.
-        tp_points = 1000 * point
-        
-        # Phase 49: Fiscal Hardening (Precision Math)
-        # Analysis: BTCXAU 1.00 move = $1000 per Lot.
-        # User Limit: $1.70 Loss on 0.01 Lot ($170 per Lot).
-        # $170 / $1000 = 0.17 distance.
-        # User Target: $0.70 Profit on 0.01 Lot ($70 per Lot).
-        # $70 / $1000 = 0.07 distance.
-        
-        sl_dist = 0.17 # $1.70 on 0.01
-        tp_dist = 0.07 # $0.70 on 0.01
-        
-        # Dynamic Scaler: If price is huge (Bitcoin 90k), these distances are tiny.
-        # If price is small (BTCXAU 20), these are correct.
-        # This simple check handles the "Dynamic" requirement roughly.
-        if price > 1000:
-             # Likely BTCUSD or Gold
-             # 0.17 on 90000 is nothing.
-             # On BTCUSD, 1.00 move = $1.
-             # So we need sl_dist = 170.0 and tp_dist = 70.0
-             sl_dist = 170.0
-             tp_dist = 70.0
-        
-        # Override for tiny prices (just in case scaling is weird, but verify first)
+        if price < 50: # BTCXAU
+            tp_dist = 0.05 # 5 cents (~$0.50 profit)
+            sl_dist = 0.12 # 12 cents (~$1.20 risk)
+        else: # BTCUSD (Price ~90,000)
+             tp_dist = price * 0.001 # 0.1% (~$90)
+             sl_dist = price * 0.002 # 0.2% (~$180)
+             
+        # Override for tiny prices 
         if price < 5.0: 
              sl_dist = price * 0.01
              tp_dist = price * 0.02
@@ -89,15 +61,13 @@ class ExecutionEngine:
         if self.bridge:
             # SPREAD GUARD (Dynamic w/ Profit Ratio)
             # User Q: Does it adapt? A: Yes, relative to our Target.
-            # We allow the Spread to be at most 20% of our Target Profit.
-            # If we aim for $0.70, max spread is $0.14.
-            # If we aim for $10.00, max spread is $2.00.
-            # This ensures the Math always works, regardless of Capital/Size.
-            max_spread = tp_dist * 0.20 
+            # We allow the Spread to be at most 50% of our Target Profit.
+            # (Relaxed from 20% to 50% to allow Micro-Scalping on BTCXAU where spread is ~3c and target is 7c).
+            max_spread = tp_dist * 0.50 
             
             spread = ask - bid
             if spread > max_spread:
-                logger.warning(f"SPREAD GUARD: Refused. Spread {spread:.3f} > {max_spread:.3f} (20% of Target).")
+                logger.warning(f"SPREAD GUARD: Refused. Spread {spread:.3f} > {max_spread:.3f} (50% of Target).")
                 return None
         
         sl = price - sl_dist if cmd_type == 0 else price + sl_dist
@@ -115,10 +85,44 @@ class ExecutionEngine:
 
     def check_predictive_exit(self, trade: Dict, current_tick: Dict):
         """
-        Virtual TP 2.0
+        Virtual TP 2.0 (The Magnet)
+        Checks if we should close BEFORE the hard TP to secure bag.
         """
-        # Logic: If price is within 50 points of TP AND Velocity > 20 points/sec
-        # CLOSE NOW before slippage happens.
+        symbol = trade.get('symbol')
+        ticket = trade.get('ticket')
+        profit = trade.get('profit', 0.0)
+        tp = trade.get('tp', 0.0)
+        open_price = trade.get('open_price', 0.0)
+        current_price = current_tick.get('bid') if trade.get('type') == 0 else current_tick.get('ask') # approx
+        
+        if tp == 0 or open_price == 0: return # No TP set
+        
+        # 1. Calculation of Progress
+        total_dist = abs(tp - open_price)
+        current_dist = abs(current_price - open_price)
+        
+        if total_dist == 0: return
+
+        progress = current_dist / total_dist
+        
+        # 2. Virtual Hit Logic
+        # If we are 80% of the way there, and profit is decent, CLOSE.
+        # User Feedback: "Impossible to reach". So we make it easier.
+        
+        if progress > 0.80:
+             logger.info(f"VIRTUAL TP: {symbol} at 80% progress. Securing ${profit:.2f}.")
+             self.close_trade(ticket, symbol)
+             return True
+             
+        # 3. Time Decay / Stalling (Simple check)
+        # If profit is > $5.00 and we are stalling (would require history, skipping for now)
+        
+        return False
+
+    def close_trade(self, ticket: int, symbol: str):
+        logger.info(f"EXECUTION: Closing Trade {ticket} ({symbol})")
+        if self.bridge:
+            self.bridge.send_command("CLOSE_TRADE", [str(ticket)])
     def close_all(self, symbol: str):
         """Emergency Exit / Strategic Close"""
         logger.warning(f"EXECUTION: CLOSE ALL POSITIONS for {symbol}")

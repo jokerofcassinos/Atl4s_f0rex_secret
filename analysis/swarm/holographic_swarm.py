@@ -2,119 +2,104 @@
 import logging
 import numpy as np
 import pandas as pd
-from typing import Dict, Any
-from core.interfaces import SwarmSignal, SubconsciousUnit
+from typing import Dict, Any, List
+from core.interfaces import SubconsciousUnit, SwarmSignal
+from scipy.stats import entropy
+import time
 
 logger = logging.getLogger("HolographicSwarm")
 
 class HolographicSwarm(SubconsciousUnit):
     """
-    The Quantum Hologram (Spectral Analysis).
-    Phase 34 Innovation.
+    Phase 75: The Holographic Swarm (AdS/CFT Correspondence).
+    
+    Applies the Holographic Principle to Market Data.
+    Premise: The Volume (Boundary Information) encodes the future Price Path (Bulk Geometry).
+    
     Logic:
-    1. Transforms Time-Series Price Data into Frequency Domain using FFT (Fast Fourier Transform).
-    2. Identifies the "Dominant Cycle" (The wave with the highest amplitude).
-    3. Filters out high-frequency noise (Smoothing).
-    4. Projects the Phase of the Dominant Cycle.
-       - Phase 0 or 2pi = Cycle Trough (Potential Bottom) -> BUY
-       - Phase pi = Cycle Peak (Potential Top) -> SELL
+    - We calculate the Shannon Entropy of the Price-Volume Distribution (Relative Volume Profile).
+    - Low Entropy = Ordered State = Strong Trend (Laminar Bulk).
+    - High Entropy = Disordered State = Range/Choppiness (Turbulent Bulk).
+    - Phase Transition: Sudden drop in Entropy signals the start of a Trend.
     """
     def __init__(self):
-        super().__init__("HolographicSwarm")
+        super().__init__("Holographic_Swarm")
 
-    async def process(self, context: Dict[str, Any]) -> SwarmSignal:
-        df = context.get('df_h1') # Use H1 for Cyclical Stability
-        if df is None or len(df) < 128: return None # FFT likes powers of 2 ideally, but >100 is needed
+    async def process(self, context) -> SwarmSignal:
+        df_m5 = context.get('df_m5')
+        if df_m5 is None or len(df_m5) < 50: return None
         
-        # 1. Prepare Data (Detrending)
-        # FFT requires stationary data usually, or we just look for cycles in the detrended series.
-        close = df['close'].values
-        # Simple linear detrending
-        x = np.arange(len(close))
-        poly = np.polyfit(x, close, 1)
-        trend = np.polyval(poly, x)
-        detrended = close - trend
+        # 1. Construct the Hologram (Volume Profile)
+        # We take the last 50 candles
+        closes = df_m5['close'].iloc[-50:].values
         
-        # 2. Perform FFT
-        # We use a window of last 128 candles for spectral clarity
-        # If we use too long, cycles shift. 128 hours ~ 1 week (Forex) is good.
-        N = 128
-        if len(detrended) < N: N = len(detrended)
-        y = detrended[-N:]
+        if 'tick_volume' in df_m5.columns:
+             volumes = df_m5['tick_volume'].iloc[-50:].values
+        elif 'Volume' in df_m5.columns:
+             volumes = df_m5['Volume'].iloc[-50:].values
+        else:
+             # If no volume, we can't do Entropy Analysis properly.
+             # Return High Entropy (Uncertainty) or None?
+             # Let's return None to avoid noise.
+             return None
         
-        fft_vals = np.fft.rfft(y)
-        fft_freq = np.fft.rfftfreq(N)
+        # Create a Histogram of Volume by Price Level (The Boundary)
+        # Use simple binning
+        hist, bin_edges = np.histogram(closes, bins=10, weights=volumes, density=True)
         
-        # 3. Find Dominant Frequency
-        # We ignore the 0 freq (DC component)
-        amplitudes = np.abs(fft_vals)
-        # Zero out low frequencies that are just trend remnants
-        amplitudes[0:3] = 0 
+        # 2. Calculate Information Entropy (Shannon)
+        # H = -SUM(p * log(p))
+        # Add epsilon to avoid log(0)
+        hist_probs = hist / np.sum(hist) + 1e-9
+        holographic_entropy = entropy(hist_probs)
         
-        peak_idx = np.argmax(amplitudes)
-        dominant_freq = fft_freq[peak_idx]
-        
-        if dominant_freq == 0: return None
-        
-        cycle_period = 1 / dominant_freq
-        
-        # 4. Phase Analysis
-        # What is the phase of this specific frequency at the last data point?
-        # Angle of the complex number
-        phase_angle = np.angle(fft_vals[peak_idx])
-        
-        # The FFT tells us the phase at t=0 (start of window). 
-        # We need phase at t=N (end of window).
-        # Phase_t = Phase_0 + 2*pi*f*t
-        current_phase = phase_angle + (2 * np.pi * dominant_freq * (N-1))
-        
-        # Normalize to 0 - 2pi
-        current_phase = current_phase % (2 * np.pi)
-        
-        # 5. Interpretation
-        # Sine wave: 
-        # 0 = Center going Up (Bullish Momentum)
-        # pi/2 = Peak (Overbought) -> Reversal Down
-        # pi = Center going Down (Bearish Momentum)
-        # 3pi/2 = Trough (Oversold) -> Reversal Up
+        # Normalize Entropy? Max Entropy for 10 bins is log(10) = 2.30
+        max_entropy = np.log(10)
+        normalized_H = holographic_entropy / max_entropy
         
         signal = "WAIT"
         confidence = 0.0
-        bias = ""
+        reason = ""
         
-        # We target the TURNING POINTS
-        # Peak (Sell): Around pi/2 (1.57)
-        # Trough (Buy): Around 3pi/2 (4.71)
+        # 3. Decode the Bulk Geometry
+        # Low Entropy (< 0.6) means Volume is concentrated (Gaussian/Ordered).
+        # This usually happens DURING a strong trend (acceptance of price).
+        # OR right before a breakout from a tight range (if range is small).
         
-        # Tolerance window
-        tol = 0.5
+        # High Entropy (> 0.9) means Volume is scattered (Uniform/Random).
+        # This implies confusion/distribution/range.
         
-        if abs(current_phase - (3 * np.pi / 2)) < tol:
-            signal = "BUY"
-            confidence = 75.0
-            bias = "Cycle Trough"
-        elif abs(current_phase - (np.pi / 2)) < tol:
-            signal = "SELL"
-            confidence = 75.0
-            bias = "Cycle Peak"
+        # We need to detect the CHANGE (Phase Transition).
+        # Calculate Entropy of previous window to compare?
+        # For now, just absolute state.
         
-        # Or Momentum logic?
-        # If phase is between 3pi/2 and pi/2 (via 0) -> Rising
-        # If phase is between pi/2 and 3pi/2 -> Falling
-        
-        # Let's stick to Reversal Logic for this Swarm (Counter-cyclical)
-        
+        if normalized_H < 0.6:
+            # Low Entropy -> Structured Flow.
+            # Check Trend Direction
+            drift = closes[-1] - closes[0]
+            
+            if drift > 0:
+                signal = "BUY"
+                confidence = 80.0 + ((1.0 - normalized_H) * 20) # Lower H = Higher Conf
+                reason = f"HOLOGRAPHIC: Low Entropy ({normalized_H:.2f}). Ordered Bullish Flow."
+            else:
+                signal = "SELL"
+                confidence = 80.0 + ((1.0 - normalized_H) * 20)
+                reason = f"HOLOGRAPHIC: Low Entropy ({normalized_H:.2f}). Ordered Bearish Flow."
+                
+        elif normalized_H > 0.9:
+            # High Entropy -> Chaos.
+            signal = "WAIT" 
+            confidence = 0.0
+            reason = f"HOLOGRAPHIC: Maximum Entropy ({normalized_H:.2f}). Market Incoherent."
+            
         if signal != "WAIT":
             return SwarmSignal(
-                source="HolographicSwarm",
+                source=self.name,
                 signal_type=signal,
                 confidence=confidence,
-                timestamp=0,
-                meta_data={
-                    "reason": f"{bias} detected. Period: {cycle_period:.1f} bars",
-                    "phase": current_phase,
-                    "period": cycle_period
-                }
+                timestamp=time.time(),
+                meta_data={'entropy': normalized_H, 'reason': reason}
             )
             
         return None

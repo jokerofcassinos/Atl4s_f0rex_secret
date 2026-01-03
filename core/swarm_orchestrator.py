@@ -62,6 +62,22 @@ from analysis.swarm.hyperdimensional_swarm import HyperdimensionalSwarm
 from analysis.swarm.mirror_swarm import MirrorSwarm
 from analysis.swarm.interference_swarm import InterferenceSwarm
 from analysis.swarm.kinematic_swarm import KinematicSwarm
+from analysis.swarm.singularity_swarm import SingularitySwarm
+from analysis.swarm.hyperdimensional_swarm import HyperdimensionalSwarm
+from analysis.swarm.vortex_swarm import VortexSwarm
+from analysis.swarm.dna_swarm import DNASwarm
+from analysis.swarm.schrodinger_swarm import SchrodingerSwarm
+from analysis.swarm.antimatter_swarm import AntimatterSwarm
+from analysis.swarm.heisenberg_swarm import HeisenbergSwarm
+from analysis.swarm.navier_stokes_swarm import NavierStokesSwarm
+from analysis.swarm.dark_matter_swarm import DarkMatterSwarm
+from analysis.swarm.holographic_swarm import HolographicSwarm
+from analysis.swarm.superluminal_swarm import SuperluminalSwarm
+from analysis.swarm.event_horizon_swarm import EventHorizonSwarm
+from analysis.swarm.lorentz_swarm import LorentzSwarm
+from analysis.swarm.minkowski_swarm import MinkowskiSwarm
+from analysis.swarm.higgs_swarm import HiggsSwarm
+from analysis.swarm.boltzmann_swarm import BoltzmannSwarm
 
 # Meta-Cognition
 from analysis.swarm.attention_swarm import AttentionSwarm
@@ -170,6 +186,22 @@ class SwarmOrchestrator:
         self.active_agents.append(MirrorSwarm())
         self.active_agents.append(InterferenceSwarm())
         self.active_agents.append(KinematicSwarm())
+        self.active_agents.append(SingularitySwarm())
+        self.active_agents.append(HyperdimensionalSwarm())
+        self.active_agents.append(VortexSwarm())
+        self.active_agents.append(DNASwarm())
+        self.active_agents.append(SchrodingerSwarm())
+        self.active_agents.append(AntimatterSwarm())
+        self.active_agents.append(HeisenbergSwarm())
+        self.active_agents.append(NavierStokesSwarm())
+        self.active_agents.append(DarkMatterSwarm())
+        self.active_agents.append(HolographicSwarm())
+        self.active_agents.append(SuperluminalSwarm())
+        self.active_agents.append(EventHorizonSwarm())
+        self.active_agents.append(LorentzSwarm())
+        self.active_agents.append(MinkowskiSwarm())
+        self.active_agents.append(HiggsSwarm())
+        self.active_agents.append(BoltzmannSwarm())
         
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         
@@ -219,12 +251,39 @@ class SwarmOrchestrator:
         
         # Collect Signals (and Log them)
         signal_summary = []
+        laminar_mode = False
+        self.alpha_threshold = 60.0 # Reset to Default
+        
         for agent in self.active_agents:
             thought = await agent.process(context)
             if thought:
                 self.bus.register_thought(thought)
                 current_signals[agent.name] = thought.signal_type
                 signal_summary.append(f"{agent.name}={thought.signal_type}({thought.confidence:.0f}%)")
+                
+                # SAFETY OVERRIDE (Phase 64 Fixing Phase 58 failure)
+                # If Harvester signals EXIT (Emergency or Strategic), we obey IMMEDIATELY.
+                if agent.name == "HarvesterSwarm" and "EXIT" in thought.signal_type:
+                     logger.warning(f"🚨 HARVESTER OVERRIDE: {thought.signal_type} ({thought.meta_data.get('reason')})")
+                     return (thought.signal_type, thought.confidence, thought.meta_data)
+                
+                # Phase 54: Laminar Flow Engine
+                if agent.name == "Chaos_Swarm":
+                    entropy = thought.meta_data.get('entropy', 1.0)
+                    lyapunov = thought.meta_data.get('lyapunov', 0.0)
+                    
+                    # Laminar Flow Condition (Low Entropy + Stability)
+                    if entropy < 0.6 and lyapunov < 0.01:
+                        # Market is Smooth. Lower the Shields.
+                        self.alpha_threshold = 45.0
+                        laminar_mode = True
+                        self.short_term_memory['market_state']['regime'] = 'LAMINAR'
+                        logger.info(f"🌊 LAMINAR FLOW DETECTED (Ent={entropy:.2f}): Shields Lowered to {self.alpha_threshold}% for Rapid Fire.")
+                    
+                    # Turbulent Condition
+                    elif entropy > 0.85:
+                        self.alpha_threshold = 75.0
+                        logger.info(f"🌪️ TURBULENCE DETECTED (Ent={entropy:.2f}): Shields Raised to {self.alpha_threshold}%.")
         
         if signal_summary:
             logger.info(f"SWARM VOTES: {', '.join(signal_summary)}")
@@ -318,7 +377,15 @@ class SwarmOrchestrator:
         thoughts = self.bus.get_recent_thoughts()
         if not thoughts: return None
         
-        # 1. Attention Mechanism (The Transformer)
+        # 1. Physics Reality Check (Phase 65: Clash of Gods)
+        # Physics (Kinematics/Hyperdimensional) overrides Consensus/Transformer.
+        # "Reality does not negotiate."
+        physics_decision = self._resolve_physics_conflict(thoughts)
+        if physics_decision:
+             logger.info(f"PHYSICS OVERRIDE: {physics_decision[0]} (God Mode Active)")
+             return (physics_decision[0], physics_decision[1], physics_decision[2])
+
+        # 2. Attention Mechanism (The Transformer)
         attention_signal = self.attention.synthesize(thoughts)
         
         final_decision = None
@@ -432,6 +499,45 @@ class SwarmOrchestrator:
                  return ("WAIT", 0.0, {})
 
         return (final_decision, final_score, final_metadata)
+
+    def _resolve_physics_conflict(self, thoughts):
+        """
+        Phase 65: The Clash of Gods.
+        Physics Agents have Dominion over Statistical Agents.
+        Hierarchy: Singularity (2.5) > Hyperdimensional (2.2) > Vortex (2.1) > Kinematic (2.0)
+        """
+        physics_agents = ['Singularity_Swarm', 'Hyperdimensional_Swarm', 'Kinematic_Swarm', 'Vortex_Swarm']
+        high_command = [t for t in thoughts if t.source in physics_agents and t.confidence > 80.0]
+        
+        if not high_command: return None
+        
+        # Sort by Weight/Authority
+        # We need a map or just hardcode hierarchy
+        hierarchy = {
+            'Singularity_Swarm': 3, 
+            'Hyperdimensional_Swarm': 2.5, 
+            'Vortex_Swarm': 2.2,
+            'Kinematic_Swarm': 1
+        }
+        
+        # Find highest rank signal
+        best_signal = None
+        best_rank = -1
+        
+        for t in high_command:
+            rank = hierarchy.get(t.source, 0)
+            if rank > best_rank:
+                best_rank = rank
+                best_signal = t
+            elif rank == best_rank:
+                 # Tie-break by confidence
+                 if t.confidence > best_signal.confidence:
+                     best_signal = t
+                     
+        if best_signal:
+             return (best_signal.signal_type, best_signal.confidence, best_signal.meta_data)
+             
+        return None
 
     async def run(self):
         """Main Life Loop"""

@@ -74,38 +74,63 @@ class HarvesterSwarm(SubconsciousUnit):
         # If Price Action is "Difficult" (Low ER, High Wicks) -> SUGGEST EXIT
         # "Quanto mais dificil mais rapido fecha"
         
+        
+        # --- 3. TACHYON SHIELD (Phase 78: Priority Profit Taking) ---
+        # Logic: If we hit critical targets, EXIT IMMEDIATELY.
+        # Do not wait for "Market Struggle". Do not analyze ER. Secure the bag.
+        
+        positions = tick.get('positions', 0)
+        current_profit = tick.get('profit', 0.0) 
+        best_profit = tick.get('best_profit', -999.0)
+        best_ticket = tick.get('best_ticket', 0)
+        
+        if positions > 0:
+            # A. EMERGENCY CIRCUIT BREAKER (Stop Loss)
+            if current_profit < -15.0: # Tightened from -20 to -15
+                 signal = "EXIT_ALL"
+                 confidence = 100.0 # MAX PRIORITY
+                 reason = f"🚨 EMERGENCY STOP: Loss ${current_profit:.2f} > Limit $15.00"
+                 return SwarmSignal(self.name, signal, confidence, pd.Timestamp.now(), {'reason': reason})
+
+            # B. SURGICAL SNIPER EXIT (Single Trade TP)
+            # If any single trade is > $3.00 (Lowered for Scalping), take it.
+            if best_profit > 3.0:
+                 signal = "EXIT_SPECIFIC"
+                 confidence = 100.0
+                 reason = f"🎯 SNIPER EXIT: Trade {best_ticket} Green (${best_profit:.2f}) > $3.00 Threshold."
+                 return SwarmSignal(self.name, signal, confidence, pd.Timestamp.now(), {'ticket': best_ticket, 'reason': reason})
+                 
+            # C. VIRTUAL TP (Global TP)
+            # If Net PnL > $5.00, take it.
+            if current_profit > 5.0:
+                 signal = "EXIT_ALL"
+                 confidence = 95.0
+                 reason = f"💎 VIRTUAL TP HIT: Profit ${current_profit:.2f} > $5.00 Threshold."
+                 return SwarmSignal(self.name, signal, confidence, pd.Timestamp.now(), {'reason': reason})
+
+        # --- 4. Efficiency Analysis (Market Quality) ---
+        # Used for "Soft Exits" (Stalling) or Vetoing new trades.
+        
         if er < 0.3 or wick_ratio > 0.6:
             # Market is Churning/Struggling.
-            # Only signal EXIT if we actually have positions to protect.
-            # Otherwise, just VETO new entries.
-            
-            positions = tick.get('positions', 0)
-            current_profit = tick.get('profit', 0.0) # New Field from Bridge
-            
             if positions > 0:
-                # PROFIT SNATCHER LOGIC
-                if current_profit > 0 and er < 0.4:
+                # Soft Exit: We are Green but stalling.
+                if current_profit > 0.5: # Breakeven+
                      signal = "EXIT_ALL"
                      confidence = 90.0
                      reason = f"Profit Snatcher: Green (${current_profit:.2f}) but Stalling (ER {er:.2f})"
-                
-                elif current_profit > 15.0: # Hard Target (Scalp Bag check)
-                     signal = "EXIT_ALL"
-                     confidence = 95.0
-                     reason = f"Hard Target Reached: ${current_profit:.2f}"
-                     
                 else:
-                     signal = "EXIT_ALL" # Acts as 'Close if Open' (Panic defense)
-                     confidence = 85.0 # High urgency
-                     reason = f"Struggle Detected (Protecting Capital): ER {er:.2f} | Wick {wick_ratio:.2f}"
+                     # We are Red and Stalling. HEDGE? Or just WAIT?
+                     # Panic Close if very choppy?
+                     signal = "WAIT" # Let logic handle it, or panic close if risky
             else:
-                signal = "VETO" # Prevent entering this mess
+                signal = "VETO"
                 confidence = 60.0
                 reason = f"Chop Detected (Vetoing Entry): ER {er:.2f} | Wick {wick_ratio:.2f}"
-            
+                
         elif er > 0.7:
              # Market is Flying.
-             signal = "HOLD" # Encourage holding
+             signal = "HOLD"
              confidence = 90.0
              reason = f"Flow State: ER {er:.2f}"
              

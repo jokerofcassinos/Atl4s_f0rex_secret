@@ -173,6 +173,13 @@ class OmegaSystem:
                         # Immediate Priority Override
                         self.executor.close_all(self.symbol)
                         logger.warning("STRATEGIC EXIT TRIGGERED.")
+                        
+                    elif decision == "EXIT_SPECIFIC":
+                        # Surgical Close of Winner
+                        ticket = meta_data.get('ticket')
+                        if ticket:
+                             self.executor.close_trade(ticket, self.symbol)
+                             logger.warning(f"SURGICAL EXIT: Closing Ticket {ticket}. Reason: {meta_data.get('reason')}")
 
 
                     state = {

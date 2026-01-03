@@ -35,7 +35,24 @@ class NeuroplasticityLoop:
             'Topological_Swarm': 1.4, # The Geometer
             'Manifold_Swarm': 1.4, # The Cartographer
             'Associative_Swarm': 1.3, # The Librarian
-            'Path_Integral_Swarm': 1.6 # The Physicist
+            'Path_Integral_Swarm': 1.6, # The Physicist
+            'Singularity_Swarm': 2.5, # THE UNIFIED FIELD (Max Authority)
+            'Singularity_Swarm': 2.5, # THE UNIFIED FIELD (Max Authority)
+            'Hyperdimensional_Swarm': 2.2, # CHAOS DIVERGENCE (Safety Hedge)
+            'Vortex_Swarm': 2.1, # TRAP DETECTOR (Wick Rejection)
+            'DNA_Swarm': 2.0, # EVOLUTIONARY MEMORY (Genetic Match)
+            'Schrodinger_Swarm': 1.9, # QUANTUM TUNNELING (Breakout Physics)
+            'Antimatter_Swarm': 1.5, # PARITY CHECK (Symmetry Validator)
+            'Heisenberg_Swarm': 1.7, # UNCERTAINTY PRINCIPLE (Volatility Squeeze)
+            'Navier_Stokes_Swarm': 1.6, # FLUID DYNAMICS (Laminar vs Turbulent)
+            'Dark_Matter_Swarm': 1.8, # MASS-TO-LIGHT RATIO (Invisible Liquidity)
+            'Holographic_Swarm': 1.7, # ENTROPY (AdS/CFT)
+            'Superluminal_Swarm': 2.1, # FFT PRECOGNITION (Tachyonic Antitelephone)
+            'Event_Horizon_Swarm': 1.8, # GENERAL RELATIVITY (Gravity Well)
+            'Lorentz_Swarm': 2.2, # CHAOS THEORY (Bifurcation Detector)
+            'Minkowski_Swarm': 1.9, # SPECIAL RELATIVITY (Spacetime Interval)
+            'Higgs_Swarm': 2.0, # PARTICLE PHYSICS (Mass Generation / Liquidity Drag)
+            'Boltzmann_Swarm': 1.8 # THERMODYNAMICS (Free Energy)
         }
         
         # Performance Trackers (Rolling Accuracy)

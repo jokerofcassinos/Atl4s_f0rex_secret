@@ -176,14 +176,31 @@ void OnTick()
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    reflex.Update(ask - bid);
    
-   // 2. Send Tick to Brain (Native Socket)
-   // Msg: TICK|SYMBOL|TIME|BID|ASK|VOL\n
+   // 2. Scan for Best Profit (Surgical TP)
    MqlTick tick;
    SymbolInfoTick(_Symbol, tick);
    
-   string msg = StringFormat("TICK|%s|%I64d|%.5f|%.5f|%I64d|%.2f|%d|%.2f\n", 
+   double best_profit = -999999.0;
+   long best_ticket = 0;
+   
+   for(int i=0; i<PositionsTotal(); i++) {
+      if(PositionSelectByTicket(PositionGetTicket(i))) {
+         if(PositionGetSymbol(i) == _Symbol) { // Filter by current symbol? Or Global? Let's do Global for now or Symbol?
+            // Actually, usually we run one bot per chart. Restrict to _Symbol.
+            double prof = PositionGetDouble(POSITION_PROFIT);
+            if(prof > best_profit) {
+               best_profit = prof;
+               best_ticket = PositionGetInteger(POSITION_TICKET);
+            }
+         }
+      }
+   }
+   
+   // Msg: TICK|SYMBOL|TIME|BID|ASK|VOL|EQUITY|POS_COUNT|ACC_PROFIT|BEST_PROFIT|BEST_TICKET\n
+   string msg = StringFormat("TICK|%s|%I64d|%.5f|%.5f|%I64d|%.2f|%d|%.2f|%.2f|%I64d\n", 
                              _Symbol, tick.time_msc, tick.bid, tick.ask, tick.volume,
-                             AccountInfoDouble(ACCOUNT_EQUITY), PositionsTotal(), AccountInfoDouble(ACCOUNT_PROFIT));
+                             AccountInfoDouble(ACCOUNT_EQUITY), PositionsTotal(), AccountInfoDouble(ACCOUNT_PROFIT),
+                             best_profit, best_ticket);
    
    uchar req[];
    StringToCharArray(msg, req);
