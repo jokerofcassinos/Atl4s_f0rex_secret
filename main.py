@@ -1,4 +1,4 @@
-
+﻿
 import asyncio
 import logging
 import pandas as pd
@@ -64,21 +64,42 @@ class OmegaSystem:
                     best_profit_guard = tick.get('best_profit', -999.0)
                     positions_guard = tick.get('positions', 0)
                     
+                    positions_guard = tick.get('positions', 0)
+                    
                     if positions_guard > 0:
-                        # 1. SURGICAL PRIORITY: Close the big winner first.
-                        # This avoids closing small nascent trades (e.g. $1 profit) when a big one hits ($30).
+                        # 1. GUARDIAN VIRTUAL SL (Phase 94 - Emergency Layer)
+                        # User Request: "Same concept as virtual TP but for SL"
+                        # If we bleed too much, cut the basket blindly.
+                        if current_profit_guard < -15.0:
+                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < -$15.00. EMERGENCY BASKET EXIT.")
+                             self.executor.close_all(self.symbol) # Try primary
+                             self.executor.close_all("BTCUSD")    # Try secondary (Hardcoded for now as quick fix)
+                             await asyncio.sleep(0.5)
+                             continue
+
+                        # 2. SURGICAL PRIORITY: Close the big winner first.
                         if best_profit_guard > 3.0:
                              best_ticket = tick.get('best_ticket')
                              logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > $3.00. CLOSING TICKET {best_ticket}.")
-                             self.executor.close_trade(best_ticket, self.symbol)
+                             
+                             # FIX: We don't know the symbol of best_ticket from 'tick' alone.
+                             # But we know it's likely either self.symbol OR 'BTCUSD' (based on user logs).
+                             # We try closing via self.symbol first.
+                             self.executor.close_trade(best_ticket, self.symbol) 
+                             # Redundant Safety: If it's the other symbol, we might need to send to that bridge client?
+                             # For now, let's assume MQL5 'CLOSE_TRADE' can handle ticket regardless of symbol IF we fix MQL5 side.
+                             # But sticking to Python fix:
+                             if self.symbol != "BTCUSD":
+                                 self.executor.close_trade(best_ticket, "BTCUSD")
+                                 
                              await asyncio.sleep(0.2) 
-                             continue # Continue loop to refresh tick and check next best
+                             continue 
 
-                        # 2. GLOBAL SAFETY: Only Close All if total profit is massive or protecting a large basket.
-                        # Raised from 3.0 to 15.0 to prevent premature closure of small baskets.
+                        # 3. GLOBAL SAFETY Profit
                         if current_profit_guard > 15.0:
                             logger.critical(f"[!] GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $15.00. BASKET EXIT.")
                             self.executor.close_all(self.symbol)
+                            if self.symbol != "BTCUSD": self.executor.close_all("BTCUSD")
                             await asyncio.sleep(0.5)
                             continue
 
