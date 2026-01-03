@@ -67,17 +67,7 @@ class OmegaSystem:
                     positions_guard = tick.get('positions', 0)
                     
                     if positions_guard > 0:
-                        # 1. GUARDIAN VIRTUAL SL (Phase 94 - Emergency Layer)
-                        # User Request: "Same concept as virtual TP but for SL"
-                        # If we bleed too much, cut the basket blindly.
-                        if current_profit_guard < -15.0:
-                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < -$15.00. EMERGENCY BASKET EXIT.")
-                             self.executor.close_all(self.symbol) # Try primary
-                             self.executor.close_all("BTCUSD")    # Try secondary (Hardcoded for now as quick fix)
-                             await asyncio.sleep(0.5)
-                             continue
-
-                        # 2. SURGICAL PRIORITY: Close the big winner first.
+                        # 1. SURGICAL PRIORITY: Close the big winner first.
                         if best_profit_guard > 3.0:
                              best_ticket = tick.get('best_ticket')
                              logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > $3.00. CLOSING TICKET {best_ticket}.")
@@ -94,6 +84,16 @@ class OmegaSystem:
                                  
                              await asyncio.sleep(0.2) 
                              continue 
+                             
+                        # 2. GUARDIAN VIRTUAL SL (Phase 94 - Emergency Layer)
+                        # User Request: "Same concept as virtual TP but for SL"
+                        # If we bleed too much, cut the basket blindly.
+                        if current_profit_guard < -15.0:
+                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < -$15.00. EMERGENCY BASKET EXIT.")
+                             self.executor.close_all(self.symbol) # Try primary
+                             self.executor.close_all("BTCUSD")    # Try secondary (Hardcoded for now as quick fix)
+                             await asyncio.sleep(0.5)
+                             continue
 
                         # 3. GLOBAL SAFETY Profit
                         if current_profit_guard > 15.0:
