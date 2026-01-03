@@ -201,10 +201,14 @@ class OmegaSystem:
                              logger.info(f"FIRE! Burst {tracker['count']+1}/{max_burst} | Slots {current_positions+1}/{max_slots}")
                              
                              # Fix: Method is execute_signal, and takes 'decision' string ("BUY"/"SELL"), not 'cmd' int.
+                             # Wolf Pack Mode: We allow lenient spreads (0.05) to ensure burst execution.
+                             spread_tol = 0.05 if self.config['mode'] == "WOLF_PACK" else None
+                             
                              await self.executor.execute_signal(decision, self.symbol, 
                                                                 tick.get('bid'), tick.get('ask'), 
                                                                 confidence=confidence,
-                                                                account_info={'equity': tick.get('equity', 1000)}) 
+                                                                account_info={'equity': tick.get('equity', 1000)},
+                                                                spread_tolerance=spread_tol) 
                              
                              tracker['count'] += 1
                              self.burst_tracker[self.symbol] = tracker

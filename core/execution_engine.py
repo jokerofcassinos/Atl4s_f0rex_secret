@@ -17,7 +17,7 @@ class ExecutionEngine:
         self.leverage_manager = DynamicLeverage()
         self.risk_filter = GreatFilter()
         
-    async def execute_signal(self, command: str, symbol: str, bid: float, ask: float, confidence: float = 80.0, account_info: Dict = None):
+    async def execute_signal(self, command: str, symbol: str, bid: float, ask: float, confidence: float = 80.0, account_info: Dict = None, spread_tolerance: float = None):
         """
         Converts a Cortex Command into a Physical Order.
         Args:
@@ -62,8 +62,8 @@ class ExecutionEngine:
             # SPREAD GUARD (Dynamic w/ Profit Ratio)
             # User Q: Does it adapt? A: Yes, relative to our Target.
             # We allow the Spread to be at most 50% of our Target Profit.
-            # (Relaxed from 20% to 50% to allow Micro-Scalping on BTCXAU where spread is ~3c and target is 7c).
-            max_spread = tp_dist * 0.50 
+            # If spread_tolerance is provided (Wolf Pack Mode), we use that instead.
+            max_spread = spread_tolerance if spread_tolerance else tp_dist * 0.50 
             
             spread = ask - bid
             if spread > max_spread:
