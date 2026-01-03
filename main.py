@@ -88,8 +88,9 @@ class OmegaSystem:
                         # 2. GUARDIAN VIRTUAL SL (Phase 94 - Emergency Layer)
                         # User Request: "Same concept as virtual TP but for SL"
                         # If we bleed too much, cut the basket blindly.
-                        if current_profit_guard < -15.0:
-                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < -$15.00. EMERGENCY BASKET EXIT.")
+                        # Updated to $40.00 as per user request (approx 10 pips on 0.42 lots)
+                        if current_profit_guard < -40.0:
+                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < -$40.00. EMERGENCY BASKET EXIT.")
                              self.executor.close_all(self.symbol) # Try primary
                              self.executor.close_all("BTCUSD")    # Try secondary (Hardcoded for now as quick fix)
                              await asyncio.sleep(0.5)

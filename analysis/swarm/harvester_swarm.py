@@ -137,33 +137,18 @@ class HarvesterSwarm(SubconsciousUnit):
         # --- 5. Phase 94: The Pre-Cog Safety (Virtual SL) ---
         # Logic: If Drawdown > Threshold AND Physics Invalidation -> KILL.
         
-        if positions > 0 and current_profit < -2.0: # Early warning (Hard Stop usually -15)
+        # Updated: Trigger at -$10 (Early Warning) and -$20 (Kill Zone) for $40 Max Risk.
+        if positions > 0 and current_profit < -10.0: 
             
             # A. Riemann Curvature Check (Simplified)
-            # Is the trend curving against us?
-            # SMA20 vs EMA20 divergence
             closes = df_m1['close']
             if len(closes) > 20:
                 sma = closes.rolling(20).mean().iloc[-1]
                 ema = closes.ewm(span=20).mean().iloc[-1]
-                
-                # Separation Vector
                 sep = ema - sma
                 
-                # If we are long (Ticket Type 0? Assuming)
-                # We don't have ticket type easily available in 'tick' map often, 
-                # but 'profit' < 0 implies we are against the move.
-                
-                # If Price is accelerating AWAY from our entry?
-                # We use internal logic:
-                # If we are BUYING, we want Positive Curvature or Upward Trend.
-                # If Entropy is High and Direction is WRONG -> Close.
-                
-                # Let's use a simpler heuristic for stability:
-                # If Profit < -5.0 (33% of SL) AND Market is Efficiently Moving Against Us (ER > 0.6)
-                # Then it's not noise, it's a trend. CLOSE.
-                
-                if current_profit < -5.0:
+                # If Profit < -20.0 (50% of Virtual SL) AND Market is Efficiently Moving Against Us (ER > 0.6)
+                if current_profit < -20.0:
                     if er > 0.6: 
                         # High Efficiency AGAINST us.
                         signal = "EXIT_ALL"
@@ -171,12 +156,10 @@ class HarvesterSwarm(SubconsciousUnit):
                         reason = f"PRE-COG SAFETY: Efficient Trend Interception. Loss ${current_profit:.2f} with ER {er:.2f}."
                         
                     # B. Nash Invalidation (Volume Pressure)
-                    # If Volume is high and we are losing...
                     last_vol = df_m1['volume'].iloc[-1]
                     avg_vol = df_m1['volume'].mean()
                     
                     if last_vol > avg_vol * 1.5:
-                        # High Volume Rejection
                          signal = "EXIT_ALL"
                          confidence = 85.0
                          reason = f"PRE-COG SAFETY: Volume Spike Rejection. Loss ${current_profit:.2f}."
