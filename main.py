@@ -199,7 +199,9 @@ class OmegaSystem:
 
                         if current_positions < max_slots and tracker['count'] < max_burst:
                              logger.info(f"FIRE! Burst {tracker['count']+1}/{max_burst} | Slots {current_positions+1}/{max_slots}")
-                             self.executor.execute_trade(self.symbol, cmd, 
+                             
+                             # Fix: Method is execute_signal, and takes 'decision' string ("BUY"/"SELL"), not 'cmd' int.
+                             await self.executor.execute_signal(decision, self.symbol, 
                                                                 tick.get('bid'), tick.get('ask'), 
                                                                 confidence=confidence,
                                                                 account_info={'equity': tick.get('equity', 1000)}) 
