@@ -36,6 +36,46 @@ class OmegaSystem:
         self.last_trade_times = {} # Cooldown tracking
         self.burst_tracker = {} # Burst Execution Manager
         
+        # User Configuration (Defaults)
+        self.config = {
+            "virtual_sl": 40.0,
+            "virtual_tp": 3.0,
+            "mode": "SNIPER" # SNIPER or WOLF_PACK
+        }
+        
+    def interactive_startup(self):
+        print("\n" + "="*50)
+        print("   OMEGA PROTOCOL v4.0 - SINGULARITY EDITION   ")
+        print("="*50)
+        
+        try:
+            # 1. Virtual SL
+            vsl_input = input(f"Virtual SL ($) [Default: {self.config['virtual_sl']}]: ").strip()
+            if vsl_input: self.config['virtual_sl'] = float(vsl_input)
+            
+            # 2. Virtual TP
+            vtp_input = input(f"Virtual TP ($) [Default: {self.config['virtual_tp']}]: ").strip()
+            if vtp_input: self.config['virtual_tp'] = float(vtp_input)
+            
+            # 3. Mode Selection
+            print("\nSelect Operational Mode:")
+            print("1. SNIPER (Precision, 1 Order per Signal)")
+            print("2. WOLF PACK (Aggressive, Scaled Burst Execution)")
+            mode_input = input("Selection [1/2]: ").strip()
+            
+            if mode_input == "2":
+                self.config['mode'] = "WOLF_PACK"
+                print(">> WOLF PACK MODE ENGAGED. UNLEASH THE HOUNDS.")
+            else:
+                self.config['mode'] = "SNIPER"
+                print(">> SNIPER MODE ENGAGED. ONE SHOT, ONE KILL.")
+                
+        except ValueError:
+            print("Invalid Input. Using Defaults.")
+            
+        print(f"\nConfiguration Loaded: VSL=${self.config['virtual_sl']} | VTP=${self.config['virtual_tp']} | Mode={self.config['mode']}")
+        print("="*50 + "\n")
+
     async def boot_sequence(self):
         logger.info("Initializing Omega Protocol...")
         await self.cortex.initialize_swarm()
@@ -43,6 +83,7 @@ class OmegaSystem:
         logger.info("System Ready. Waiting for Market Data...")
 
     async def run(self):
+        self.interactive_startup()
         await self.boot_sequence()
         
         while True:
@@ -64,13 +105,12 @@ class OmegaSystem:
                     best_profit_guard = tick.get('best_profit', -999.0)
                     positions_guard = tick.get('positions', 0)
                     
-                    positions_guard = tick.get('positions', 0)
-                    
                     if positions_guard > 0:
                         # 1. SURGICAL PRIORITY: Close the big winner first.
-                        if best_profit_guard > 3.0:
+                        # Uses Dynamic VTP from Config
+                        if best_profit_guard > self.config['virtual_tp']:
                              best_ticket = tick.get('best_ticket')
-                             logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > $3.00. CLOSING TICKET {best_ticket}.")
+                             logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > ${self.config['virtual_tp']}. CLOSING TICKET {best_ticket}.")
                              
                              # FIX: We don't know the symbol of best_ticket from 'tick' alone.
                              # But we know it's likely either self.symbol OR 'BTCUSD' (based on user logs).
@@ -86,17 +126,17 @@ class OmegaSystem:
                              continue 
                              
                         # 2. GUARDIAN VIRTUAL SL (Phase 94 - Emergency Layer)
-                        # User Request: "Same concept as virtual TP but for SL"
+                        # Uses Dynamic VSL from Config
                         # If we bleed too much, cut the basket blindly.
-                        # Updated to $40.00 as per user request (approx 10 pips on 0.42 lots)
-                        if current_profit_guard < -40.0:
-                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < -$40.00. EMERGENCY BASKET EXIT.")
+                        limit = -abs(self.config['virtual_sl']) # Ensure negative
+                        if current_profit_guard < limit:
+                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < ${limit}. EMERGENCY BASKET EXIT.")
                              self.executor.close_all(self.symbol) # Try primary
                              self.executor.close_all("BTCUSD")    # Try secondary (Hardcoded for now as quick fix)
                              await asyncio.sleep(0.5)
                              continue
 
-                        # 3. GLOBAL SAFETY Profit
+                        # 3. GLOBAL SAFETY Profit (Hardcoded Basket Target)
                         if current_profit_guard > 15.0:
                             logger.critical(f"[!] GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $15.00. BASKET EXIT.")
                             self.executor.close_all(self.symbol)
@@ -112,11 +152,7 @@ class OmegaSystem:
                     
                     # 3. Cortex Thinking
                     # Returns (decision, confidence, metadata)
-                    decision_tuple = await self.cortex.process_tick(tick, data_map)
-                    
-                    decision = decision_tuple[0]
-                    confidence = decision_tuple[1]
-                    metadata = decision_tuple[2]
+                    decision, confidence, metadata = await self.cortex.process_tick(tick, data_map)
                     
                     # Phase 30: Apex Routing
                     if decision == "ROUTING":
@@ -133,45 +169,24 @@ class OmegaSystem:
                              # We continue to let loop refresh.
                              continue 
                     
-                    # 4. Execution
-                    current_time = pd.Timestamp.now()
-                    last_fire = self.last_trade_times.get(self.symbol, None)
-                    
-                    cooldown_seconds = 45 # Safety: 45s cooldown to prevent order stacking
-                    
-                    if decision in ["BUY", "SELL"]:
-                        # --- CONTRARIAN MODE (OFF) ---
-                        # Flip the signal: Buy -> Sell, Sell -> Buy
-                        # original_decision = decision
-                        # if decision == "BUY": decision = "SELL"
-                        # elif decision == "SELL": decision = "BUY"
-                        # logger.warning(f"CONTRARIAN MODE: Inverting {original_decision} to {decision}")
-                        # ---------------------------------------
-                        # --- DYNAMIC SLOT MANAGEMENT (Phase 28) ---
-                        # 1. Get State
-                        current_equity = tick.get('equity', 1000.0)
+                    # 4. Neural Execution 
+                    if decision == "BUY" or decision == "SELL":
+                        cmd = 0 if decision == "BUY" else 1
+                        
+                        # Phase 95: Wolf Pack Logic (Dynamic Burst)
+                        max_burst = 1 # Default Sniper
+                        
+                        if self.config['mode'] == "WOLF_PACK":
+                            if confidence >= 95.0: max_burst = 5 # FULL PACK
+                            elif confidence >= 90.0: max_burst = 4
+                            elif confidence >= 85.0: max_burst = 3
+                            elif confidence >= 80.0: max_burst = 2
+                            else: max_burst = 1
+                            
+                        # Existing Burst Logic (Simulates HFT volley)
+                        # We use the 'max_burst' determined above.
+                        
                         current_positions = tick.get('positions', 0)
-                        
-                        # 2. Base Slots (1 per $500)
-                        base_slots = max(1, int(current_equity / 500))
-                        
-                        # 3. Regime Modifier (Architect)
-                        # We need access to Architect's directive. It's in the signals meta_data.
-                        # For now, we assume simple logic or extract if available.
-                        # Let's use a simpler heuristic for now:
-                        # If HIGH CONFIDENCE (Architect aligned), multiplier = 1.5
-                        
-                        slot_multiplier = 1.0
-                        if confidence >= 90.0: slot_multiplier = 1.5 
-                        
-                        # 4. Final Calculation
-                        max_slots = int(base_slots * slot_multiplier)
-                        
-                        # 5. Cap (Safety)
-                        max_slots = min(max_slots, 20) 
-                        
-                        logger.info(f"SLOT MANAGER: {current_positions}/{max_slots} slots used. (Eq: {current_equity:.0f})")
-
                         # --- DYNAMIC BURST EXECUTION (Scale-In) ---
                         # Logic: High Confidence = Machine Gun Mode. Low Confidence = Single Shot.
                         # Window: 45 seconds.
