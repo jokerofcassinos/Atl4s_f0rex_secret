@@ -294,16 +294,26 @@ void ProcessCommand(string json) {
     }
     else if (action == "CLOSE_ALL") {
         string symbol = ArraySize(parts) > 1 ? parts[1] : _Symbol;
+        StringToUpper(symbol); // Normalize input
+        
         for(int i=PositionsTotal()-1; i>=0; i--) {
             ulong ticket = PositionGetTicket(i);
-            if(PositionGetString(POSITION_SYMBOL) == symbol) trade.PositionClose(ticket);
+            string pos_sym = PositionGetString(POSITION_SYMBOL);
+            StringToUpper(pos_sym); // Normalize position symbol
+            
+            if(pos_sym == symbol) trade.PositionClose(ticket);
         }
     }
     else if (action == "CLOSE_BUYS") {
         string symbol = ArraySize(parts) > 1 ? parts[1] : _Symbol;
+        StringToUpper(symbol);
+        
         for(int i=PositionsTotal()-1; i>=0; i--) {
             ulong ticket = PositionGetTicket(i);
-            if(PositionGetString(POSITION_SYMBOL) == symbol && PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) {
+            string pos_sym = PositionGetString(POSITION_SYMBOL);
+            StringToUpper(pos_sym);
+            
+            if(pos_sym == symbol && PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) {
                 trade.PositionClose(ticket);
                 Print("CLOSE_BUYS: Exiting BUY ", ticket);
             }
@@ -311,9 +321,14 @@ void ProcessCommand(string json) {
     }
     else if (action == "CLOSE_SELLS") {
         string symbol = ArraySize(parts) > 1 ? parts[1] : _Symbol;
+        StringToUpper(symbol);
+        
         for(int i=PositionsTotal()-1; i>=0; i--) {
             ulong ticket = PositionGetTicket(i);
-            if(PositionGetString(POSITION_SYMBOL) == symbol && PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL) {
+            string pos_sym = PositionGetString(POSITION_SYMBOL);
+            StringToUpper(pos_sym);
+            
+            if(pos_sym == symbol && PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL) {
                 trade.PositionClose(ticket);
                 Print("CLOSE_SELLS: Exiting SELL ", ticket);
             }
