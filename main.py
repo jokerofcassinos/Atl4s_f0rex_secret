@@ -106,6 +106,9 @@ class OmegaSystem:
                     positions_guard = tick.get('positions', 0)
                     
                     if positions_guard > 0:
+                        # DEBUG: What does Guardian see?
+                        # logger.info(f"GUARDIAN SCAN: BestProfit=${best_profit_guard:.2f} (Target=${self.config['virtual_tp']}) TotalProfit=${current_profit_guard:.2f}")
+
                         # 1. SURGICAL PRIORITY: Close the big winner first.
                         # Uses Dynamic VTP from Config
                         if best_profit_guard > self.config['virtual_tp']:
