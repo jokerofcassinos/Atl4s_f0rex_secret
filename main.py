@@ -170,6 +170,7 @@ class OmegaSystem:
                              continue 
                     
                     # 4. Neural Execution 
+                    # 4. Neural Execution 
                     if decision == "BUY" or decision == "SELL":
                         cmd = 0 if decision == "BUY" else 1
                         
@@ -187,37 +188,24 @@ class OmegaSystem:
                         # We use the 'max_burst' determined above.
                         
                         current_positions = tick.get('positions', 0)
-                        # --- DYNAMIC BURST EXECUTION (Scale-In) ---
-                        # Logic: High Confidence = Machine Gun Mode. Low Confidence = Single Shot.
-                        # Window: 45 seconds.
-                        
-                        if self.symbol not in self.burst_tracker:
-                            self.burst_tracker[self.symbol] = {'start': current_time, 'count': 0}
-                            
-                        tracker = self.burst_tracker[self.symbol]
-                        
-                        # 1. Check/Reset Window
-                        if (current_time - tracker['start']).total_seconds() > 45:
-                            tracker['start'] = current_time
-                            tracker['count'] = 0
-                            
-                        max_burst = 1
-                        if confidence >= 95.0: max_burst = 5
-                        elif confidence >= 90.0: max_burst = 3
-                        elif confidence >= 80.0: max_burst = 1
-                        
-                        # 3. Fire Check
-                        logger.info(f"DEBUG BURST: Conf={confidence:.1f} MaxBurst={max_burst} Count={tracker['count']} Pos={current_positions} MaxSlots={max_slots}")
+                        max_slots = 10 # Allow more slots in Wolf Mode?
+                        if self.config['mode'] == "WOLF_PACK": max_slots = 15
 
-                        # GATE: Only fire if we have slots AND haven't exceeded burst
-                        if tracker['count'] < max_burst and current_positions < max_slots:
-                             await self.executor.execute_signal(decision, self.symbol, 
+                        tracker = self.burst_tracker.get(self.symbol, {'timestamp': 0, 'count': 0})
+                        
+                        # Reset burst if 1 minute passed
+                        if tick.get('time_msc', 0) - tracker['timestamp'] > 60000:
+                             tracker = {'timestamp': tick.get('time_msc', 0), 'count': 0}
+
+                        if current_positions < max_slots and tracker['count'] < max_burst:
+                             logger.info(f"FIRE! Burst {tracker['count']+1}/{max_burst} | Slots {current_positions+1}/{max_slots}")
+                             self.executor.execute_trade(self.symbol, cmd, 
                                                                 tick.get('bid'), tick.get('ask'), 
                                                                 confidence=confidence,
-                                                                account_info={'equity': current_equity}) 
+                                                                account_info={'equity': tick.get('equity', 1000)}) 
                              
                              tracker['count'] += 1
-                             logger.info(f"FIRE! Burst {tracker['count']}/{max_burst} | Slots {current_positions + 1}/{max_slots}")
+                             self.burst_tracker[self.symbol] = tracker
                         else:
                              if current_positions >= max_slots:
                                  logger.info("Signal Blocked: Max Slots Reached.")
