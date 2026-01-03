@@ -5,100 +5,121 @@ import pandas as pd
 from typing import Dict, Any, List
 from core.interfaces import SubconsciousUnit, SwarmSignal
 import time
+from scipy.stats import entropy
 
 logger = logging.getLogger("HeisenbergSwarm")
 
 class HeisenbergSwarm(SubconsciousUnit):
     """
-    Phase 71: The Heisenberg Swarm (Uncertainty Principle).
+    Phase 89: The Heisenberg Swarm (Uncertainty Principle).
     
-    Applies the Quantum Uncertainty Principle to Market Microstructure.
-    Relation: Delta_Price * Delta_Momentum >= Constant.
+    Manages the trade-off between Position Precision (Delta x) and Momentum Precision (Delta p).
+    
+    Physics:
+    - Delta x * Delta p >= h_bar / 2
+    - If accurate Price (Range), Impulse is unknown (Breakout risk).
+    - If accurate Momentum (Trend), Price is unknown (Target risk).
     
     Logic:
-    - Delta_x (Position Uncertainty): The vividness of the current price range (consolidation).
-      Small Delta_x = Pinched Bollinger / Flat Dojis / Inside Bars.
-    - Delta_p (Momentum Uncertainty): The potential for explosive movement.
+    - Delta x: Price Volatility (Bollinger Band Width / ATR).
+    - Delta p: Momentum Volatility (StdDev of ROC).
     
-    Prediction:
-    - If Delta_x goes to ZERO (Extreme Coiling), Delta_p must go to INFINITY.
-    - We predict a 'Volatility Singularity' (Massive Expansion) imminent.
-    - Direction is determined by the 'Quantum Drift' (micro-bias in the noise).
+    States:
+    1. Collapsed State (Low Delta x): The particle is localized. 
+       - Prediction: Massive Expansion of Momentum pending (Breakout).
+       - Action: SNIPER MODE (Wait for breach).
+       
+    2. Wave State (Low Delta p): The particle is a wave.
+       - Prediction: Momentum is stable, but location is fuzzy.
+       - Action: FLUX MODE (Trend Follow, ignore minor pullbacks).
+       
+    3. High Entropy (High Delta x, High Delta p):
+       - Chaos. Stay out.
     """
     def __init__(self):
         super().__init__("Heisenberg_Swarm")
-        self.plank_constant_market = 0.0001 # Minimum product threshold
 
     async def process(self, context) -> SwarmSignal:
         df_m5 = context.get('df_m5')
         if df_m5 is None or len(df_m5) < 30: return None
         
-        # 1. Calculate Position Uncertainty (Delta x)
-        # We use the standard deviation of Price over the last 10 bars
-        # Or simpler: The High-Low range of the last 5 bars normalized.
+        closes = df_m5['close'].values
         
-        recent = df_m5.iloc[-10:]
-        highest = recent['high'].max()
-        lowest = recent['low'].min()
-        close = recent['close'].iloc[-1]
+        # 1. Calculate Uncertainties
         
-        delta_x = (highest - lowest) / close # Normalized Range
+        # Delta x (Position Uncertainty)
+        # Use simple StdDev of last 20 periods relative to price
+        delta_x = np.std(closes[-20:])
         
-        # 2. Calculate Momentum Uncertainty (Delta p)
-        # We use the standard deviation of Returns (Variance of speed)
-        returns = df_m5['close'].pct_change().dropna()
-        delta_p = returns.iloc[-10:].std()
+        # Delta p (Momentum Uncertainty)
+        # First calculate momentum (ROC)
+        momentum = np.diff(closes)
+        # Then calculate variability of momentum
+        delta_p = np.std(momentum[-20:])
         
-        # 3. Product of Uncertainty
-        uncertainty_product = delta_x * delta_p
+        # Normalize
+        avg_price = np.mean(closes[-20:])
+        norm_dx = (delta_x / avg_price) * 10000 # Basis points
+        
+        # 2. Determine State
         
         signal = "WAIT"
         confidence = 0.0
         reason = ""
+        meta_data = {}
         
-        # 4. The Heisenberg Squeeze
-        # If the product is EXTREMELY LOW, the market is "violating" the principle locally.
-        # Nature abhors this vacuum -> Expect Explosion.
+        # Heuristic Thresholds (auto-adaptive ideally, but hardcoded for now)
+        # Low dx typical < 5.0 (Tight Range)
+        # Low dp typical < 2.0 (Steady Trend)
         
-        # Thresholds tuned for typical Forex/Crypto low volatility epochs
-        # Delta_x < 0.1% (0.001) AND Delta_p is low.
-        
-        if delta_x < 0.0005: # Very Tight Range (0.05%)
-             # SQUEEZE DETECTED
-             # Direction? 
-             # Check the 'Drift' (Slope of Linear Regression on Close)
-             y = recent['close'].values
-             x = np.arange(len(y))
-             slope, intercept = np.polyfit(x, y, 1)
+        if norm_dx < 5.0:
+            # COLLAPSED STATE (Particle)
+            # Price is pinned. Momentum is about to explode.
+            # We don't know direction yet, but we know MAGNITUDE will be high.
+            
+            # Check immediate breakout
+            current_mom = momentum[-1]
+            if abs(current_mom) > delta_p * 2:
+                # Breakout initiated
+                direction = "BUY" if current_mom > 0 else "SELL"
+                signal = direction
+                confidence = 90.0
+                reason = f"HEISENBERG: Wavefunction Collapse -> Particle Breakout ({direction}). Low dx ({norm_dx:.1f})."
+            else:
+                signal = "WAIT"
+                confidence = 50.0
+                reason = f"HEISENBERG: Collapsed State. Awaiting Impulse. dx={norm_dx:.1f}"
+                
+        elif delta_p < np.mean(np.abs(momentum[-20:])) * 0.5: 
+             # WAVE STATE (Momentum)
+             # Momentum is very consistent (Low variance in ROC).
+             # This is a strong trend.
              
-             # Also check Volume Flow if available
-             # For now, Slope Bias.
-             
-             if abs(slope) < 1e-9:
-                 pass # Too flat to tell
-             elif slope > 0:
-                 signal = "BUY"
-                 confidence = 90.0 # High Conf on Breakout
-                 reason = f"HEISENBERG: Uncertainty Collapse (dx={delta_x:.5f}). Upside Quantum Leap."
-             else:
-                 signal = "SELL"
-                 confidence = 90.0
-                 reason = f"HEISENBERG: Uncertainty Collapse (dx={delta_x:.5f}). Downside Quantum Leap."
+             trend_dir = np.mean(momentum[-10:])
+             if abs(trend_dir) > 0:
+                 direction = "BUY" if trend_dir > 0 else "SELL"
+                 signal = direction
+                 confidence = 85.0
+                 reason = f"HEISENBERG: Coherent Wave State. Momentum Defined. Riding Wave."
                  
-        # 5. The Wave Function Collapse (High Uncertainty)
-        # If Delta_p is massive (High Volatility), we should stay out (Chaos).
-        if delta_p > 0.005: # High relative volatility
-             signal = "WAIT"
-             confidence = 0.0
-             reason = "Wave Function Collapsed (Chaos)"
-             
+        else:
+            # High Uncertainty
+            # Just noise.
+            pass
+
+        meta_data = {
+            'delta_x': norm_dx,
+            'delta_p': delta_p,
+            'reason': reason
+        }
+
         if signal != "WAIT":
-            return SwarmSignal(
+             return SwarmSignal(
                 source=self.name,
                 signal_type=signal,
                 confidence=confidence,
                 timestamp=time.time(),
-                meta_data={'delta_x': delta_x, 'reason': reason}
+                meta_data=meta_data
             )
             
         return None

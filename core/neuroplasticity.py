@@ -52,7 +52,14 @@ class NeuroplasticityLoop:
             'Lorentz_Swarm': 2.2, # CHAOS THEORY (Bifurcation Detector)
             'Minkowski_Swarm': 1.9, # SPECIAL RELATIVITY (Spacetime Interval)
             'Higgs_Swarm': 2.0, # PARTICLE PHYSICS (Mass Generation / Liquidity Drag)
-            'Boltzmann_Swarm': 1.8 # THERMODYNAMICS (Free Energy)
+            'Boltzmann_Swarm': 1.8, # THERMODYNAMICS (Free Energy)
+            'Fermi_Swarm': 2.1, # NUCLEAR PHYSICS (Decay Half-Life)
+            'Bose_Einstein_Swarm': 2.3, # QUANTUM COHERENCE (The Laser Beam)
+            'Schrodinger_Newton_Swarm': 1.9, # SELF-GRAVITATING WAVEFUNCTION (Price Collapse)
+            'Tachyon_Swarm': 2.5, # RETROCAUSAL TRAP DETECTOR (Imaginary Mass)
+            'Feynman_Swarm': 2.4, # PATH INTEGRAL (Least Action Exit)
+            'Maxwell_Swarm': 2.2, # ELECTRODYNAMICS (Back-EMF Rejection)
+            'Heisenberg_Swarm': 2.6 # UNCERTAINTY PRINCIPLE (Particle vs Wave State)
         }
         
         # Performance Trackers (Rolling Accuracy)

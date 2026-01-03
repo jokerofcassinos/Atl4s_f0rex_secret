@@ -78,6 +78,13 @@ from analysis.swarm.lorentz_swarm import LorentzSwarm
 from analysis.swarm.minkowski_swarm import MinkowskiSwarm
 from analysis.swarm.higgs_swarm import HiggsSwarm
 from analysis.swarm.boltzmann_swarm import BoltzmannSwarm
+from analysis.swarm.fermi_swarm import FermiSwarm
+from analysis.swarm.bose_einstein_swarm import BoseEinsteinSwarm
+from analysis.swarm.schrodinger_newton_swarm import SchrodingerNewtonSwarm
+from analysis.swarm.tachyon_swarm import TachyonSwarm
+from analysis.swarm.feynman_swarm import FeynmanSwarm
+from analysis.swarm.maxwell_swarm import MaxwellSwarm
+from analysis.swarm.heisenberg_swarm import HeisenbergSwarm
 
 # Meta-Cognition
 from analysis.swarm.attention_swarm import AttentionSwarm
@@ -202,6 +209,13 @@ class SwarmOrchestrator:
         self.active_agents.append(MinkowskiSwarm())
         self.active_agents.append(HiggsSwarm())
         self.active_agents.append(BoltzmannSwarm())
+        self.active_agents.append(FermiSwarm())
+        self.active_agents.append(BoseEinsteinSwarm())
+        self.active_agents.append(SchrodingerNewtonSwarm())
+        self.active_agents.append(TachyonSwarm())
+        self.active_agents.append(FeynmanSwarm())
+        self.active_agents.append(MaxwellSwarm())
+        self.active_agents.append(HeisenbergSwarm())
         
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         

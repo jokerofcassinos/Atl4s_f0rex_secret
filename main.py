@@ -58,6 +58,28 @@ class OmegaSystem:
                     if 'last' not in tick:
                         tick['last'] = (tick['bid'] + tick['ask']) / 2
 
+                    # --- 0. EMERGENCY GUARDIAN (Latency Bypass) ---
+                    # CRITICAL: If profit is secured, skipping ALL heavy calculation/IO to close immediately.
+                    current_profit_guard = tick.get('profit', 0.0)
+                    best_profit_guard = tick.get('best_profit', -999.0)
+                    positions_guard = tick.get('positions', 0)
+                    
+                    if positions_guard > 0:
+                        # Global Take Profit (Lowered to $3.00 for protection)
+                        if current_profit_guard > 3.0:
+                            logger.critical(f"⚡ GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $3.00. BYPASSING CORTEX. CLOSING ALL.")
+                            self.executor.close_all(self.symbol)
+                            await asyncio.sleep(0.5)
+                            continue
+
+                        # Surgical Take Profit
+                        if best_profit_guard > 3.0:
+                             best_ticket = tick.get('best_ticket')
+                             logger.critical(f"⚡ GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > $3.00. CLOSING TICKET {best_ticket}.")
+                             self.executor.close_trade(best_ticket, self.symbol)
+                             await asyncio.sleep(0.2) 
+                             # Don't continue, let it run in case others need managing, but we secured the bag.
+
                     # 2. Fetch/Update Context (Dataframes)
                     # Ideally, data_loader handles live updates via tick injection
                     # For now, we reload/resample.
