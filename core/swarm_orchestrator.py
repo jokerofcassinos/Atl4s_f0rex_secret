@@ -527,7 +527,7 @@ class SwarmOrchestrator:
         Physics Agents have Dominion over Statistical Agents.
         Hierarchy: Singularity (2.5) > Hyperdimensional (2.2) > Vortex (2.1) > Kinematic (2.0)
         """
-        physics_agents = ['Singularity_Swarm', 'Hyperdimensional_Swarm', 'Kinematic_Swarm', 'Vortex_Swarm']
+        physics_agents = ['SingularitySwarm', 'HyperdimensionalSwarm', 'KinematicSwarm', 'VortexSwarm']
         high_command = [t for t in thoughts if t.source in physics_agents and t.confidence > 80.0]
         
         if not high_command: return None
@@ -535,10 +535,10 @@ class SwarmOrchestrator:
         # Sort by Weight/Authority
         # We need a map or just hardcode hierarchy
         hierarchy = {
-            'Singularity_Swarm': 3, 
-            'Hyperdimensional_Swarm': 2.5, 
-            'Vortex_Swarm': 2.2,
-            'Kinematic_Swarm': 1
+            'SingularitySwarm': 3, 
+            'HyperdimensionalSwarm': 2.5, 
+            'VortexSwarm': 2.2,
+            'KinematicSwarm': 1
         }
         
         # Find highest rank signal
