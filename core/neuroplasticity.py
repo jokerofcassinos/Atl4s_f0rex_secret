@@ -60,7 +60,8 @@ class NeuroplasticityLoop:
             'Feynman_Swarm': 2.4, # PATH INTEGRAL (Least Action Exit)
             'Maxwell_Swarm': 2.2, # ELECTRODYNAMICS (Back-EMF Rejection)
             'Heisenberg_Swarm': 2.6, # UNCERTAINTY PRINCIPLE (Particle vs Wave State)
-            'Riemann_Swarm': 2.7 # DIFFERENTIAL GEOMETRY (Metric Curvature)
+            'Riemann_Swarm': 2.7, # DIFFERENTIAL GEOMETRY (Metric Curvature)
+            'Penrose_Swarm': 2.8 # TWISTOR THEORY (Aeon Transition)
         }
         
         # Performance Trackers (Rolling Accuracy)
