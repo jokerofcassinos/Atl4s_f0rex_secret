@@ -185,14 +185,14 @@ void OnTick()
    
    for(int i=0; i<PositionsTotal(); i++) {
       if(PositionSelectByTicket(PositionGetTicket(i))) {
-         if(PositionGetSymbol(i) == _Symbol) { // Filter by current symbol? Or Global? Let's do Global for now or Symbol?
-            // Actually, usually we run one bot per chart. Restrict to _Symbol.
+         // FIX: Scan ALL symbols to ensure cross-pair winners are detected.
+         // if(PositionGetSymbol(i) == _Symbol) { 
             double prof = PositionGetDouble(POSITION_PROFIT);
             if(prof > best_profit) {
                best_profit = prof;
                best_ticket = PositionGetInteger(POSITION_TICKET);
             }
-         }
+         // }
       }
    }
    
