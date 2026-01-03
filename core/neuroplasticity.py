@@ -59,7 +59,8 @@ class NeuroplasticityLoop:
             'Tachyon_Swarm': 2.5, # RETROCAUSAL TRAP DETECTOR (Imaginary Mass)
             'Feynman_Swarm': 2.4, # PATH INTEGRAL (Least Action Exit)
             'Maxwell_Swarm': 2.2, # ELECTRODYNAMICS (Back-EMF Rejection)
-            'Heisenberg_Swarm': 2.6 # UNCERTAINTY PRINCIPLE (Particle vs Wave State)
+            'Heisenberg_Swarm': 2.6, # UNCERTAINTY PRINCIPLE (Particle vs Wave State)
+            'Riemann_Swarm': 2.7 # DIFFERENTIAL GEOMETRY (Metric Curvature)
         }
         
         # Performance Trackers (Rolling Accuracy)
