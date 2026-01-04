@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from typing import List, Dict
 from core.interfaces import SubconsciousUnit, SwarmSignal
-from core.transformer_lite import TransformerBlock
+from core.transformer_lite import TransformerLite
 
 logger = logging.getLogger("AttentionSwarm")
 
@@ -16,7 +16,7 @@ class AttentionSwarm(SubconsciousUnit):
         super().__init__("Attention_Swarm")
         self.embed_dim = 16 # Small embedding
         self.head_dim = 16
-        self.transformer = TransformerBlock(self.embed_dim, self.head_dim)
+        self.transformer = TransformerLite(self.embed_dim, self.head_dim)
         
         # Embedding Lookups (Simplified)
         # 0: WAIT, 1: BUY, 2: SELL
