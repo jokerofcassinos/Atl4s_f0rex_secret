@@ -85,7 +85,10 @@ from analysis.swarm.schrodinger_newton_swarm import SchrodingerNewtonSwarm
 from analysis.swarm.tachyon_swarm import TachyonSwarm
 from analysis.swarm.feynman_swarm import FeynmanSwarm
 from analysis.swarm.maxwell_swarm import MaxwellSwarm
-
+from analysis.swarm.penrose_swarm import PenroseSwarm
+from analysis.swarm.godel_swarm import GodelSwarm
+from analysis.swarm.cinematics_swarm import CinematicsSwarm
+from analysis.swarm.attention_swarm import AttentionSwarm
 from .neuroplasticity import NeuroPlasticityEngine
 from .mcts_planner import MCTSPlanner
 from .hyper_dimensional import HyperDimensionalEngine
@@ -194,6 +197,10 @@ class SwarmOrchestrator:
         self.active_agents.append(FeynmanSwarm())
         self.active_agents.append(MaxwellSwarm())
         self.active_agents.append(HolographicSwarm()) # The Original Entropy Swarm
+        self.active_agents.append(PenroseSwarm())
+        self.active_agents.append(GodelSwarm())
+        self.active_agents.append(CinematicsSwarm())
+        self.active_agents.append(AttentionSwarm())
         
         # Phase 111-115
         self.active_agents.append(NewsSwarm())
