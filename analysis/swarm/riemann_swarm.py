@@ -102,19 +102,44 @@ class RiemannSwarm(SubconsciousUnit):
                      score_sell += score
         
         # 5. Synthesis
+        curvature = self._calculate_curvature_bridge(closes)
+        
+        # Curvature Logic (General Relativity market analogy)
+        # K > 0 (Spherical): Space is closing on itself -> Trend Exhaustion/Reversal
+        # K < 0 (Hyperbolic): Space is expanding -> Trend Acceleration
+        
+        curvature_bias = "NEUTRAL"
+        if curvature > 0.5:
+             curvature_bias = "REVERSAL"
+             # If Signal is BUY, but Curvature says Reversal -> Weaken confidence
+             # If Signal is SELL, and Curvature says Reversal (of a uptrend) -> Strengthen?
+             # Simplified: High Positive K acts as "Gravity" pulling price back.
+        elif curvature < -0.5:
+             curvature_bias = "EXPANSION"
+             # Trend is accelerating.
+             
         if prime_power > 10.0: # 10% of energy in Primes
             if score_buy > score_sell:
                 dominant_signal = "BUY"
                 dominant_conf = score_buy * 2.0 # Amplify impact
+                
+                if curvature_bias == "EXPANSION": dominant_conf += 10.0
+                if curvature_bias == "REVERSAL": dominant_conf -= 20.0
+                
             elif score_sell > score_buy:
                 dominant_signal = "SELL"
                 dominant_conf = score_sell * 2.0
+                
+                if curvature_bias == "EXPANSION": dominant_conf += 10.0
+                if curvature_bias == "REVERSAL": dominant_conf -= 20.0
             
             meta = {
                 'prime_energy': prime_power,
-                'harmonics': ", ".join(reason_parts)
+                'harmonics': ", ".join(reason_parts),
+                'curvature': curvature,
+                'geometry': curvature_bias
             }
-            logger.info(f"RIEMANN ZETA: Prime Harmonics (Energy: {prime_power:.1f}%). {meta['harmonics']}")
+            logger.info(f"RIEMANN ZETA: Primes({prime_power:.1f}%) | K={curvature:.4f} ({curvature_bias})")
             
             return SwarmSignal(
                 source=self.name,
@@ -125,3 +150,56 @@ class RiemannSwarm(SubconsciousUnit):
             )
             
         return None
+
+    def _calculate_curvature_bridge(self, closes: np.ndarray) -> float:
+        """Calculates Sectional Curvature (C++ or Py Fallback)"""
+        try:
+             import ctypes
+             import os
+             dll_path = os.path.join("cpp_core", "physics_core.dll")
+             
+             if os.path.exists(dll_path):
+                 lib = ctypes.CDLL(dll_path)
+                 
+                 # double calculate_sectional_curvature(double* prices, int length, int window_size)
+                 lib.calculate_sectional_curvature.argtypes = [
+                     ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int
+                 ]
+                 lib.calculate_sectional_curvature.restype = ctypes.c_double
+                 
+                 # Prepare Array
+                 array_type = ctypes.c_double * len(closes)
+                 c_closes = array_type(*closes)
+                 
+                 k = lib.calculate_sectional_curvature(c_closes, len(closes), 20)
+                 return k
+        except Exception:
+            pass
+            
+        # Python Fallback (Simplified Discrete Curvature)
+        # K ~ y'' / (1 + y'^2)^1.5
+        # We average K over the last 20 points
+        if len(closes) < 20: return 0.0
+        
+        window = closes[-20:]
+        total_k = 0.0
+        
+        for i in range(2, len(window)):
+             # Scale derivatives to reasonable values (Price changes are small)
+             # Multiply by 100 or 1000 to make 'dx' meaningful? 
+             # Let's assume dx=1 (1 candle)
+             
+             y_now = window[i]
+             y_prev = window[i-1]
+             y_prev2 = window[i-2]
+             
+             dy = y_now - y_prev
+             ddy = (y_now - y_prev) - (y_prev - y_prev2)
+             
+             denom = pow(1.0 + dy*dy, 1.5)
+             if denom == 0: denom = 0.0001
+             
+             k = ddy / denom
+             total_k += k
+             
+        return total_k / (len(window) - 2)

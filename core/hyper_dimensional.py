@@ -7,6 +7,39 @@ logger = logging.getLogger("HyperCore")
 # Dimensionality
 D = 10000 
 
+
+# Try Load C++ Lib
+_hdc_lib = None
+try:
+    import ctypes
+    import os
+    _dll_path = os.path.join("cpp_core", "hdc_core.dll")
+    if os.path.exists(_dll_path):
+        _hdc_lib = ctypes.CDLL(_dll_path)
+        
+        # void bind_vectors(const int8_t* val_a, const int8_t* val_b, int8_t* result, int size)
+        _hdc_lib.bind_vectors.argtypes = [
+            ctypes.POINTER(ctypes.c_int8), ctypes.POINTER(ctypes.c_int8), 
+            ctypes.POINTER(ctypes.c_int8), ctypes.c_int
+        ]
+        
+        # void bundle_vectors(const int8_t* inputs, int num, int8_t* result, int size)
+        _hdc_lib.bundle_vectors.argtypes = [
+            ctypes.POINTER(ctypes.c_int8), ctypes.c_int, 
+            ctypes.POINTER(ctypes.c_int8), ctypes.c_int
+        ]
+        
+        # double cosine_similarity(const int8_t* val_a, const int8_t* val_b, int size)
+        _hdc_lib.cosine_similarity.argtypes = [
+            ctypes.POINTER(ctypes.c_int8), ctypes.POINTER(ctypes.c_int8), ctypes.c_int
+        ]
+        _hdc_lib.cosine_similarity.restype = ctypes.c_double
+        
+        # logger.info("HDC: Silicon Memory Active (C++)")
+except Exception as e:
+    # logger.warning(f"HDC: C++ Load Failed ({e})")
+    pass
+
 class HyperVector:
     """
     10,000-bit vector wrapper for HDC operations.
@@ -21,61 +54,76 @@ class HyperVector:
             self.values = data.astype(np.int8)
 
     def bind(self, other):
-        """
-        XOR (Multiplication in bipolar).
-        Preserves distance. Invertible.
-        Used to bind Variable to Value (e.g. Price * High).
-        """
-        return HyperVector(self.values * other.values)
+        """XOR (Multiplication in bipolar)."""
+        if _hdc_lib:
+            res = np.zeros(D, dtype=np.int8)
+            c_a = self.values.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+            c_b = other.values.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+            c_res = res.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+            
+            _hdc_lib.bind_vectors(c_a, c_b, c_res, D)
+            return HyperVector(res)
+        else:
+            return HyperVector(self.values * other.values)
 
     def bundle(self, other):
-        """
-        Superposition (Addition).
-        Result is similar to both inputs.
-        """
-        # Element-wise sum of bipolar vectors
-        # Normalization (Majority rule) happens contextually or we keep the integers for a bit
-        # Simple Majority Rule:
-        res = self.values + other.values
-        # Threshold back to -1, 1
-        res[res > 0] = 1
-        res[res < 0] = -1
-        # Random breaking of ties (zeros)
-        res[res == 0] = np.random.choice([-1, 1], size=np.sum(res==0))
-        return HyperVector(res)
+        """Superposition (Addition)."""
+        if _hdc_lib:
+             # Fast Bundle
+             inputs = np.concatenate([self.values, other.values])
+             res = np.zeros(D, dtype=np.int8)
+             c_in = inputs.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+             c_res = res.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+             _hdc_lib.bundle_vectors(c_in, 2, c_res, D)
+             return HyperVector(res)
+        else:
+            res = self.values + other.values
+            res[res > 0] = 1
+            res[res < 0] = -1
+            res[res == 0] = np.random.choice([-1, 1], size=np.sum(res==0))
+            return HyperVector(res)
     
     def permute(self, shifts=1):
-        """
-        Cyclic Shift (Roll).
-        Encodes Sequence / Time.
-        """
+        """Cyclic Shift (Roll)."""
         return HyperVector(np.roll(self.values, shifts))
 
     def similarity(self, other):
-        """
-        Cosine Similarity (Normalized Dot Product).
-        For Bipolar vectors, this is 1 - 2*HammingDist/D.
-        Range: -1 to 1.
-        """
-        dot = np.dot(self.values, other.values)
-        return dot / D
+        """Cosine Similarity."""
+        if _hdc_lib:
+             c_a = self.values.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+             c_b = other.values.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+             return _hdc_lib.cosine_similarity(c_a, c_b, D)
+        else:
+            dot = np.dot(self.values, other.values)
+            return dot / D
 
     @staticmethod
     def batch_bundle(vectors):
         if not vectors: return HyperVector()
-        sum_vec = np.zeros(D, dtype=np.int32)
-        for v in vectors:
-            sum_vec += v.values
         
-        # Initial majority
-        res = np.zeros(D, dtype=np.int8)
-        res[sum_vec > 0] = 1
-        res[sum_vec < 0] = -1
-        res[res == 0] = np.random.choice([-1, 1], size=np.sum(res==0))
-        return HyperVector(res)
+        if _hdc_lib:
+             # Flatten
+             raw_arrays = [v.values for v in vectors]
+             flat = np.concatenate(raw_arrays)
+             res = np.zeros(D, dtype=np.int8)
+             
+             c_in = flat.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+             c_res = res.ctypes.data_as(ctypes.POINTER(ctypes.c_int8))
+             
+             _hdc_lib.bundle_vectors(c_in, len(vectors), c_res, D)
+             return HyperVector(res)
+        else:
+            sum_vec = np.zeros(D, dtype=np.int32)
+            for v in vectors:
+                sum_vec += v.values
+            
+            res = np.zeros(D, dtype=np.int8)
+            res[sum_vec > 0] = 1
+            res[sum_vec < 0] = -1
+            res[res == 0] = np.random.choice([-1, 1], size=np.sum(res==0))
+            return HyperVector(res)
 
 # Pre-computed Base Vectors (Item Memory)
-# We need base vectors for Features (Close, Vol, RSI) and Values (High, Low, Up, Down)
 class HDCEncoder:
     def __init__(self):
         self.features = {
@@ -85,18 +133,12 @@ class HDCEncoder:
             'TREND': HyperVector()
         }
         # Continuous value mapping requires Level Hypervectors
-        # We generate a "Thermometer code" or interpolated vectors
         self.levels = []
         base = HyperVector()
-        destination = HyperVector()
-        # Create 100 interpolated vectors
-        # Simple random flipping approach for now (Orthogonal Levels)
-        # Actually, for continuous values, we want Sim(L1, L2) to be high.
-        # So we flip bits progressively.
         
+        # Create 100 interpolated vectors
         self.level_vecs = []
         current = np.copy(base.values)
-        # Flip 100 bits per step? D=10000, 100 steps.
         flip_mask = np.arange(D)
         np.random.shuffle(flip_mask)
         
@@ -106,7 +148,7 @@ class HDCEncoder:
             self.level_vecs.append(HyperVector(np.copy(current)))
             # Flip chunk bits
             start = i * chunk
-            end = (i+1) * chunk
+            end = i * chunk + chunk
             if end > D: end = D
             current[flip_mask[start:end]] *= -1 # Flip sign
             

@@ -63,53 +63,88 @@ class LaplaceSwarm(SubconsciousUnit):
         friction_coeff = max(0.01, spread * 10.0) 
         
         # 2. The Simulation (Forward Integration) -- The "Demon" Logic
-        # We simulate the particle's path until velocity reaches 0
+        terminal_price = current_price
         
-        sim_p = current_price
-        sim_v = v_smooth
-        sim_a = acceleration # Initial impulse
-        time_step = 1.0 # Virtual Seconds? Steps?
-        
-        trajectory = []
-        max_steps = 100
-        
-        for t in range(max_steps):
-            # Force Balance: F_net = F_inertial - F_friction
+        # Try C++ Acceleration
+        cpp_active = False
+        try:
+             import ctypes
+             import os
+             dll_path = os.path.join("cpp_core", "physics_core.dll")
+             
+             if os.path.exists(dll_path):
+                 lib = ctypes.CDLL(dll_path)
+                 
+                 class TrajectoryResult(ctypes.Structure):
+                     _fields_ = [
+                         ("terminal_price", ctypes.c_double),
+                         ("max_deviation", ctypes.c_double),
+                         ("steps_taken", ctypes.c_int),
+                         ("total_distance", ctypes.c_double)
+                     ]
+                 
+                 lib.simulate_trajectory.argtypes = [
+                     ctypes.c_double, ctypes.c_double, ctypes.c_double,
+                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int
+                 ]
+                 lib.simulate_trajectory.restype = TrajectoryResult
+                 
+                 # Call C++
+                 res = lib.simulate_trajectory(
+                     current_price, v_smooth, acceleration, 
+                     mass, friction_coeff, 1.0, 100
+                 )
+                 
+                 terminal_price = res.terminal_price
+                 cpp_active = True
+                 # logger.debug(f"Laplace [C++]: Terminal {terminal_price:.2f}")
+                 
+        except Exception as e:
+            # logger.warning(f"Laplace C++ Error: {e}")
+            pass
             
-            # Crash Protection: Clamp velocity to prevent overflow
-            sim_v = max(-1000.0, min(1000.0, sim_v))
+        if not cpp_active:
+            # Fallback Python Simulation
+            sim_p = current_price
+            sim_v = v_smooth
+            sim_a = acceleration # Initial impulse
+            time_step = 1.0 # Virtual Seconds? Steps?
             
-            # Friction Force (Hybrid Model)
-            # Low speed = Linear (Stokes), High speed = Quadratic (Turbulent)
-            if abs(sim_v) < 10:
-                f_friction = -1.0 * friction_coeff * sim_v
-            else:
-                # Use Linear for high speed loop to avoid V^2 explosion, or heavily damped V^2
-                f_friction = -1.0 * np.sign(sim_v) * friction_coeff * (abs(sim_v) ** 1.5) 
+            max_steps = 100
             
-            # Update Velocity (v = u + at) -> but force based
-            # a = F/m
-            # We assume initial acceleration decays, new forces are just friction
-            
-            # Decay the initial drive
-            sim_a *= 0.9 
-            
-            # Effective Acceleration this step
-            eff_a = sim_a + (f_friction / mass)
-            
-            # Validate eff_a to prevent NaN
-            if np.isnan(eff_a) or np.isinf(eff_a): eff_a = 0.0
-            
-            sim_v += eff_a * time_step
-            sim_p += sim_v * time_step
-            
-            trajectory.append(sim_p)
-            
-            # Terminal condition
-            if abs(sim_v) < 0.001 * current_price: # Stopped
-                break
+            for t in range(max_steps):
+                # Force Balance: F_net = F_inertial - F_friction
                 
-        terminal_price = sim_p
+                # Crash Protection: Clamp velocity to prevent overflow
+                sim_v = max(-1000.0, min(1000.0, sim_v))
+                
+                # Friction Force (Hybrid Model)
+                # Low speed = Linear (Stokes), High speed = Quadratic (Turbulent)
+                if abs(sim_v) < 10:
+                    f_friction = -1.0 * friction_coeff * sim_v
+                else:
+                    f_friction = -1.0 * friction_coeff * (abs(sim_v) ** 1.5) * (1 if sim_v > 0 else -1)
+                
+                # Update Velocity (v = u + at) -> but force based
+                # a = F/m
+                # We assume initial acceleration decays, new forces are just friction
+                
+                # Decay the initial drive
+                sim_a *= 0.9 
+                
+                # Effective Acceleration this step
+                eff_a = sim_a + (f_friction / mass)
+                
+                if np.isnan(eff_a) or np.isinf(eff_a): eff_a = 0.0
+                
+                sim_v += eff_a * time_step
+                sim_p += sim_v * time_step
+                
+                # Terminal condition
+                if abs(sim_v) < 0.001 * current_price: 
+                    break
+                    
+            terminal_price = sim_p
         
         # 3. The Prophecy
         # If terminal price is significantly away from current price, we enter
