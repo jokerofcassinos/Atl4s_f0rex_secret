@@ -175,13 +175,15 @@ class OmegaSystem:
                         # If we bleed too much, cut the basket blindly.
                         limit = -abs(self.config['virtual_sl']) # Ensure negative
                         if current_profit_guard < limit:
-                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < ${limit}. EMERGENCY BASKET EXIT.")
-                             self.executor.close_all(self.symbol) # Try primary
+                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < ${limit}. SURGICAL PRUNING INITIATED.")
                              
-                             # Dynamic Basket Closure
+                             # Primary Prune
+                             self.executor.prune_losers(self.symbol)
+                             
+                             # Dynamic Basket Prune
                              for sec_symbol in self.flow_manager.active_symbols:
                                  if sec_symbol != self.symbol:
-                                     self.executor.close_all(sec_symbol)
+                                     self.executor.prune_losers(sec_symbol)
 
                              await asyncio.sleep(0.5)
                              continue

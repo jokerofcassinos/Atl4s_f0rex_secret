@@ -144,6 +144,15 @@ class ExecutionEngine:
         if self.bridge:
             self.bridge.send_command("CLOSE_ALL", [symbol])
 
+    def prune_losers(self, symbol: str):
+        """
+        Surgically removes only losing positions for a symbol.
+        Preserves winning hedges.
+        """
+        logger.warning(f"EXECUTION: PRUNING LOSERS for {symbol}")
+        if self.bridge:
+            self.bridge.send_command("PRUNE_LOSERS", [symbol])
+
     def close_longs(self, symbol: str):
         logger.warning(f"EXECUTION: Closing LONGS for {symbol}")
         if self.bridge: self.bridge.send_command("CLOSE_BUYS", [symbol])

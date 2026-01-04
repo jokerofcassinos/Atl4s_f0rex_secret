@@ -292,17 +292,39 @@ void ProcessCommand(string json) {
              Print("Hard Order Executed: ", ticket, " | SL: ", sl, " | TP: ", tp);
          }
     }
-    else if (action == "CLOSE_ALL") {
-        string symbol = ArraySize(parts) > 1 ? parts[1] : _Symbol;
-        StringToUpper(symbol); // Normalize input
+    else if(action == "PRUNE_LOSERS") {
+        // PRUNE_LOSERS|SYMBOL (or ALL)
+        string target_sym = parts[1];
+        Print("PRUNING LOSERS for ", target_sym);
         
         for(int i=PositionsTotal()-1; i>=0; i--) {
             ulong ticket = PositionGetTicket(i);
-            string pos_sym = PositionGetString(POSITION_SYMBOL);
-            StringToUpper(pos_sym); // Normalize position symbol
-            
-            if(pos_sym == symbol) trade.PositionClose(ticket);
+            if(PositionSelectByTicket(ticket)) {
+                string sym = PositionGetSymbol(i);
+                double profit = PositionGetDouble(POSITION_PROFIT);
+                
+                // If Target matches (or ALL) AND Profit is negative
+                if((target_sym == "ALL" || sym == target_sym) && profit < 0) {
+                     trade.PositionClose(ticket);
+                     Print("Pruned Losing Ticket ", ticket, " ($", profit, ")");
+                }
+            }
         }
+    }
+    else if(action == "CLOSE_ALL") {
+       // CLOSE_ALL|SYMBOL
+       string target_sym = parts[1];
+       Print("CLOSING ALL TRADES for ", target_sym);
+       
+       for(int i=PositionsTotal()-1; i>=0; i--) {
+          ulong ticket = PositionGetTicket(i);
+          if(PositionSelectByTicket(ticket)) {
+             string sym = PositionGetSymbol(i);
+             if(target_sym == "ALL" || sym == target_sym) {
+                trade.PositionClose(ticket);
+             }
+          }
+       }
     }
     else if (action == "CLOSE_BUYS") {
         string symbol = ArraySize(parts) > 1 ? parts[1] : _Symbol;
