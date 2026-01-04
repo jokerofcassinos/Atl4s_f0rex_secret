@@ -334,6 +334,14 @@ class SwarmOrchestrator:
             
         final_decision = "WAIT"
         final_score = 0
+        
+        # CIVIL WAR CHECK (Both sides strong)
+        if score_buy > 2000 and score_sell > 2000:
+             ratio = score_buy / score_sell if score_sell > 0 else 1.0
+             if 0.8 < ratio < 1.2:
+                 logger.warning(f"CIVIL WAR DETECTED: Buyers({score_buy:.0f}) vs Sellers({score_sell:.0f}). Gridlock.")
+                 return "WAIT", 0.0, {}
+                 
         if score_buy > score_sell and score_buy > 500: # Heuristic thresh
             final_decision = "BUY"
             final_score = 80

@@ -94,9 +94,7 @@ class WeaverSwarm(SubconsciousUnit):
         # If Coherence is Low (<0.3), we detect Civil War.
         elif coherence < 0.3:
             # We explicitly signal WAIT to dampen the noise
-            # or we signal "VETO" if we have authority?
-            # Let's just signal WAIT but with High Confidence to drag the average down?
-            # Weaver doesn't override, it votes.
+            logger.warning(f"CIVIL WAR DETECTED: Swarm Split! Buyers({n_buy}) vs Sellers({n_sell}). Coherence {coherence:.2f}. FREEZING.")
             decision = "WAIT" 
             conf = 0.0 # Wait signals usually have 0 conf, but maybe we want to log the event.
             meta['reason'] = f"Civil War Detected (Buyers: {n_buy}, Sellers: {n_sell})"
