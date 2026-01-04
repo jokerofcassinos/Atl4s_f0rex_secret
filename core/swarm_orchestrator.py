@@ -89,6 +89,8 @@ from analysis.swarm.penrose_swarm import PenroseSwarm
 from analysis.swarm.godel_swarm import GodelSwarm
 from analysis.swarm.cinematics_swarm import CinematicsSwarm
 from analysis.swarm.attention_swarm import AttentionSwarm
+from analysis.swarm.unified_field_swarm import UnifiedFieldSwarm
+from analysis.swarm.black_swan_swarm import BlackSwanSwarm
 from .neuroplasticity import NeuroPlasticityEngine
 from .mcts_planner import MCTSPlanner
 from .hyper_dimensional import HyperDimensionalEngine
@@ -201,6 +203,8 @@ class SwarmOrchestrator:
         self.active_agents.append(GodelSwarm())
         self.active_agents.append(CinematicsSwarm())
         self.active_agents.append(AttentionSwarm())
+        self.active_agents.append(UnifiedFieldSwarm())
+        self.active_agents.append(BlackSwanSwarm())
         
         # Phase 111-115
         self.active_agents.append(NewsSwarm())
