@@ -43,6 +43,7 @@ from analysis.swarm.nexus_swarm import NexusSwarm
 from analysis.swarm.nexus_swarm import NexusSwarm
 from analysis.swarm.apex_swarm import ApexSwarm
 from analysis.swarm.weaver_swarm import WeaverSwarm
+from analysis.swarm.laplace_swarm import LaplaceSwarm
 from analysis.swarm.event_horizon_swarm import EventHorizonSwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
@@ -224,6 +225,7 @@ class SwarmOrchestrator:
         self.active_agents.append(GodelSwarm())
         self.active_agents.append(AkashicSwarm())
         self.active_agents.append(WeaverSwarm(self.bus))
+        self.active_agents.append(LaplaceSwarm())
         
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         
