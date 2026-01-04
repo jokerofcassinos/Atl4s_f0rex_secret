@@ -53,7 +53,7 @@ class DNA:
                 child_genes[key] = partner.genes[key]
         return DNA(child_genes)
 
-class EvolutionChamber:
+class EvolutionEngine:
     """
     The Lab.
     Manages the Population and Natural Selection.

@@ -41,7 +41,7 @@ def scaled_dot_product_attention(Q, K, V, dk):
     
     return output, attention_weights
 
-class TransformerBlock:
+class TransformerLite:
     """
     Simplified Single-Head Attention Block for Swarm Consensus.
     """

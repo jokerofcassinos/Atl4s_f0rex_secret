@@ -127,3 +127,18 @@ class HDCEncoder:
         # Bundle
         state = HyperVector.batch_bundle([v_close, v_vol, v_rsi])
         return state
+
+class HyperDimensionalEngine:
+    """
+    Orchestrates HDC operations for the Swarm.
+    """
+    def __init__(self):
+        self.encoder = HDCEncoder()
+        
+    def encode(self, state_dict):
+        # Wrapper for encoding
+        return self.encoder.encode_state(
+            state_dict.get('close_pct', 50),
+            state_dict.get('vol_pct', 50),
+            state_dict.get('rsi', 50)
+        )

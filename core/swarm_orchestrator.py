@@ -90,7 +90,7 @@ from .neuroplasticity import NeuroPlasticityEngine
 from .mcts_planner import MCTSPlanner
 from .hyper_dimensional import HyperDimensionalEngine
 from .transformer_lite import TransformerLite
-from .evolution_engine import EvolutionEngine
+from .genetics import EvolutionEngine
 
 logger = logging.getLogger("SwarmOrchestrator")
 
