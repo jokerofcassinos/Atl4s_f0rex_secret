@@ -5,6 +5,8 @@ from typing import Dict, Any
 from risk.dynamic_leverage import DynamicLeverage
 from risk.great_filter import GreatFilter
 
+from risk.event_horizon import EventHorizonRisk
+
 logger = logging.getLogger("ExecutionEngine")
 
 class ExecutionEngine:
@@ -14,13 +16,75 @@ class ExecutionEngine:
     """
     def __init__(self, bridge=None):
         self.bridge = bridge
-        self.risk_filter = None # Add logic
+        self.risk_filter = None 
         self.leverage_manager = DynamicLeverage()
-        self.config = {"spread_limit": 0.0005} # Default
+        self.event_horizon = EventHorizonRisk() # Phase 116
+        self.config = {"spread_limit": 0.0005} 
+        self.last_stop_update = {} # {ticket: timestamp}
 
     def set_config(self, config: Dict):
         self.config = config
         
+    async def manage_dynamic_stops(self, tick: Dict):
+        """
+        Phase 116: Event Horizon Loop.
+        Iterates through open trades and applies Parabolic Trailing Stops.
+        """
+        if not self.bridge: return
+        
+        trades = tick.get('trades_json', [])
+        # If string, parse it? ZmqBridge usually handles it.
+        # Assuming list of dicts: [{'ticket':1, 'symbol':'XAUUSD', 'type':0, 'open':2000, 'sl':1990, 'profit':5.0}]
+        
+        if not trades: return
+        
+        current_price = tick.get('bid') # Default to Bid
+        if not current_price: return
+        
+        symbol_spread = tick.get('ask', 0) - tick.get('bid', 0)
+        
+        for trade in trades:
+            symbol = trade.get('symbol')
+            if symbol != tick.get('symbol'): continue # Only manage current symbol tick matches
+            
+            ticket = trade.get('ticket')
+            type_int = trade.get('type') # 0=Buy, 1=Sell
+            open_price = trade.get('open_price')
+            current_sl = trade.get('sl')
+            
+            side = "BUY" if type_int == 0 else "SELL"
+            trade_price = tick.get('bid') if side == "BUY" else tick.get('ask')
+            
+            # Event Horizon Calculation
+            new_stop_level = self.event_horizon.calculate_dynamic_stop(
+                symbol, open_price, trade_price, side, symbol_spread
+            )
+            
+            if new_stop_level:
+                # Ratchet Logic: Only move closer to price
+                update_needed = False
+                
+                if side == "BUY":
+                    # For BUY, SL must move UP (Higher than current SL)
+                    if new_stop_level > current_sl and new_stop_level < trade_price:
+                        update_needed = True
+                else:
+                    # For SELL, SL must move DOWN (Lower than current SL)
+                    # (Remember SL is above price for Sell)
+                    if (current_sl == 0 or new_stop_level < current_sl) and new_stop_level > trade_price:
+                        update_needed = True
+                
+                # Check for Min Distance (Don't spam updates for 0.01 change)
+                if update_needed:
+                     diff = abs(new_stop_level - current_sl)
+                     if diff > symbol_spread * 0.2: # Material change
+                         logger.info(f"EVENT HORIZON: Updating SL for Ticket {ticket} -> {new_stop_level:.2f}")
+                         # Command: MODIFY_TRADE|ticket|sl|tp
+                         # Keep existing TP
+                         tp = trade.get('tp', 0.0)
+                         self.bridge.send_command("MODIFY_TRADE", [str(ticket), f"{new_stop_level:.2f}", f"{tp:.2f}"])
+                         self.last_stop_update[ticket] = tick.get('time_msc', 0)
+
     async def execute_signal(self, command: str, symbol: str, bid: float, ask: float, confidence: float = 80.0, account_info: Dict = None, spread_tolerance: float = None):
         """
         Converts a Cortex Command into a Physical Order.

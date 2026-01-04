@@ -138,6 +138,21 @@ class ZmqBridge:
                         tick['best_profit'] = float(parts[9])
                         tick['best_ticket'] = int(parts[10])
                     return tick
+                    
+            elif line.startswith("TRADES_JSON"):
+                # Format: TRADES_JSON|{json_string}
+                try:
+                    parts = line.split('|', 1)
+                    if len(parts) == 2:
+                        data = json.loads(parts[1]) # List of dicts
+                        return {
+                            'type': 'TRADES_JSON',
+                            'trades': data
+                        }
+                except Exception as e:
+                    logger.error(f"JSON Parse Error: {e}")
+                    return None
+                    
             return None
         except:
             return None

@@ -206,11 +206,26 @@ class OmegaSystem:
                     # Fetches M1, M5, M15, M30, H1, H4, D1, W1
                     data_map = self.data_loader.get_data(self.symbol) 
                     
-                    # Phase 105: The Causal Nexus (Inject Basket Data)
                     if self.flow_manager and self.flow_manager.active_symbols:
                         basket_data = self.data_loader.get_basket_data(self.flow_manager.active_symbols)
                         data_map['basket_data'] = basket_data
+                        
+                    # Phase 116: Event Horizon (Parabolic Exits)
+                    # 1. Fetch Open Trades if we have positions but no details
+                    # Or refresh every 5s to keep stops valid
+                    current_positions_count = tick.get('positions', 0)
+                    now_msc = tick.get('time_msc', 0)
+                    last_trade_fetch = self.last_trade_times.get('fetch', 0)
                     
+                    if current_positions_count > 0:
+                        if now_msc - last_trade_fetch > 2000: # Every 2s
+                             self.bridge.send_command("GET_OPEN_TRADES", [self.symbol])
+                             self.last_trade_times['fetch'] = now_msc
+                             
+                    # 2. Run Dynamic Stop Manager
+                    # This relies on ZmqBridge merging TRADES_JSON into the tick
+                    await self.executor.manage_dynamic_stops(tick)
+
                     # 3. Cortex Thinking
                     # Returns (decision, confidence, metadata)
                     decision, confidence, metadata = await self.cortex.process_tick(tick, data_map, self.config)
