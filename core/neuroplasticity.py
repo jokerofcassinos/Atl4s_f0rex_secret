@@ -4,7 +4,7 @@ from typing import Dict
 
 logger = logging.getLogger("Neuroplasticity")
 
-class NeuroplasticityLoop:
+class NeuroPlasticityEngine:
     """
     The Adaptation Engine.
     Adjusts Synaptic Weights based on Agent Accuracy.
