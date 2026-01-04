@@ -206,7 +206,7 @@ class OmegaSystem:
                     
                     # 3. Cortex Thinking
                     # Returns (decision, confidence, metadata)
-                    decision, confidence, metadata = await self.cortex.process_tick(tick, data_map)
+                    decision, confidence, metadata = await self.cortex.process_tick(tick, data_map, self.config)
                     
                     # Phase 30: Apex Routing
                     if decision == "ROUTING":

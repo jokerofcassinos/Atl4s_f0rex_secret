@@ -238,7 +238,7 @@ class SwarmOrchestrator:
         self.state = "CONSCIOUS"
         logger.info("State: CONSCIOUS. Waiting for Input.")
 
-    async def process_tick(self, tick: Dict[str, Any], data_map: Dict[str, pd.DataFrame]) -> Tuple[str, float, Dict[str, Any]]:
+    async def process_tick(self, tick: Dict[str, Any], data_map: Dict[str, pd.DataFrame], config: Dict = None) -> Tuple[str, float, Dict[str, Any]]:
         """
         The Main Loop of Consciousness.
         """
@@ -267,12 +267,16 @@ class SwarmOrchestrator:
         if random.random() < 0.05 and df_m5 is not None: 
              self.current_dna = self.evolution.evolve(df_m5)
 
+        # Context for Swarms
+        df_h1 = data_map.get('H1') # Assuming H1 data is available in data_map
         context = {
-            'tick': tick, # Changed from tick_data to tick
+            'tick': tick,
             'data_map': data_map,
-            'df_m1': data_map.get('M1'),
-            'df_m5': data_map.get('M5'),
-            'market_state': self.short_term_memory.get('market_state', {}),
+            'df_m1': data_map.get('M1'), # Keep M1 if it was intended to be there
+            'df_m5': df_m5,
+            'df_h1': df_h1,
+            'market_state': {}, # To be populated by specialized agents
+            'config': config if config else {},
             'dna': self.current_dna 
         }
         

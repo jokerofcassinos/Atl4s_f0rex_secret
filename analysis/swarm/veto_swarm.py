@@ -71,22 +71,22 @@ class VetoSwarm(SubconsciousUnit):
              if price_trend > 0 and vol_trend < 0:
                  pass # Warning, but maybe not hard veto unless extreme
                  
-        # 4. Weekend Guard (Forex Protection vs Crypto Freedom)
+        # 4. Weekend Guard (Dynamic)
         # Check if today is Saturday(5) or Sunday(6)
         current_time = pd.Timestamp.now()
         day_of_week = current_time.dayofweek # 0=Mon, 6=Sun
         
-        # Simple Crypto Heuristic
-        # Check context['tick']['symbol']
-        symbol = context.get('tick', {}).get('symbol', 'Unknown')
-        
-        is_crypto_pair = "BTC" in symbol or "ETH" in symbol or "SOL" in symbol
+        # Check Config for "Weekend Mode" implied by Profile
+        # If Virtual SL is wide (>15) it's likely Crypto/Weekend profile.
+        # Or check spread_limit (0.05 vs 0.02).
+        config = context.get('config', {})
+        is_crypto_profile = config.get('spread_limit', 0.0) >= 0.04
         
         if day_of_week >= 5: # Saturday or Sunday
-            if not is_crypto_pair:
-                 votes.append(f"VETO: Market Closed (Weekend) for {symbol}")
+            if not is_crypto_profile:
+                 votes.append(f"VETO: Market Closed (Weekend) for {symbol} (Profile: Forex)")
             else:
-                 # It is Crypto, allow it.
+                 # It is Crypto Profile, allow it.
                  pass
                  
         if votes:
