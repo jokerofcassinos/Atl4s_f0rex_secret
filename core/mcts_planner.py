@@ -42,98 +42,117 @@ class MCTSPlanner:
         self.simulation_depth = 5 # Look 5 steps (candles) ahead
         self.iterations = 50 # Simulations per decision (HFT constrained)
 
-    def search(self, root_state: Dict, trend_bias: float = 0.0) -> str:
+    def _run_simulation_bridge(self, root_state: Dict, drift: float) -> str:
         """
-        Run MCTS to find the best immediate action.
-        root_state: {'price': 100, 'entry': 98, 'pnl': 2.0}
-        trend_bias: Drift to apply to simulation (from Swarm Consensus)
+        Attempts to run MCTS via C++ Engine. Falls back to Python.
         """
-        root_state['projected_drift'] = trend_bias # Inject Swarm Opinion
+        # Try Loading C++ DLL
+        try:
+            import ctypes
+            import os
+            
+            dll_path = os.path.join("cpp_core", "mcts_core.dll")
+            if not os.path.exists(dll_path):
+                raise FileNotFoundError("DLL not compiled")
+                
+            lib = ctypes.CDLL(dll_path)
+            
+            # Signature: run_mcts_simulation(price, entry, dir, vol, drift, iter, depth)
+            lib.run_mcts_simulation.argtypes = [
+                ctypes.c_double, ctypes.c_double, ctypes.c_int,
+                ctypes.c_double, ctypes.c_double, ctypes.c_int, ctypes.c_int
+            ]
+            
+            class SimResult(ctypes.Structure):
+                _fields_ = [
+                    ("best_move_type", ctypes.c_int),
+                    ("expected_value", ctypes.c_double),
+                    ("visits", ctypes.c_int)
+                ]
+            lib.run_mcts_simulation.restype = SimResult
+            
+            # Prepare Args
+            price = float(root_state['price'])
+            entry = float(root_state['entry'])
+            direction = 1 if root_state['side'] == 'BUY' else -1
+            vol = float(root_state.get('volatility', 1.0))
+            
+            # Call C++
+            # Boost iterations if C++ is active!
+            turbo_iters = self.iterations * 100 
+            
+            res = lib.run_mcts_simulation(price, entry, direction, vol, drift, turbo_iters, self.simulation_depth)
+            
+            move_map = {0: "HOLD", 1: "CLOSE", 2: "ADD"}
+            best_move = move_map.get(res.best_move_type, "HOLD")
+            
+            logger.debug(f"MCTS [C++]: {best_move} (Visits: {res.visits}, EV: {res.expected_value:.2f})")
+            return best_move
+            
+        except Exception as e:
+            # Fallback to Python
+            # logger.warning(f"MCTS C++ Unavailable ({e}). Using Python Fallback.")
+            return self._run_simulation_python(root_state, drift)
+
+    def _run_simulation_python(self, root_state: Dict, drift: float) -> str:
+        """Original Python Implementation."""
+        root_state['projected_drift'] = drift
         root = MCTSNode(state=root_state)
         
-        # Iteration Budget
         for _ in range(self.iterations):
             node = root
             state = root_state.copy()
             
-            # 1. Selection
+            # Selection
             while node.untried_moves == [] and node.children != []:
                 node = node.uct_select_child()
-                # Update implicit state if we were tracking full Simulation path (omitted for speed)
                 
-            # 2. Expansion
+            # Expansion
             if node.untried_moves != []:
                 m = random.choice(node.untried_moves) 
-                # Simulate Next State based on Move
                 state = self._simulate_step(state, m)
                 node = node.add_child(m, state)
                 
-            # 3. Simulation (Rollout)
-            # Rollout until depth
+            # Rollout
             depth = 0
             while depth < self.simulation_depth:
-                # Random Policy or Heuristic
                 possible_moves = ["HOLD", "CLOSE"]
                 m = random.choice(possible_moves)
                 state = self._simulate_step(state, m)
-                
-                if m == "CLOSE": break # Terminal state
+                if m == "CLOSE": break
                 depth += 1
                 
-            # 4. Backpropagation
-            # Calculate Reward (PnL / Risk)
+            # Backprop
             reward = self._evaluate_terminal_state(state)
             while node != None:
                 node.visits += 1
                 node.wins += reward
                 node = node.parent
                 
-        # Best Move
-        if not root.children: return "HOLD" # Default
-        
-        # Select child with highest visit count (Robust choice)
+        if not root.children: return "HOLD"
         best_node = sorted(root.children, key=lambda c: c.visits)[-1]
-        logger.debug(f"MCTS Plan: {best_node.move} (Visits: {best_node.visits}, EV: {best_node.wins/best_node.visits:.2f})")
-        
+        logger.debug(f"MCTS [PY]: {best_node.move} (Visits: {best_node.visits}, EV: {best_node.wins/best_node.visits:.2f})")
         return best_node.move
 
+    def search(self, root_state: Dict, trend_bias: float = 0.0) -> str:
+        return self._run_simulation_bridge(root_state, trend_bias)
+
     def _simulate_step(self, state: Dict, move: str) -> Dict:
-        """
-        Transitions the state given a move.
-        Crucial: Uses Oracle to get 'Expected' Price.
-        """
+        # Helper for Python loop
         new_state = state.copy()
-        
         if move == "CLOSE":
-            # PnL locked at current price
             new_state['active'] = False
             return new_state
-            
         if move == "HOLD":
-            # Project Price 1 Step Ahead using Oracle
-            # (Simplified for speed: Assume generic step from Oracle projection)
-            # In full version: call self.oracle.generate_projection() here? Too slow?
-            # Speed Hack: Use a pre-calculated 'drift' from the root context.
-            
-            current_price = new_state['price']
-            
-            # Simple Random Walk for Rollout if Oracle is too heavy
-            # Or use 'projected_drift' stored in state
             drift = new_state.get('projected_drift', 0.0) 
             vol = new_state.get('volatility', 1.0)
-            
             shock = np.random.normal(0, vol)
-            new_price = current_price + drift + shock
-            
-            new_state['price'] = new_price
-            new_state['pnl'] = (new_price - new_state['entry']) if new_state['side'] == 'BUY' else (new_state['entry'] - new_price)
+            new_state['price'] += drift + shock
+            entry = new_state['entry']
+            if new_state['side'] == 'BUY': new_state['pnl'] = new_state['price'] - entry
+            else: new_state['pnl'] = entry - new_state['price']
             new_state['active'] = True
-            
         return new_state
 
     def _evaluate_terminal_state(self, state: Dict) -> float:
-        """Returns Utility (Reward)."""
-        # Utility = Normalized PnL
-        pnl = state['pnl']
-        # Normalize? e.g. target is 100 pts.
-        return pnl 
+        return state['pnl'] 
