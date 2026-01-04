@@ -9,6 +9,13 @@ from core.opportunity_flow import OpportunityFlowManager
 from data_loader import DataLoader
 import json
 
+# Sub-Engines
+from core.consciousness_bus import ConsciousnessBus
+from core.genetics import EvolutionEngine
+from core.neuroplasticity import NeuroPlasticityEngine
+from core.transformer_lite import TransformerLite
+from core.mcts_planner import MCTSPlanner
+
 # Setup Logging
 logging.basicConfig(
     level=logging.DEBUG,
@@ -20,15 +27,31 @@ logging.basicConfig(
 )
 # Filter noisy 3rd party logs
 logging.getLogger("yfinance").setLevel(logging.WARNING)
-logging.getLogger("peewee").setLevel(logging.WARNING) # Disabled per user request
-# logging.getLogger("urllib3").setLevel(logging.WARNING) # Enabled per user request
+logging.getLogger("peewee").setLevel(logging.WARNING) 
+# logging.getLogger("urllib3").setLevel(logging.WARNING) 
 
 logger = logging.getLogger("OmegaProtocol")
 
 class OmegaSystem:
     def __init__(self, zmq_port=5557):
         self.bridge = ZmqBridge(port=zmq_port)
-        self.cortex = SwarmOrchestrator()
+        
+        # Initialize Core Cognitive Engines
+        self.bus = ConsciousnessBus()
+        self.evolution = EvolutionEngine()
+        self.neuroplasticity = NeuroPlasticityEngine()
+        self.attention = TransformerLite(embed_dim=64, head_dim=64) # Simple init stats
+        self.grandmaster = MCTSPlanner()
+        
+        # Inject into Cortex
+        self.cortex = SwarmOrchestrator(
+            bus=self.bus,
+            evolution=self.evolution,
+            neuroplasticity=self.neuroplasticity,
+            attention=self.attention,
+            grandmaster=self.grandmaster
+        )
+        
         self.executor = ExecutionEngine(self.bridge)
         self.flow_manager = OpportunityFlowManager()
         self.data_loader = DataLoader()
