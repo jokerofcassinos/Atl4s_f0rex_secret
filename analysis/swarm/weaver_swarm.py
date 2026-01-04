@@ -28,8 +28,8 @@ class WeaverSwarm(SubconsciousUnit):
         
     async def process(self, context: Dict[str, Any]) -> Optional[SwarmSignal]:
         # 1. Gather Intelligence
-        # We look at thoughts from the last 10 seconds to build the graph
-        thoughts = self.bus.get_recent_thoughts(timewindow=5000)
+        # We look at recent thoughts. The Bus flushes them on call.
+        thoughts = self.bus.get_recent_thoughts()
         
         if not thoughts: return None
         
