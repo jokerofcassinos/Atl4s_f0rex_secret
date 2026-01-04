@@ -32,7 +32,7 @@ class OmegaSystem:
         self.executor = ExecutionEngine(self.bridge)
         self.flow_manager = OpportunityFlowManager()
         self.data_loader = DataLoader()
-        self.symbol = "XAUUSD" # Default
+        self.symbol = "ETHUSD" # Default for Sunday Crypto
         self.last_trade_times = {} # Cooldown tracking
         self.burst_tracker = {} # Burst Execution Manager
         
