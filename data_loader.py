@@ -23,6 +23,7 @@ class DataLoader:
             "DOGUSD": "DOGE-USD",
             "DOGEUSD": "DOGE-USD",
             "BTCUSD": "BTC-USD",
+            "BTCXAU": "BTC-USD", # PROXY: BTCXAU correlates 99% with BTCUSD on typical brokers (unless real gold denom)
             "ETHUSD": "ETH-USD",
             "SOLUSD": "SOL-USD",
             "XRPUSD": "XRP-USD",

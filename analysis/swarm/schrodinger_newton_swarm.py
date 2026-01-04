@@ -86,11 +86,15 @@ class SchrodingerNewtonSwarm(SubconsciousUnit):
              
              if direction == "UP":
                  signal = "BUY"
-                 confidence = 75.0 + (pull_strength * 10) # Denser = Stronger Pull
+                 # Fix: pull_strength can be > 1.0 depending on density scaling. Check magnitude.
+                 # We normalize it or clamp it.
+                 added_conf = min(pull_strength * 10, 24.0) # Cap boost at 24% (Total 99%)
+                 confidence = 75.0 + added_conf
                  reason = f"SCHRODINGER-NEWTON: Self-Gravity Pull to Mode {mode_price:.2f}. Density={pull_strength:.2f}"
              else:
                  signal = "SELL"
-                 confidence = 75.0 + (pull_strength * 10)
+                 added_conf = min(pull_strength * 10, 24.0)
+                 confidence = 75.0 + added_conf
                  reason = f"SCHRODINGER-NEWTON: Self-Gravity Pull to Mode {mode_price:.2f}. Density={pull_strength:.2f}"
                  
         elif abs(normalized_dist) <= 0.5:

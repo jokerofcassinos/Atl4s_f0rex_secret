@@ -13,9 +13,11 @@ logger = logging.getLogger("TransformerLite")
 
 @njit
 def softmax(x):
-    """Numerically stable softmax"""
+    """Numerically stable softmax with NaN protection"""
+    # Replace NaNs with -inf to ignore them (prob -> 0)
+    x = np.nan_to_num(x, nan=-1e9)
     e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum(axis=-1, keepdims=True)
+    return e_x / (e_x.sum(axis=-1, keepdims=True) + 1e-9) # Epsilon div by zero
 
 @njit
 def scaled_dot_product_attention(Q, K, V, dk):
