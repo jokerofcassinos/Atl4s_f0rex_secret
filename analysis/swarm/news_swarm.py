@@ -22,7 +22,7 @@ class NewsSwarm(SubconsciousUnit):
         super().__init__("News_Swarm")
         self.scraper = NewsScraper()
         self.last_scrape_time = 0
-        self.scrape_interval = 3600 * 4 # Every 4 hours
+        self.scrape_interval = 900 # Every 15 minutes (Real-Time Gnosis)
         self.current_bias = 0.0
         self.last_news = []
         
