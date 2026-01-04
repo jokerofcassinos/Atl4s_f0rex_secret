@@ -51,6 +51,7 @@ from analysis.swarm.causal_swarm import CausalSwarm
 from analysis.swarm.news_swarm import NewsSwarm
 from analysis.swarm.zero_point_swarm import ZeroPointSwarm
 from analysis.swarm.active_inference_swarm import ActiveInferenceSwarm
+from analysis.swarm.hawking_swarm import HawkingSwarm
 from analysis.swarm.event_horizon_swarm import EventHorizonSwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
@@ -240,6 +241,7 @@ class SwarmOrchestrator:
         self.active_agents.append(NewsSwarm())
         self.active_agents.append(ZeroPointSwarm())
         self.active_agents.append(ActiveInferenceSwarm())
+        self.active_agents.append(HawkingSwarm())
         
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         
