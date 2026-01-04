@@ -11,6 +11,52 @@ from datetime import datetime, timedelta
 logger = logging.getLogger("Atl4s-Data")
 
 class DataLoader:
+    def _normalize_symbol(self, symbol: str) -> str:
+        """
+        Converts MT5 symbols (e.g., 'DOGUSD', 'BTCUSD') to Yahoo Finance Tickers (e.g., 'DOGE-USD', 'BTC-USD').
+        """
+        s = symbol.upper()
+        
+        # 1. Explicit Dictionary (The "Fixer" List)
+        # Add any tricky ones here.
+        mapping = {
+            "DOGUSD": "DOGE-USD",
+            "DOGEUSD": "DOGE-USD",
+            "BTCUSD": "BTC-USD",
+            "ETHUSD": "ETH-USD",
+            "SOLUSD": "SOL-USD",
+            "XRPUSD": "XRP-USD",
+            "LTCUSD": "LTC-USD",
+            "BNBUSD": "BNB-USD",
+            "XAUUSD": "GC=F", # Gold Futures (Often better vol than XAUUSD=X) or "XAUUSD=X"
+            "XAGUSD": "SI=F", # Silver
+            "EURUSD": "EURUSD=X",
+            "GBPUSD": "GBPUSD=X",
+            "USDJPY": "USDJPY=X",
+            "AUDUSD": "AUDUSD=X",
+            "USDCAD": "USDCAD=X",
+            "USDCHF": "USDCHF=X",
+            "NZDUSD": "NZDUSD=X"
+        }
+        
+        if s in mapping:
+            return mapping[s]
+            
+        # 2. Generic Crypto Heuristic
+        # If it ends in USD but is not in the map, try adding dash.
+        # e.g. "ADAUSD" -> "ADA-USD"
+        if s.endswith("USD") and len(s) > 6: 
+             # Likely Crypto like "SHIBUSD" -> "SHIB-USD"
+             return s.replace("USD", "-USD")
+             
+        # 3. Fallback for 3-letter Cryptos (BTCUSD -> BTC-USD) not in map
+        if len(s) == 6 and s.endswith("USD"):
+             # Could be "ADAUSD" -> "ADA-USD"
+             # But checks against known forex?
+             pass 
+             
+        return s 
+
     def __init__(self, symbol=config.SYMBOL, timeframe=config.TIMEFRAME):
         self.symbol = symbol
         self.timeframe = timeframe
@@ -22,7 +68,8 @@ class DataLoader:
         If symbol/timeframe provided, returns specific DataFrame.
         Otherwise returns dictionary map for default context.
         """
-        target_symbol = symbol if symbol else self.symbol
+        raw_symbol = symbol if symbol else self.symbol
+        target_symbol = self._normalize_symbol(raw_symbol)
         
         # If specific request
         if symbol and timeframe:
