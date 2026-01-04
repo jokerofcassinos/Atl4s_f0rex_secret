@@ -49,6 +49,7 @@ from analysis.swarm.singularity_swarm import SingularitySwarm
 from analysis.swarm.neural_lace import NeuralLace
 from analysis.swarm.causal_swarm import CausalSwarm
 from analysis.swarm.news_swarm import NewsSwarm
+from analysis.swarm.zero_point_swarm import ZeroPointSwarm
 from analysis.swarm.event_horizon_swarm import EventHorizonSwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
@@ -236,6 +237,7 @@ class SwarmOrchestrator:
         self.active_agents.append(NeuralLace(self.bus))
         self.active_agents.append(CausalSwarm())
         self.active_agents.append(NewsSwarm())
+        self.active_agents.append(ZeroPointSwarm())
         
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         
