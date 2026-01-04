@@ -421,13 +421,32 @@ class SwarmOrchestrator:
         thoughts = self.bus.get_recent_thoughts()
         if not thoughts: return None
         
+        # --- PHASE 111: THE GREAT FILTER ---
+        allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_ALL", "EXIT_LONG", "EXIT_SHORT", "VETO"]
+        macro_bias_reason = ""
+        for t in thoughts:
+             if t.source == "News_Swarm" and hasattr(t, 'meta_data'):
+                 bias = t.meta_data.get('bias', 0.0)
+                 if bias > 0.25:
+                     allowed_actions = ["BUY", "WAIT", "EXIT_SHORT", "EXIT_ALL"]
+                     macro_bias_reason = f"Macro Bullish ({bias:.2f})"
+                 elif bias < -0.25:
+                     allowed_actions = ["SELL", "WAIT", "EXIT_LONG", "EXIT_ALL"]
+                     macro_bias_reason = f"Macro Bearish ({bias:.2f})"
+
         # 1. Physics Reality Check (Phase 65: Clash of Gods)
-        # Physics (Kinematics/Hyperdimensional) overrides Consensus/Transformer.
-        # "Reality does not negotiate."
         physics_decision = self._resolve_physics_conflict(thoughts)
         if physics_decision:
-             logger.info(f"PHYSICS OVERRIDE: {physics_decision[0]} (God Mode Active)")
-             return (physics_decision[0], physics_decision[1], physics_decision[2])
+             action = physics_decision[0]
+             if action not in allowed_actions:
+                  logger.warning(f"PHYSICS BLOCKED BY MACRO: {action} denied.")
+                  if action == "SELL" and "EXIT_SHORT" in allowed_actions:
+                      return ("EXIT_SHORT", 99.0, {'reason': f"Macro Override ({macro_bias_reason})"})
+                  if action == "BUY" and "EXIT_LONG" in allowed_actions:
+                      return ("EXIT_LONG", 99.0, {'reason': f"Macro Override ({macro_bias_reason})"})
+                  return ("WAIT", 0.0, {})
+             logger.info(f"PHYSICS OVERRIDE: {action} (God Mode Active)")
+             return (action, physics_decision[1], physics_decision[2])
 
         # 2. Attention Mechanism (The Transformer)
         attention_signal = self.attention.synthesize(thoughts)
@@ -482,12 +501,27 @@ class SwarmOrchestrator:
         # --- NEW HANDLING FOR VETO/EXIT_ALL FROM SUB-AGENTS (Harvester) ---
         # Harvester issues EXIT_ALL. We must catch it.
         # Check thoughts for URGENT Signals
+        # --- FILTER ENFORCEMENT ---
+        if final_decision not in allowed_actions:
+             if "EXIT" not in final_decision:
+                  logger.warning(f"CONSENSUS BLOCKED BY MACRO: {final_decision} -> Denied.")
+                  if final_decision == "SELL" and "EXIT_SHORT" in allowed_actions:
+                      final_decision = "EXIT_SHORT"
+                      final_metadata['reason'] = f"Macro Override: {macro_bias_reason}"
+                      final_score = 99.0
+                  elif final_decision == "BUY" and "EXIT_LONG" in allowed_actions:
+                      final_decision = "EXIT_LONG"
+                      final_metadata['reason'] = f"Macro Override: {macro_bias_reason}"
+                      final_score = 99.0
+                  else:
+                      final_decision = "WAIT"
+
         for t in thoughts:
              if t.signal_type == "EXIT_ALL": 
                  logger.warning(f"CRITICAL EXIT TRIGGERED BY: {t.source} (Reason: {t.meta_data.get('reason', 'None')})")
                  return ("EXIT_ALL", t.confidence, t.meta_data)
              if t.signal_type == "VETO":
-                 if final_decision != "WAIT":
+                 if final_decision != "WAIT" and "EXIT" not in final_decision:
                      logger.info(f"VETO enforced by {t.source} ({t.meta_data.get('reason','')})")
                      final_decision = "WAIT"
 
