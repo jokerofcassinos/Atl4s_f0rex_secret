@@ -30,6 +30,10 @@ logging.getLogger("yfinance").setLevel(logging.WARNING)
 logging.getLogger("peewee").setLevel(logging.WARNING) 
 # logging.getLogger("urllib3").setLevel(logging.WARNING) 
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", module="sklearn") 
+
 logger = logging.getLogger("OmegaProtocol")
 
 class OmegaSystem:
