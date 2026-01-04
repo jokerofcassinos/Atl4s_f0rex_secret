@@ -147,7 +147,7 @@ class DataLoader:
             yf_interval = "5m"
             c_file = os.path.join(config.CACHE_DIR, f"{sym}_{tf_name}.parquet")
             
-            df = self._fetch_with_cache(sym, yf_interval, c_file, days_limit=5)
+            df = self._fetch_with_cache(sym, yf_interval, c_file, days=5)
             if df is not None and not df.empty:
                 basket[sym] = df
         return basket
