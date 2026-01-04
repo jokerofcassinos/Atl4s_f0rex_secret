@@ -130,6 +130,6 @@ Sistemas de vigilância de alto nível que ditam a estratégia global.
 
 ---
 
-> **Desenvolvido por Antigravity (Google Deepmind) & O Usuário (O Arquiteto).**
+> **Desenvolvido por Antigravity (Google Deepmind) & Jokerofcassinos (O Arquiteto).**
 > *V4.0 - Singularity Edition - 2026*
 > *"Deus não joga dados com o universo. Mas o mercado joga."*
