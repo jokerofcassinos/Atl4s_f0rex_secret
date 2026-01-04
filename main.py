@@ -203,7 +203,13 @@ class OmegaSystem:
                     # Ideally, data_loader handles live updates via tick injection
                     # For now, we reload/resample.
                     # Fetches M1, M5, M15, M30, H1, H4, D1, W1
+                    # Fetches M1, M5, M15, M30, H1, H4, D1, W1
                     data_map = self.data_loader.get_data(self.symbol) 
+                    
+                    # Phase 105: The Causal Nexus (Inject Basket Data)
+                    if self.flow_manager and self.flow_manager.active_symbols:
+                        basket_data = self.data_loader.get_basket_data(self.flow_manager.active_symbols)
+                        data_map['basket_data'] = basket_data
                     
                     # 3. Cortex Thinking
                     # Returns (decision, confidence, metadata)
