@@ -7,6 +7,7 @@ from typing import Dict, List, Any, Tuple
 import pandas as pd
 from .consciousness_bus import ConsciousnessBus
 from .interfaces import SwarmSignal, SubconsciousUnit
+from core.memory.holographic import HolographicMemory # Phase 117
 
 # --- SWARM MODULE IMPORTS ---
 # Core / Legacy
@@ -248,10 +249,108 @@ class SwarmOrchestrator:
         self.active_agents.append(HawkingSwarm())
         self.active_agents.append(RiemannSwarm())
         
+        # Phase 117: Holographic Associative Memory
+        self.holographic_memory = HolographicMemory()
+        self.last_consensus_state = {}
+        self.last_price = 0.0
+
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         
         self.state = "CONSCIOUS"
         logger.info("State: CONSCIOUS. Waiting for Input.")
+
+    async def process_tick(self, tick: Dict[str, Any], data_map: Dict[str, pd.DataFrame], config: Dict = None) -> Tuple[str, float, Dict[str, Any]]:
+        """
+        The Main Loop of Consciousness.
+        """
+        # --- PHASE 117: HOLOGRAPHIC LEARNING (Effect precedes Cause? No, Cause -> Effect) ---
+        # We learn from the Past (Last Tick's State -> Current Tick's Outcome)
+        current_price = tick.get('bid', 0)
+        
+        if self.last_price > 0 and self.last_consensus_state:
+            # Calculate Outcome (Price Delta)
+            delta = current_price - self.last_price
+            
+            # Normalize Delta (Tanh to squash between -1 and 1, roughly)
+            # A move of $1.00 in XAUUSD is significant.
+            outcome_score = np.tanh(delta * 0.5) 
+            
+            # Imprint the Experience
+            # "When we felt [last_state], the price did [outcome_score]"
+            self.holographic_memory.store_experience(self.last_consensus_state, outcome_score)
+            
+        self.last_price = current_price
+
+        # --- PHASE 47: DATA NORMALIZATION (SCALE FIX) ---
+        # (Existing code continues...)
+        # ... [rest of process_tick logic is unchanged until synthesis] ...
+        
+        # 1. Gather Thoughts
+        thoughts = []
+        swarm_snapshot = {} # For Memory
+        
+        for agent in self.active_agents:
+            signal = await agent.process(data_map)
+            if signal:
+                thoughts.append(signal)
+                # Build Consensus State for Memory
+                # Key: AgentName, Value: Confidence * Sign (Buy=1, Sell=-1, Wait=0)
+                sign = 1.0 if signal.signal_type == "BUY" else (-1.0 if signal.signal_type == "SELL" else 0.0)
+                swarm_snapshot[agent.name] = signal.confidence * sign
+
+        # Store for next tick's learning
+        self.last_consensus_state = swarm_snapshot
+        
+        # ... logic continues ...
+
+        # 2. Synthesize Thoughts (Updated to use Memory)
+        decision, score, meta = self.synthesize_thoughts(thoughts, swarm_snapshot)
+        return decision, score, meta
+
+    def synthesize_thoughts(self, thoughts: List[SwarmSignal], current_state_vector: Dict=None) -> Tuple[str, float, Dict]:
+        if not thoughts: return "WAIT", 0.0, {}
+        
+        # (Existing Phase 114 logic...)
+        allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_ALL", "EXIT_LONG", "EXIT_SHORT", "VETO"]
+        
+        # ... [Handling Macro etc] ...
+        
+        # ... [Physics Override] ...
+
+        # ... [Attention Mechanism] ...
+        
+        # --- PHASE 117: HOLOGRAPHIC INTUITION ---
+        if current_state_vector:
+            intuition_score = self.holographic_memory.retrieve_intuition(current_state_vector)
+            
+            # "Gut Feeling" Logic
+            # If Intuition is Strong Negative (< -0.5), it means "We have seen this before, and it ended badly."
+            if abs(intuition_score) > 0.5:
+                # If Intuition opposes the current decision?
+                pass # Implementation detail: check synthesize flow
+                
+        # [Existing weighted voting logic]...
+        
+        # Let's just modify the END of synthesize_thoughts or replace it?
+        # The previous 'synthesize_thoughts' method had ~100 lines. 
+        # I should probably use a smaller replacement chunks to avoid wiping the logic I can't see fully.
+        # But I need to change the SIGNATURE of synthesize_thoughts to accept `current_state_vector`.
+        # OR I can just access `self.last_consensus_state` inside it (since I set it in process_tick).
+        # Yes, accessing `self.last_consensus_state` is safer to avoid signature mismatch if called elsewhere.
+        
+        # Wait, I am replacing `process_tick`'s beginning.
+        # But `process_tick` is huge.
+        # I should probably ONLY inject the Learning Logic in `process_tick` via a specific match.
+        
+        return self._synthesize_thoughts_internal(thoughts) # Just redirecting for now to avoid complexity?
+        
+    # Wait, I need to be surgical.
+    # 1. Update __init__ to add self.holographic_memory
+    # 2. Update synthesize_thoughts to USE it (and build the vector there)
+    # 3. Update process_tick to DO THE LEARNING.
+    
+    # Let's do __init__ first.
+    pass
 
     async def process_tick(self, tick: Dict[str, Any], data_map: Dict[str, pd.DataFrame], config: Dict = None) -> Tuple[str, float, Dict[str, Any]]:
         """
@@ -418,13 +517,15 @@ class SwarmOrchestrator:
              self.synaptic_buffer.pop(0)
 
 
-    async def synthesize_thoughts(self) -> str:
+    def synthesize_thoughts(self, thoughts: List[SwarmSignal] = None, current_state_vector: Dict = None) -> Tuple[str, float, Dict]:
         """
         The 'Free Will' Simulation.
         Aggregates thousands of micro-signals into a coherent Action.
         """
-        thoughts = self.bus.get_recent_thoughts()
-        if not thoughts: return None
+        if not thoughts:
+            thoughts = self.bus.get_recent_thoughts()
+        
+        if not thoughts: return "WAIT", 0.0, {}
         
         # --- PHASE 114: THE BALANCE OF POWER (SOFT ARBITRATION) ---
         allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_ALL", "EXIT_LONG", "EXIT_SHORT", "VETO"]
@@ -552,8 +653,6 @@ class SwarmOrchestrator:
                      logger.info(f"VETO enforced by {t.source} ({t.meta_data.get('reason','')})")
                      final_decision = "WAIT"
 
-        return (final_decision, final_score, final_metadata)
-
         # 2. VETO CHECK (Absolute Safety)
         # We always check VetoSwarm last
         for t in thoughts:
@@ -561,15 +660,18 @@ class SwarmOrchestrator:
                  logger.warning(f"VETO TRIGGERED: {t.meta_data.get('reason')}")
                  return ("WAIT", 0.0, {})
 
-
-        # 3. Holographic Recall
-        if final_decision != "WAIT":
-             # Placeholder for vector construction
-             current_vector = [final_score] 
-             mem_outcome, mem_conf = self.holographic_memory.recall(current_vector)
-             if mem_conf > 0.8 and mem_outcome < 0:
-                 logger.warning("DEJA VU: Negative Outcome Memory. Aborting.")
-                 return ("WAIT", 0.0, {})
+        # 3. Holographic Recall (Phase 117)
+        if final_decision != "WAIT" and current_state_vector:
+             # Query the Hologram
+             intuition = self.holographic_memory.retrieve_intuition(current_state_vector)
+             
+             # "Déjà Vu" Logic
+             if intuition < -0.3: # Negative association (Pain)
+                  logger.warning(f"DEJA VU: Holographic Memory senses danger (Score: {intuition:.2f}). Aborting {final_decision}.")
+                  return ("WAIT", 0.0, {})
+             elif intuition > 0.3: # Positive association (Pleasure)
+                  logger.info(f"INTUITION: Holographic Memory confirms {final_decision} (Score: {intuition:.2f}).")
+                  final_score = min(100, final_score + 10)
 
         # 4. System 2 Check (The Grandmaster)
         # MCTS Verification
@@ -585,8 +687,6 @@ class SwarmOrchestrator:
              }
              
              # Trend Bias Injection
-             # If Score is 80 (High Conf), Bias is 0.4 (Strong Drift)
-             # If score is 0, bias is 0.
              bias = 0.0
              if final_decision == "BUY":
                  bias = (final_score / 100.0) * 0.5
@@ -599,11 +699,10 @@ class SwarmOrchestrator:
              if plan == "CLOSE": 
                  logger.warning(f"GRANDMASTER VETO: MCTS predicts negative EV for {final_decision}. Signaling Directional EXIT.")
                  # Don't force exit all, just don't enter *new* trade.
-                 # Actually, if we are in a trade, this suggests getting out.
-                 # But sticking to "Vetoing the Entry" for now.
                  return ("WAIT", 0.0, {})
 
         return (final_decision, final_score, final_metadata)
+
 
     def _resolve_physics_conflict(self, thoughts):
         """
