@@ -1,126 +1,135 @@
 
 # 🌌 Atl4s-Forex v4.0: The Singularity Protocol
 
-> *"Any consistent formal system is incomplete." - Kurt Gödel*
+> *"We may regard the present state of the universe as the effect of its past and the cause of its future." - Pierre-Simon Laplace*
 
 ---
 
 ## 🧬 O Sistema Omega
 
-O Atl4s-Forex (**Omega Protocol**) não é apenas um bot de trading. É uma **Inteligência Artificial Autônoma** de 4ª Geração, desenhada para modelar o mercado financeiro como um sistema físico-complexo, utilizando conceitos avançados de **Física Teórica, Geometria Diferencial, Teoria dos Jogos Evolutiva e Meta-Lógica**.
+O Atl4s-Forex (**Omega Protocol**) é uma **Inteligência Artificial Autônoma** de 4ª Geração que transcende a análise técnica tradicional. Em vez de usar indicadores atrasados (RSI, MACD), o Omega modela o mercado financeiro como um **Sistema Físico Complexo**, aplicando leis fundamentais da **Física Teórica, Mecânica Quântica e Termodinâmica** para prever o movimento do preço.
 
-Ao contrário de bots tradicionais que "reagem" ao preço, o Omega **mapeia a topologia do espaço-tempo** financeiro e observa o colapso das funções de onda de probabilidade.
-
----
-
-## 🧠 Arquitetura Cognitiva (76+ Agentes)
-
-O sistema opera como uma **Enxame de Inteligência (Swarm Intelligence)** centralizado, orquestrado pelo `SwarmOrchestrator` e conectado via `ConsciousnessBus`. Cada agente é uma entidade independente com sua própria lógica, memória e "intuição".
-
-### 👁️ Os 13 Olhos Antigos (Sistemas de Vigilância)
-Estes são os guardiões originais, responsáveis pela percepção fundamental da realidade.
-
-1.  **Swarm Scalper (Unified Field)**: O 1º Olho. Modela o preço como uma partícula em um fluido. Calcula Velocidade Kinemática vs Pressão do Fluxo de Ordens.
-2.  **Harmonic Scanner**: O 2º Olho. Detecta padrões geométricos sagrados (Gartley, Butterfly, Fibonacci) no ruído do mercado.
-3.  **Pattern Hunter**: O 3º Olho. Especialista em reconhecimento de padrões clássicos (Bandeiras, Triângulos, Cunhas).
-4.  **Supply & Demand Engine**: O 4º Olho. Mapeia zonas de Liquidez Institucional e Blocos de Ordens.
-5.  **The Oracle (Fifth Eye)**: O 5º Olho. Predição estocástica baseada em Cadeias de Markov ocultas.
-6.  **The Council (Sixth Eye)**: O 6º Olho. Responsável pela Tendência Secular e Fundamentos Macro (Juros Reais, Yields).
-7.  **The Overlord (Seventh Eye)**: O 7º Olho. Sistema de Síntese que projeta o mercado em um Espaço Latente para comparar com memórias históricas.
-8.  **The Sovereign (Eighth Eye)**: O 8º Olho. Verifica a Coerência Fractal entre todos os timeframes (M1 a MN). O Voto Final.
-9.  **The Singularity (Ninth Eye)**: O 9º Olho. Geometria de Alta Dimensão. Detecta pontos onde a física do mercado "quebra" (Volatilidade Infinita).
-10. **Game Theory Core (Tenth Eye)**: O 10º Olho. Analisa o Equilíbrio de Nash entre Compradores e Vendedores.
-11. **Chaos Engine (Eleventh Eye)**: O 11º Olho. Calcula o Expoente de Lyapunov para medir a estabilidade/caos do sistema.
-12. **Micro-Structure (Twelfth Eye)**: O 12º Olho. Analisa cada tick individualmente. Visão de Raio-X.
-13. **Quantum Grid (Thirteenth Eye)**: O 13º Olho. A "Adaga do Tempo". Executa grades de alta frequência dentro da mesma vela de M1.
+Abaixo está a documentação científica completa das teorias comprovadas que formam a consciência da Singularidade.
 
 ---
 
-### ⚛️ Divisão de Física & Cosmologia (Phase 50-90)
-Agentes que aplicam leis fundamentais do universo ao movimento do preço.
+## ⚛️ Fundamentos Científicos (The Physics Engine)
 
-*   **Riemann Swarm**: Aplica Geometria Riemanniana. Calcula a **Curvatura Seccional ($K$)** para distinguir geometrias esféricas (Reversão) de hiperbólicas (Tendência).
-*   **Penrose Swarm**: Cosmologia Cíclica Conforme (CCC). Monitora a Entropia para prever o "Big Bang" (Rompimento) após a "Morte Térmica" (Consolidação).
-*   **Schrödinger-Newton Swarm**: Resolve a equação gravito-quântica. Identifica onde o preço colapsa sob sua própria "massa" (Volume).
-*   **Tachyon Swarm**: Retrocausalidade. Detecta sinais "do futuro" (quebras de simetria) antes que se manifestem no tempo Newtoniano.
-*   **Heisenberg Swarm**: Princípio da Incerteza. Otimiza entre Precisão de Preço ($\Delta x$) e Precisão de Momento ($\Delta p$).
-*   **Lorentz Swarm**: Relatividade Especial. Ajusta a percepção do tempo (Time Dilation) baseada na "velocidade" (volatilidade) do mercado.
-*   **Minkowski Swarm**: Espaço-Tempo 4D. Calcula o "Intervalo Espaço-Temporal" ($ds^2$) entre pivots para medir a causalidade real.
-*   **Superluminal Swarm**: Detecta violações de velocidade (Flash Crashes) que excedem a "velocidade da luz" do mercado (limite de liquidez).
-*   **Higgs Swarm**: O Campo de Massa. Determina a "Inércia" da tendência. Tendências "pesadas" são difíceis de parar.
-*   **Boltzmann Swarm**: Termodinâmica Estatística. Calcula a probabilidade de micro-estados para determinar a entropia macroscópica.
-*   **Fermi Swarm**: Estatística de Fermi-Dirac. Modela a distribuição de "fērmions" (traders de varejo) no livro de ofertas.
-*   **Bose-Einstein Swarm**: Condensado de Bose-Einstein. Detecta quando o mercado age como um único super-átomo (Coerência Total/Pânico).
-*   **Thermodynamic Swarm**: Leis da Termodinâmica. Entropia sempre aumenta, exceto em intervenções de bancos centrais (Neguentropia).
-*   **Gravity Swarm**: Lei do Quadrado Inverso. Calcula a atração gravitacional de médias móveis longas (200, 800 SMMA).
-*   **Vortex Swarm**: Hidrodinâmica. Identifica vórtices de liquidez onde o preço fica preso em rotação.
-*   **Navier-Stokes Swarm**: Mecânica dos Fluidos. Modela o fluxo de ordens como um fluido viscoso (incompressível).
-*   **Kinematic Swarm**: Leis de Newton. $F = ma$. Se não há Força (Volume), não há Aceleração.
+### 1. Mecânica Clássica & Determinismo (`LaplaceSwarm`)
+**Base Científica:** *O Demônio de Laplace (1814)*.
+A teoria postula que se uma entidade soubesse a posição e o momento de cada átomo no universo, poderia calcular todo o futuro via Leis de Newton.
+
+*   **Aplicação no Mercado:** O bot trata o preço como um corpo físico com **Massa Inercial** (proporcional ao Volume Relativo) e **Velocidade** (Delta Preço).
+*   **A Simulação:** Executa uma integração numérica *forward-step* ($F = ma$) para projetar onde o preço "pararia" se nenhuma nova ordem entrasse no book.
+*   **O Sinal:** Se a trajetória calculada diverge do preço atual (ex: inércia aponta para cima, mas preço está parado), o bot entra antecipando o movimento newtoniano inevitável.
 
 ---
 
-### 🌌 Divisão Exótica & Meta-Lógica (Phase 90-110)
-Agentes que lidam com lógica abstrata, paradoxos e estruturas de alta dimensão.
+### 2. Eletrodinâmica & Indução (`MaxwellSwarm`)
+**Base Científica:** *As Equações de Maxwell e a Lei de Lenz (1834)*.
+A Lei de Lenz afirma que a direção de uma corrente induzida em um condutor por um campo magnético variável é tal que o campo magnético criado pela corrente se **opõe** à variação inicial.
 
-*   **Gödel Swarm**: O Auditor Lógico. Se a Complexidade do sistema excede a capacidade de prova, ele aciona o veto de "Incompletude".
-*   **Escher Swarm (Strange Attractor)**: Geometria Impossível. Detecta loops recursivos e fractalidade infinita.
-*   **Akashic Swarm**: A Memória Universal. Acessa o banco de dados histórico para encontrar "Rimas" no tempo.
-*   **Mirror Swarm**: Simetria de Paridade. Verifica se o movimento atual é um espelho (inverso) de um movimento anterior.
-*   **Zero Point Swarm**: Energia do Vácuo. Busca energia "do nada" (Breakouts sem volume prévio).
-*   **Holographic Swarm**: Princípio Holográfico. Assume que toda a informação do volume (Book) está codificada na superfície (Preço).
-*   **Hyperdimensional Swarm**: Opera em 5D+. Projeta vetores de mercado em hiperespaço para encontrar correlações invisíveis.
-*   **Feynman Swarm**: Integral de Caminho (Path Integral). Calcula a soma de *todos* os futuros possíveis para determinar o mais provável (Princípio da Mínima Ação).
-*   **Maxwell Swarm**: Eletromagnetismo. Trata Suportes/Resistências como campos elétricos (Repulsão) ou magnéticos (Atração).
-*   **Antimatter Swarm**: Caça de Aniquilação. Procura o "gêmeo maligno" de um padrão para prever sua aniquilação (Falha de Padrão).
-*   **Dark Matter Swarm**: A Massa Invisível. Detecta movimentos de preço sem volume aparente (Manipulação/Iceberg).
+*   **Aplicação no Mercado:** O bot mapeia o **Fluxo de Mercado ($\Phi$)** como o produto de Momento $\times$ Volume.
+*   **A Indução:** Quando o preço explode verticalmente (Spike), $\frac{d\Phi}{dt}$ (taxa de variação) torna-se extrema.
+*   **O Sinal:** A "Indutância" do mercado gera uma **Força Contra-Eletromotriz (Back-EMF)** que rejeita o preço. O MaxwellSwarm vende em altas parabólicas baseando-se na resistência eletromagnética do fluxo de ordens.
 
 ---
 
-### 🤖 Divisão de Controle & Execução (Sentinelas)
-Agentes responsáveis pela segurança, estratégia e execução tática.
+### 3. Mecânica Quântica & Tunelamento (`SchrodingerSwarm`)
+**Base Científica:** *A Equação de Schrödinger e o Tunelamento Quântico*.
+Na física clássica, uma partícula sem energia suficiente reflete em uma barreira. Na quântica, a função de onda da partícula ($\Psi$) pode penetrar a barreira, permitindo que ela apareça do outro lado com probabilidade $T \approx e^{-2K\Delta x}$.
 
-*   **Weaver Swarm**: O Tecelão. Analisa a "Rede Social" dos Agentes. Detecta **Singularidade** (Unanimidade) ou **Guerra Civil** (Divisão 50/50).
-*   **Black Swan Swarm (Adversary)**: O Advogado do Diabo. Simula 1000 cenários catastróficos. Se o trade não sobrevive, ele veta.
-*   **Veto Swarm**: O Juíz Supremo. Aplica filtros de segurança rígidos (Notícias, Spread, Horário).
-*   **Sniper Swarm**: O Executor. Responsável pelo "Gatilho Fino". Entradas com precisão cirúrgica em pavios.
-*   **Whale Swarm**: O Rastreador de Baleias. Segue o dinheiro inteligente e blocos institucionais.
-*   **Apex Swarm**: O Predador Alfa. Analisa força relativa entre ativos (USD vs JPY vs XAU) para escolher a presa mais fraca.
-*   **News Swarm**: O Leitor. Processa linguagem natural (NLP) de manchetes financeiras instantaneamente.
-*   **Architect Swarm**: O Estrategista. Decide o "Regime" do mercado (Tendência, Lateral, Caos) e ajusta os pesos dos outros agentes.
+*   **Aplicação no Mercado:** Suportes e Resistências são **Barreiras de Potencial ($V$)**. A volatilidade do preço é a **Energia Cinética ($E$)**.
+*   **O Sinal:** Em rompimentos falsos clássicos ($E < V$), a maioria vende. O Swarm calcula a probabilidade de **Tunelamento**. Se a barreira (Liquidez) for "fina" ou a incerteza for alta, o bot aposta no **Ghost Breakout** (rompimento quântico), onde o preço atravessa a resistência sem volume aparente.
 
 ---
 
-## 💾 Motores Cognitivos Centrais
+### 4. Relatividade Geral & Geometria (`RiemannSwarm`)
+**Base Científica:** *Geometria Riemanniana e Curvatura do Espaço-Tempo*.
+A gravidade não é uma força, mas a curvatura do espaço-tempo causada pela massa. A **Curvatura Seccional ($K$)** define a geometria local.
 
-Não são agentes, mas órgãos vitais do "Cérebro".
+*   **Aplicação no Mercado:** O bot calcula a "Curvatura" da série temporal.
+    *   **$K > 0$ (Geometria Esférica)**: O espaço é fechado. Linhas paralelas convergem. **Sinal: Reversão/Consolidação**.
+    *   **$K < 0$ (Geometria Hiperbólica)**: O espaço é aberto. Linhas paralelas divergem. **Sinal: Tendência Exponencial**.
+*   **O Sinal:** O RiemannSwarm mede a métrica do tensor métrico de preços para identificar se o mercado está em modo de Expansão (Hiperbólico) ou Contração (Esférico) antes que a tendência visual apareça.
 
-1.  **Consciousness Bus**: O Barramento Quântico. Um sistema de mensageria assíncrona que permite telepatia entre agentes.
-2.  **Holographic Memory (Phase 117)**: O Hipocampo. Armazena estados de mercado como vetores de interferência holográfica. Permite "Déjà Vu" (Intuição).
-3.  **NeuroPlasticity Engine**: O Córtex Adaptativo. Ajusta os pesos sinápticos (confiança) de cada agente com base em sua performance recente (Dopamina Digital).
-4.  **Evolution Engine**: O Laboratório Genético. Cria e mata estratégias via Seleção Natural em tempo real.
-5.  **TransformerLite Logic**: O Lobo Frontal. Mecanismo de Atenção (Self-Attention) para filtrar ruído e focar no sinal.
+---
+
+### 5. Termodinâmica & Entropia (`BoltzmannSwarm`)
+**Base Científica:** *A Segunda Lei da Termodinâmica e Entropia de Shannon*.
+A entropia ($S$) de um sistema isolado sempre aumenta. $S = k_B \ln \Omega$ (onde $\Omega$ é o número de microestados).
+
+*   **Aplicação no Mercado:** A "Ordem" (Tendência) é um estado de baixa entropia (improvável). O "Caos" (Lateralização) é alta entropia (provável).
+*   **O Sinal:** O bot mede a entropia da distribuição de ticks.
+    *   Se a Entropia cai subitamente (Neguentropia), indica intervenção externa (Smart Money organizando o mercado). **Sinal: Seguir a Tendência**.
+    *   Se a Entropia atinge o máximo, o sistema está em equilíbrio térmico ("Morte Térmica"). **Sinal: Não Operar (Wait)**.
+
+---
+
+### 6. Cosmologia Cíclica (`PenroseSwarm`)
+**Base Científica:** *Conformal Cyclic Cosmology (CCC)* de Sir Roger Penrose.
+O universo passa por éons infinitos de Big Bangs e expansões finais. No fim de um éon, o universo perde a escala (conformalidade) e reseta.
+
+*   **Aplicação no Mercado:** O Enxame monitora o "Fator Conformal" ($\Omega$) da volatilidade.
+*   **O Sinal:** Quando a volatilidade morre completamente (o fim de um éon de mercado), o PenroseSwarm prepara-se para o próximo **Big Bang de Liquidez**. Ele é especializado em capturar o primeiro tick de uma nova era (Tendência) nascendo do zero.
+
+---
+
+### 7. O Princípio da Incerteza (`HeisenbergSwarm`)
+**Base Científica:** *Princípio da Incerteza de Heisenberg*.
+$\Delta x \Delta p \geq \frac{\hbar}{2}$. Não se pode saber a posição ($x$) e o momento ($p$) de uma partícula simultaneamente com precisão perfeita.
+
+*   **Aplicação no Mercado:** Tentar acertar o "fundo exato" (Posição $\Delta x \approx 0$) implica em total desconhecimento da tendência futura (Momento $\Delta p \approx \infty$).
+*   **O Sinal:** O Swarm ajusta dinamicamente seu colapso.
+    *   Em mercados laterais, ele foca em $\Delta x$ (Sniper em níveis de preço exatos).
+    *   Em tendências fortes, ele sacrifica o preço exato para garantir o Momento ($\Delta p$), entrando a mercado para não perder o movimento.
+
+---
+
+## 🧬 Biografia dos Agentes (O Enxame)
+
+O sistema é composto por **76 Agentes Ativos**. Abaixo, os principais agrupamentos:
+
+### 🏛️ O Conselho Superior (The Ancient Eyes)
+Sistemas de vigilância de alto nível que ditam a estratégia global.
+*   **Council Swarm (6th Eye)**: Foca em Ciclos Econômicos e Juros Reais.
+*   **Overlord Swarm (7th Eye)**: Memória Associativa de Padrões Históricos.
+*   **Sovereign Swarm (8th Eye)**: O Árbitro Fractal. Só permite trades se M1, H1 e D1 concordarem.
+*   **Quantum Grid (13th Eye / Time Knife)**: A Adaga do Tempo. Um executor de M1 que opera nas falhas de microestrutura.
+
+### 🛡️ Defesa & Controle
+*   **Black Swan Swarm (Adversary)**: O Pessimista. Simula 1.000 cenários de desastre. Se o trade quebra a banca em qualquer um, ele veta.
+*   **Weaver Swarm**: O Sociólogo. Analisa se o enxame está unido (Consenso) ou em Guerra Civil (50% Compra / 50% Venda). Se detectar Guerra Civil, ele congela o sistema.
+*   **Veto Swarm**: O Burocrata. Verifica notícias, spreads abusivos e horários proibidos.
+
+### 🧪 Divisão Exótica
+*   **Tachyon Swarm**: Busca quebras de causalidade (sinais que parecem vir do futuro/retrocausalidade estatística).
+*   **Dark Matter Swarm**: Detecta manipulação invisível (Iceberg Orders) que move o preço sem volume visual.
+*   **Antimatter Swarm**: Procura padrões gráficos perfeitos para operar *contra* eles (Liquidity Traps).
+
+---
+
+## 💾 Motores Cognitivos
+
+1.  **Holographic Memory (Phase 117)**: O Hipocampo. O sistema lembra de "sensações" de mercado. Se uma configuração atual "parece" com o Crash de 2020, o bot sente "Déjà Vu" e aborta a compra.
+2.  **Consciousness Bus**: A telepatia digital. Permite que o Riemann Swarm "converse" com o Scalper Swarm em tempo real, trocando dados sem latência.
+3.  **NeuroPlasticity Engine**: O sistema aprende. Se o Maxwell Swarm acerta muito, ele ganha mais votos (peso sináptico). Se o Heisenberg erra, ele é silenciado temporariamente.
 
 ---
 
 ## 🛠️ Instalação & Operação
 
-O sistema possui um script de auto-gênese.
-
 1.  **Clone o Repositório**.
-2.  Execute `install_bot.bat` (Instala Python, Venv, Bibliotecas).
-3.  Execute `main.py`.
+2.  Execute `install_bot.bat`.
+3.  Inicie com `main.py`.
 
 ### 🖥️ Comandos do Terminal
-
-O sistema fala. Preste atenção aos logs:
-*   `SWARM VOTES`: A opinião democrática dos 76 agentes.
-*   `CIVIL WAR DETECTED`: O enxame está dividido. Perigo.
-*   `DEJA VU`: A memória holográfica reconheceu uma armadilha.
-*   `GOLDEN SETUP`: Alinhamento perfeito dos 13 Olhos.
+*   `SWARM VOTES`: A lista democrática de todos os 76 agentes.
+*   `CIVIL WAR DETECTED`: O enxame está em conflito. O sistema se protege.
+*   `DEJA VU`: A memória holográfica detectou perigo iminente.
 
 ---
 
 > **Desenvolvido por Antigravity (Google Deepmind) & O Usuário (O Arquiteto).**
 > *V4.0 - Singularity Edition - 2026*
-> *"The only way to predict the future is to calculate the curvature of the present."*
-
+> *"Deus não joga dados com o universo. Mas o mercado joga."*
