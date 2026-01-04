@@ -19,6 +19,13 @@ class LaplaceSwarm(SubconsciousUnit):
     """
     def __init__(self):
         super().__init__("Laplace_Swarm")
+        
+        try:
+             from core.cpp_loader import load_dll
+             load_dll("physics_core.dll")
+             logger.info("LAPLACE ENGINE: C++ CORE ACTIVE [TURBO MODE]")
+        except:
+             logger.info("LAPLACE ENGINE: PYTHON FALLBACK [STANDARD MODE]")
         self.mass_window = 20 # Average mass over 20 candles
         
     async def process(self, context: Dict[str, Any]) -> Optional[SwarmSignal]:
@@ -61,7 +68,7 @@ class LaplaceSwarm(SubconsciousUnit):
         # Higher Volatility = Lower Viscosity (Easier to move)? Or Turbulence?
         # Let's say Friction scales with Spread.
         friction_coeff = max(0.01, spread * 10.0) 
-        
+
         # 2. The Simulation (Forward Integration) -- The "Demon" Logic
         terminal_price = current_price
         

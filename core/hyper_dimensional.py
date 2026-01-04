@@ -35,8 +35,11 @@ try:
     ]
     _hdc_lib.cosine_similarity.restype = ctypes.c_double
         
-        # logger.info("HDC: Silicon Memory Active (C++)")
+    _hdc_lib.cosine_similarity.restype = ctypes.c_double
+        
+    logger.info("HDC MEMORY: C++ CORE ACTIVE [TURBO MODE]")
 except Exception as e:
+    logger.info("HDC MEMORY: PYTHON FALLBACK [STANDARD MODE]")
     # logger.warning(f"HDC: C++ Load Failed ({e})")
     pass
 

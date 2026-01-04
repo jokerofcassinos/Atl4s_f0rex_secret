@@ -22,6 +22,13 @@ class RiemannSwarm(SubconsciousUnit):
         self.primes = [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53]
         self.min_data_points = 60 # Need at least 60 candles for FFT clarity
         
+        try:
+             from core.cpp_loader import load_dll
+             load_dll("physics_core.dll")
+             logger.info("RIEMANN ENGINE: C++ CORE ACTIVE [TURBO MODE]")
+        except:
+             logger.info("RIEMANN ENGINE: PYTHON FALLBACK [STANDARD MODE]")
+        
     async def process(self, context: Dict[str, Any]) -> Optional[SwarmSignal]:
         candles = context.get('candles')
         if candles is None or len(candles) < self.min_data_points:

@@ -285,7 +285,7 @@ class SwarmOrchestrator:
         vote_strings = []
         for t in thoughts:
              vote_strings.append(f"{t.source}={t.signal_type}({t.confidence:.0f}%)")
-        logger.info(f"SWARM VOTES: {', '.join(vote_strings)}")
+        logger.debug(f"SWARM VOTES: {', '.join(vote_strings)}")
         
         allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_ALL", "EXIT_LONG", "EXIT_SHORT", "VETO"]
         macro_bias_reason = ""
