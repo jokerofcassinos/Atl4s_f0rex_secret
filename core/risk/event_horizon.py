@@ -1,7 +1,7 @@
 
 import logging
 import numpy as np
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 
 logger = logging.getLogger("EventHorizonRisk")
 
