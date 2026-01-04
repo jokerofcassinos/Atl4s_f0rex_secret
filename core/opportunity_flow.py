@@ -22,7 +22,9 @@ class OpportunityFlowManager:
     """
     def __init__(self):
         self.focus_scores: Dict[str, AssetFocus] = {}
-        self.active_symbols = ["XAUUSD", "BTCXAU", "XAUAUD"]
+        # Active Opportunity Set
+        # Active Opportunity Set
+        self.active_symbols = ["ETHUSD"] # Dynamic List? Ideally should come from Config.
         self.current_focus = "XAUUSD" # Default
 
     def calculate_focus(self, market_data: Dict[str, pd.DataFrame]) -> str:

@@ -30,13 +30,16 @@ class ApexSwarm(SubconsciousUnit):
         # Add the current primary symbol to the comparison if data exists
         current_symbol = context.get('tick', {}).get('symbol')
         df_m5_current = data_map.get('M5')
-        if current_symbol and df_m5_current is not None:
-             # We need consistent H1 data for fair comparison usually, 
-             # but let's use what we have in the basket (which is H1).
-             # If current symbol is not in basket, we might miss it.
-             # Ideally basket contains ALL candidates.
-             pass
-
+        
+        if current_symbol:
+             # Ensure current is in basket
+             if current_symbol not in basket and df_m5_current is not None:
+                 basket[current_symbol] = df_m5_current
+             
+             # If basket is basically empty or garbage, focus entirely on current
+             if len(basket) == 0 and df_m5_current is not None:
+                 basket = {current_symbol: df_m5_current}
+        
         if not basket: return None
         
         scores = {}

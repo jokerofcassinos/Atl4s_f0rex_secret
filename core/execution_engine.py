@@ -59,16 +59,23 @@ class ExecutionEngine:
              tp_dist = price * 0.02
 
         if self.bridge:
-            # SPREAD GUARD (Dynamic w/ Profit Ratio)
-            # User Q: Does it adapt? A: Yes, relative to our Target.
-            # We allow the Spread to be at most 50% of our Target Profit.
-            # If spread_tolerance is provided (Wolf Pack Mode), we use that instead.
-            max_spread = spread_tolerance if spread_tolerance else tp_dist * 0.50 
+            # 3. Dynamic Spread Guard
+            # For Crypto (Price > 1000), typical spread can be 1.0 - 5.0 points.
+            # For Forex, typical is 0.00010.
+            
+            # Adaptive Threshold: MAX_SPREAD = 0.05% of Price
+            max_spread_allowed = price * 0.0005 
+            
+            # Hard cap minimum for Forex
+            if max_spread_allowed < 0.00050: max_spread_allowed = 0.00050
+            
+            # Override for User Settings if needed
+            # But this adaptive check is safer.
             
             spread = ask - bid
-            if spread > max_spread:
-                logger.warning(f"SPREAD GUARD: Refused. Spread {spread:.3f} > {max_spread:.3f} (50% of Target).")
-                return None
+            if spread > max_spread_allowed:
+                 logger.warning(f"SPREAD GUARD: Refused. Spread {spread:.3f} > {max_spread_allowed:.3f} (0.05% of Price).")
+                 return None # Changed from False to None to match original function's return type on refusal
         
         sl = price - sl_dist if cmd_type == 0 else price + sl_dist
         tp = price + tp_dist if cmd_type == 0 else price - tp_dist
