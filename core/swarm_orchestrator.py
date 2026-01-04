@@ -245,50 +245,10 @@ class SwarmOrchestrator:
         self.active_agents.append(NewsSwarm())
         self.active_agents.append(ZeroPointSwarm())
         self.active_agents.append(ActiveInferenceSwarm())
-        self.riemann_swarm = RiemannSwarm()
-
-        # --- Swarm Registration ---
-        self.swarms = [
-            self.game_swarm,
-            self.fractal_swarms[0], # Fractal Vision
-            self.sentiment_swarm,
-            self.counterfactual_engine,
-            self.spectral_swarm,
-            self.manifold_swarm,
-            self.scalper_swarm,
-            self.architect,
-            self.time_knife,
-            self.nexus,
-            self.event_horizon, # Phase 110 (Hawking)
-            self.gravity_swarm,
-            self.strange_attractor,
-            self.akashic_swarm,
-            self.gaussian_process,
-            self.thermo_swarm,
-            self.mirror_swarm,
-            self.kinematic_swarm,
-            self.dna_swarm, 
-            self.navier_stokes,
-            self.superluminal_swarm,
-            self.boltzmann_swarm,
-            self.fermi_swarm,
-            self.bose_einstein, # Phase 93
-            self.schrodinger_newton, # Phase 94
-            self.tachyon_swarm, # Phase 95
-            self.penrose_swarm, # Phase 106
-            self.riemann_swarm, # Phase 115
-            
-            # --- Meta-Cognitive Layers ---
-            self.weaver_swarm,   # Phase 97
-            self.laplace_swarm,  # Phase 98
-            self.physarum_swarm, # Phase 99
-            self.active_inference, # Phase 109
-            self.neural_lace,     # Phase 101
-            self.news_swarm,      # Phase 107 (Oracle)
-            self.zero_point_swarm # Phase 108
-        ]
+        self.active_agents.append(HawkingSwarm())
+        self.active_agents.append(RiemannSwarm())
         
-        logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units (Legacy) + {len(self.swarms)} Advanced Units.")
+        logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         
         self.state = "CONSCIOUS"
         logger.info("State: CONSCIOUS. Waiting for Input.")
