@@ -421,32 +421,46 @@ class SwarmOrchestrator:
         thoughts = self.bus.get_recent_thoughts()
         if not thoughts: return None
         
-        # --- PHASE 111: THE GREAT FILTER ---
+        # --- PHASE 111 & 112: THE OMEGA POINT (MACRO-PHYSICS ARBITRATION) ---
         allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_ALL", "EXIT_LONG", "EXIT_SHORT", "VETO"]
         macro_bias_reason = ""
+        strong_macro = False
+        
         for t in thoughts:
-             if t.source == "News_Swarm" and hasattr(t, 'meta_data'):
-                 bias = t.meta_data.get('bias', 0.0)
-                 if bias > 0.25:
-                     allowed_actions = ["BUY", "WAIT", "EXIT_SHORT", "EXIT_ALL"]
-                     macro_bias_reason = f"Macro Bullish ({bias:.2f})"
-                 elif bias < -0.25:
-                     allowed_actions = ["SELL", "WAIT", "EXIT_LONG", "EXIT_ALL"]
-                     macro_bias_reason = f"Macro Bearish ({bias:.2f})"
+            if t.source == "News_Swarm" and hasattr(t, 'meta_data'):
+                bias = t.meta_data.get('bias', 0.0)
+                # Phase 112: Raised Threshold to 0.4 (Only Strong News blocks Physics)
+                if bias > 0.40: 
+                    allowed_actions = ["BUY", "WAIT", "EXIT_SHORT", "EXIT_ALL"]
+                    macro_bias_reason = f"Macro Bullish ({bias:.2f})"
+                    strong_macro = True
+                elif bias < -0.40:
+                    allowed_actions = ["SELL", "WAIT", "EXIT_LONG", "EXIT_ALL"]
+                    macro_bias_reason = f"Macro Bearish ({bias:.2f})"
+                    strong_macro = True
 
         # 1. Physics Reality Check (Phase 65: Clash of Gods)
         physics_decision = self._resolve_physics_conflict(thoughts)
         if physics_decision:
              action = physics_decision[0]
+             conf = physics_decision[1]
+             
+             # PHASE 112: THE PROPHET CLAUSE
+             # If Physics is > 98% (Hawking Singularity), it overrides even Strong News.
+             if conf > 98.0:
+                 logger.info(f"PHYSICS SINGULARITY ({conf}%): Overriding everything, including News.")
+                 return (action, conf, physics_decision[2])
+
              if action not in allowed_actions:
-                  logger.warning(f"PHYSICS BLOCKED BY MACRO: {action} denied.")
+                  logger.warning(f"PHYSICS BLOCKED BY MACRO: {action} denied due to {macro_bias_reason}.")
                   if action == "SELL" and "EXIT_SHORT" in allowed_actions:
                       return ("EXIT_SHORT", 99.0, {'reason': f"Macro Override ({macro_bias_reason})"})
                   if action == "BUY" and "EXIT_LONG" in allowed_actions:
                       return ("EXIT_LONG", 99.0, {'reason': f"Macro Override ({macro_bias_reason})"})
                   return ("WAIT", 0.0, {})
+             
              logger.info(f"PHYSICS OVERRIDE: {action} (God Mode Active)")
-             return (action, physics_decision[1], physics_decision[2])
+             return (action, conf, physics_decision[2])
 
         # 2. Attention Mechanism (The Transformer)
         attention_signal = self.attention.synthesize(thoughts)
