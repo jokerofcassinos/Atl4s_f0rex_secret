@@ -12,17 +12,20 @@ class ExecutionEngine:
     The Hand of God.
     Executes trades and handles Predictive Exits.
     """
-    def __init__(self, bridge):
+    def __init__(self, bridge=None):
         self.bridge = bridge
+        self.risk_filter = None # Add logic
         self.leverage_manager = DynamicLeverage()
-        self.risk_filter = GreatFilter()
+        self.config = {"spread_limit": 0.0005} # Default
+
+    def set_config(self, config: Dict):
+        self.config = config
         
     async def execute_signal(self, command: str, symbol: str, bid: float, ask: float, confidence: float = 80.0, account_info: Dict = None, spread_tolerance: float = None):
         """
         Converts a Cortex Command into a Physical Order.
         Args:
-            command: "BUY" or "SELL"
-            symbol: "BTCUSD", "XAUUSD" etc
+            command: "BUY" or "SELL", "XAUUSD" etc
             bid: Current Bid
             ask: Current Ask
             confidence: 0-100 score
@@ -60,11 +63,9 @@ class ExecutionEngine:
 
         if self.bridge:
             # 3. Dynamic Spread Guard
-            # For Crypto (Price > 1000), typical spread can be 1.0 - 5.0 points.
-            # For Forex, typical is 0.00010.
-            
-            # Adaptive Threshold: MAX_SPREAD = 0.05% of Price
-            max_spread_allowed = price * 0.0005 
+            # Adaptive Threshold: MAX_SPREAD = Config % of Price
+            spread_limit = self.config.get('spread_limit', 0.0005)
+            max_spread_allowed = price * spread_limit
             
             # Hard cap minimum for Forex
             if max_spread_allowed < 0.00050: max_spread_allowed = 0.00050
@@ -74,7 +75,7 @@ class ExecutionEngine:
             
             spread = ask - bid
             if spread > max_spread_allowed:
-                 logger.warning(f"SPREAD GUARD: Refused. Spread {spread:.3f} > {max_spread_allowed:.3f} (0.05% of Price).")
+                 logger.warning(f"SPREAD GUARD: Refused. Spread {spread:.3f} > {max_spread_allowed:.3f} ({spread_limit*100:.2f}% of Price).")
                  return None # Changed from False to None to match original function's return type on refusal
         
         sl = price - sl_dist if cmd_type == 0 else price + sl_dist

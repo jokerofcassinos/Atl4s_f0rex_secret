@@ -37,10 +37,12 @@ class OmegaSystem:
         self.burst_tracker = {} # Burst Execution Manager
         
         # User Configuration (Defaults)
+        # These are overwritten by Profile Selection
         self.config = {
             "virtual_sl": 40.0,
             "virtual_tp": 3.0,
-            "mode": "SNIPER" # SNIPER or WOLF_PACK
+            "mode": "SNIPER",
+            "spread_limit": 0.05
         }
         
     def interactive_startup(self):
@@ -48,36 +50,72 @@ class OmegaSystem:
         print("   OMEGA PROTOCOL v4.0 - SINGULARITY EDITION   ")
         print("="*50)
         
+        # --- PROFILE SELECTION ---
+        print("\nSelect Operational Profile:")
+        print("1. CRYPTO (Weekend/Volatile) - High SL/TP, Wide Spreads")
+        print("2. FOREX/GOLD (Weekday/Normal) - Tight SL/TP, Low Spreads")
+        
         try:
-            # 1. Virtual SL
-            vsl_input = input(f"Virtual SL ($) [Default: {self.config['virtual_sl']}]: ").strip()
-            if vsl_input: self.config['virtual_sl'] = float(vsl_input)
+            profile_sel = input("Selection [1/2]: ").strip()
+        except:
+            profile_sel = "1"
             
-            # 2. Virtual TP
-            vtp_input = input(f"Virtual TP ($) [Default: {self.config['virtual_tp']}]: ").strip()
-            if vtp_input: self.config['virtual_tp'] = float(vtp_input)
+        if profile_sel == "2":
+            print(">> PROFILE: FOREX/GOLD ACTIVATED.")
+            self.symbol = "XAUUSD" # Reset to Gold
+            self.config["virtual_sl"] = 10.0  # Tight SL on Gold ($10)
+            self.config["virtual_tp"] = 2.0   # Quick Scalp ($2)
+            self.config["spread_limit"] = 0.02 # 0.02% limit (~0.40 on 2000)
             
-            # 3. Mode Selection
-            print("\nSelect Operational Mode:")
-            print("1. SNIPER (Precision, 1 Order per Signal)")
-            print("2. WOLF PACK (Aggressive, Scaled Burst Execution)")
-            mode_input = input("Selection [1/2]: ").strip()
+            # Update Opportunity Flow
+            self.flow_manager.active_symbols = ["XAUUSD", "XAUAUD", "XAUEUR"]
             
-            if mode_input == "2":
-                self.config['mode'] = "WOLF_PACK"
-                print(">> WOLF PACK MODE ENGAGED. UNLEASH THE HOUNDS.")
-            else:
-                self.config['mode'] = "SNIPER"
-                print(">> SNIPER MODE ENGAGED. ONE SHOT, ONE KILL.")
-                
-        except ValueError:
-            print("Invalid Input. Using Defaults.")
+        else:
+            print(">> PROFILE: CRYPTO ACTIVATED.")
+            self.symbol = "ETHUSD" # Default Crypto
+            self.config["virtual_sl"] = 40.0 # Wide SL for Crypto
+            self.config["virtual_tp"] = 5.0  # Bigger moves
+            self.config["spread_limit"] = 0.05 # 0.05% limit
             
-        print(f"\nConfiguration Loaded: VSL=${self.config['virtual_sl']} | VTP=${self.config['virtual_tp']} | Mode={self.config['mode']}")
+            # Update Opportunity Flow
+            self.flow_manager.active_symbols = ["ETHUSD", "BTCUSD"]
+            
+        
+        print(f"Virtual SL ($) [Default: {self.config['virtual_sl']}]:")
+        try:
+            vsl_in = input().strip()
+            if vsl_in: self.config['virtual_sl'] = float(vsl_in)
+        except: pass
+            
+        print(f"Virtual TP ($) [Default: {self.config['virtual_tp']}]:")
+        try:
+            vtp_in = input().strip()
+            if vtp_in: self.config['virtual_tp'] = float(vtp_in)
+        except: pass
+
+        print("\nSelect Operational Mode:")
+        print("1. SNIPER (Precision, 1 Order per Signal)")
+        print("2. WOLF PACK (Aggressive, Scaled Burst Execution)")
+        try:
+            sel = input("Selection [1/2]: ").strip()
+            if sel == "2": self.config['mode'] = "WOLF_PACK"
+            else: self.config['mode'] = "SNIPER"
+        except: pass
+        
+        if self.config['mode'] == "WOLF_PACK":
+             print(">> WOLF PACK MODE ENGAGED. UNLEASH THE HOUNDS.")
+        else:
+             print(">> SNIPER MODE ENGAGED. ONE SHOT, ONE KILL.")
+
+        print(f"\nConfiguration Loaded: Profile={self.symbol} | VSL=${self.config['virtual_sl']} | VTP=${self.config['virtual_tp']} | Mode={self.config['mode']}")
         print("="*50 + "\n")
 
     async def boot_sequence(self):
         logger.info("Initializing Omega Protocol...")
+        
+        # Phase 102: Inject Configuration into Executor
+        self.executor.set_config(self.config)
+        
         await self.cortex.initialize_swarm()
         logger.info("Cortex Online.")
         logger.info("System Ready. Waiting for Market Data...")
