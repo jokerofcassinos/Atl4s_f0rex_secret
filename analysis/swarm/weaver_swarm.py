@@ -28,8 +28,8 @@ class WeaverSwarm(SubconsciousUnit):
         
     async def process(self, context: Dict[str, Any]) -> Optional[SwarmSignal]:
         # 1. Gather Intelligence
-        # We look at recent thoughts. The Bus flushes them on call.
-        thoughts = self.bus.get_recent_thoughts()
+        # We look at recent thoughts. Use PEEK to avoid stealing data from NeuralLace.
+        thoughts = self.bus.peek_thoughts()
         
         if not thoughts: return None
         

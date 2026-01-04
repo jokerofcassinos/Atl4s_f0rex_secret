@@ -75,10 +75,17 @@ class LaplaceSwarm(SubconsciousUnit):
         
         for t in range(max_steps):
             # Force Balance: F_net = F_inertial - F_friction
-            # F_friction opposes Velocity
             
-            # Friction Force
-            f_friction = -1.0 * np.sign(sim_v) * friction_coeff * (sim_v**2) # Quadratic drag? Or Linear?
+            # Crash Protection: Clamp velocity to prevent overflow
+            sim_v = max(-1000.0, min(1000.0, sim_v))
+            
+            # Friction Force (Hybrid Model)
+            # Low speed = Linear (Stokes), High speed = Quadratic (Turbulent)
+            if abs(sim_v) < 10:
+                f_friction = -1.0 * friction_coeff * sim_v
+            else:
+                # Use Linear for high speed loop to avoid V^2 explosion, or heavily damped V^2
+                f_friction = -1.0 * np.sign(sim_v) * friction_coeff * (abs(sim_v) ** 1.5) 
             
             # Update Velocity (v = u + at) -> but force based
             # a = F/m
@@ -89,6 +96,9 @@ class LaplaceSwarm(SubconsciousUnit):
             
             # Effective Acceleration this step
             eff_a = sim_a + (f_friction / mass)
+            
+            # Validate eff_a to prevent NaN
+            if np.isnan(eff_a) or np.isinf(eff_a): eff_a = 0.0
             
             sim_v += eff_a * time_step
             sim_p += sim_v * time_step

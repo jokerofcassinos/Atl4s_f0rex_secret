@@ -45,4 +45,8 @@ class ConsciousnessBus:
         self.memory_stream = [] # Flush short-term memory after reading
         return thoughts
 
+    def peek_thoughts(self) -> List[SwarmSignal]:
+        """Retrieves recent thoughts WITHOUT clearing (ReadOnly)."""
+        return list(self.memory_stream)
+
 print("ConsciousnessBus Online.")

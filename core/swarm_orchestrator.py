@@ -230,6 +230,7 @@ class SwarmOrchestrator:
         self.active_agents.append(LaplaceSwarm())
         self.active_agents.append(PhysarumSwarm())
         self.active_agents.append(SingularitySwarm())
+        self.active_agents.append(NeuralLace(self.bus))
         
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         
