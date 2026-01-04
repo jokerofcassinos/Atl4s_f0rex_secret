@@ -155,19 +155,17 @@ class OmegaSystem:
                         # 1. SURGICAL PRIORITY: Close the big winner first.
                         # Uses Dynamic VTP from Config
                         if best_profit_guard > self.config['virtual_tp']:
-                             best_ticket = tick.get('best_ticket')
-                             logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > ${self.config['virtual_tp']}. CLOSING TICKET {best_ticket}.")
+                             logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > ${self.config['virtual_tp']}. HARVESTING WINNERS.")
                              
-                             # Dynamic Closure Logic
-                             # Try primary symbol first
-                             self.executor.close_trade(best_ticket, self.symbol)
+                             # Harvest Winners for Primary
+                             self.executor.harvest_winners(self.symbol)
                              
-                             # Try all other active symbols (Just in case the ticket belongs to them)
+                             # Harvest Winners for Basket (Just in case)
                              for sec_symbol in self.flow_manager.active_symbols:
                                  if sec_symbol != self.symbol:
-                                     self.executor.close_trade(best_ticket, sec_symbol)
+                                     self.executor.harvest_winners(sec_symbol)
                                  
-                             await asyncio.sleep(0.2) 
+                             await asyncio.sleep(0.5) 
                              continue 
                              
                         # 2. GUARDIAN VIRTUAL SL (Phase 94 - Emergency Layer)

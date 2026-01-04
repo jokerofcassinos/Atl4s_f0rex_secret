@@ -153,6 +153,14 @@ class ExecutionEngine:
         if self.bridge:
             self.bridge.send_command("PRUNE_LOSERS", [symbol])
 
+    def harvest_winners(self, symbol: str):
+        """
+        Surgically removes only winning positions (taking profit).
+        """
+        logger.warning(f"EXECUTION: HARVESTING WINNERS for {symbol}")
+        if self.bridge:
+            self.bridge.send_command("HARVEST_WINNERS", [symbol])
+
     def close_longs(self, symbol: str):
         logger.warning(f"EXECUTION: Closing LONGS for {symbol}")
         if self.bridge: self.bridge.send_command("CLOSE_BUYS", [symbol])

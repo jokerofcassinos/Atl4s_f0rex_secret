@@ -303,11 +303,28 @@ void ProcessCommand(string json) {
                 string sym = PositionGetSymbol(i);
                 double profit = PositionGetDouble(POSITION_PROFIT);
                 
-                // If Target matches (or ALL) AND Profit is negative (Loss > Spread Buffer)
-                // We use -0.50 as a buffer to avoid closing trades that are just fighting spread.
                 if((target_sym == "ALL" || sym == target_sym) && profit < -0.50) {
                      trade.PositionClose(ticket);
                      Print("Pruned Losing Ticket ", ticket, " ($", profit, ")");
+                }
+            }
+        }
+    }
+    else if(action == "HARVEST_WINNERS") {
+        // HARVEST_WINNERS|SYMBOL (or ALL)
+        string target_sym = parts[1];
+        Print("HARVESTING WINNERS for ", target_sym);
+        
+        for(int i=PositionsTotal()-1; i>=0; i--) {
+            ulong ticket = PositionGetTicket(i);
+            if(PositionSelectByTicket(ticket)) {
+                string sym = PositionGetSymbol(i);
+                double profit = PositionGetDouble(POSITION_PROFIT);
+                
+                // If Target matches (or ALL) AND Profit is positive (Secure the bag)
+                if((target_sym == "ALL" || sym == target_sym) && profit > 0.50) {
+                     trade.PositionClose(ticket);
+                     Print("Harvested Winning Ticket ", ticket, " ($", profit, ")");
                 }
             }
         }
