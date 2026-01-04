@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List
-from .base_swarm import BaseSwarm
-from core.ratios_library import calculate_metrics
+from core.interfaces import SubconsciousUnit, SwarmSignal
+import time
 
-class CausalSwarm(BaseSwarm):
+class CausalSwarm(SubconsciousUnit):
     """
     Phase 105: The Causal Nexus.
     
@@ -21,10 +21,9 @@ class CausalSwarm(BaseSwarm):
     def __init__(self, name: str = "Causal_Nexus", lookback: int = 50):
         super().__init__(name)
         self.lookback = lookback
-        self.correlation_matrix = {}
         self.driver_symbol = None
         
-    async def process(self, context: Dict[str, Any]) -> Any:
+    async def process(self, context: Dict[str, Any]) -> SwarmSignal:
         """
         Context must contain 'basket_data': Dict[symbol, DataFrame]
         """
@@ -57,7 +56,10 @@ class CausalSwarm(BaseSwarm):
              return None
 
         # 2. Compute Correlation Matrix
-        corr_matrix = aligned_prices.corr()
+        try:
+            corr_matrix = aligned_prices.corr()
+        except:
+            return None
         
         # 3. Identify Driver (Centrality)
         # The asset with the highest sum of absolute correlations is the most connected.
@@ -72,6 +74,8 @@ class CausalSwarm(BaseSwarm):
         # 4. Analyze Driver Direction
         driver_price = aligned_prices[top_driver]
         
+        if driver_price.empty: return None
+        
         # Simple Trend: ROC of Driver
         start = driver_price.iloc[0]
         end = driver_price.iloc[-1]
@@ -80,9 +84,21 @@ class CausalSwarm(BaseSwarm):
         
         roc = (end - start) / start * 100
         
-        # 5. Generate Signal for CURRENT Symbol (self.symbol is context['symbol'])
-        target_symbol = context.get('symbol')
+        # 5. Generate Signal for CURRENT Symbol (context('symbol') is usually passed in args, 
+        # but context is a dict. The target symbol usually comes from context['symbol'] if available.
+        # If not, we check if we can infer it.)
         
+        # Swarm Orchestrator context composition:
+        # process_tick(self, tick, context, config)
+        # context generally includes 'symbol' if we added it?
+        # Typically the 'tick' has 'symbol'.
+        
+        target_symbol = context.get('symbol')
+        if not target_symbol:
+             # Try getting from tick
+             tick = context.get('tick')
+             if tick: target_symbol = tick.get('symbol')
+             
         if not target_symbol: return None
         if target_symbol not in corr_matrix.columns: return None
         
@@ -125,13 +141,12 @@ class CausalSwarm(BaseSwarm):
         conf = min(99.0, max(0.0, conf))
         
         if signal != "WAIT":
-            from .base_swarm import SwarmSignal
             return SwarmSignal(
                 signal_type=signal,
                 confidence=conf,
                 source=self.name,
                 meta_data=meta,
-                timestamp=context.get('timestamp')
+                timestamp=time.time()
             )
             
         return None
