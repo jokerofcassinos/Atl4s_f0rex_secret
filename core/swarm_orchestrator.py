@@ -158,11 +158,11 @@ class SwarmOrchestrator:
         self.active_agents.append(EventHorizonSwarm())
         self.active_agents.append(GravitySwarm())
         
-        self.active_agents.append(WeaverSwarm())
+        self.active_agents.append(WeaverSwarm(self.bus))
         self.active_agents.append(LaplaceSwarm())
         self.active_agents.append(PhysarumSwarm())
         self.active_agents.append(SingularitySwarm())
-        self.active_agents.append(NeuralLace())
+        self.active_agents.append(NeuralLace(self.bus))
         self.active_agents.append(CausalSwarm())
         
         # Phase 111-115
