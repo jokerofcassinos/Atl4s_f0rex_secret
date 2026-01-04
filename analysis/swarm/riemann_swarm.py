@@ -1,136 +1,127 @@
 
-import logging
 import numpy as np
-import pandas as pd
-from typing import Dict, Any, List
+import logging
+from typing import Dict, Any, Optional
 from core.interfaces import SubconsciousUnit, SwarmSignal
-import time
 
 logger = logging.getLogger("RiemannSwarm")
 
 class RiemannSwarm(SubconsciousUnit):
     """
-    Phase 90: The Riemann Swarm (Curvature of Spacetime).
+    Phase 115: The Riemann Zeta Swarm (Prime Harmonics).
     
-    Treats the Market as a Curved Riemannian Manifold.
+    "The Market is Music. Primes are the Notes."
     
-    Physics:
-    - In General Relativity, gravity is the curvature of spacetime.
-    - Positive Curvature (Sphere): Parallel geodesics converge. (Gravity / Mean Reversion).
-    - Negative Curvature (Saddle/Hyperbolic): Parallel geodesics diverge. (Expansion / Trend).
-    
-    Logic:
-    - We track two 'geodesics' (paths):
-      1. Slow Path (SMA 20) - The 'inertial' frame.
-      2. Fast Path (EMA 20) - The 'accelerated' frame.
-    - Separation Vector (Jacobi Field) J = Fast - Slow.
-    - Sectional Curvature K is related to the second derivative of separation.
-      d2J/dt2 + K*J = 0 (Jacobi Equation).
-      So K ~ -(Acceleration of Separation) / Separation.
-      
-    - If Separation is accelerating AWAY (Diverging faster than linear) -> K is Negative (Hyperbolic).
-      -> SIGNAL: TREND EXPANSION.
-      
-    - If Separation is accelerating TOWARDS (Converging) -> K is Positive (Spherical).
-      -> SIGNAL: MEAN REVERSION / CONSOLIDATION.
+    Uses Spectral Analysis (FFT) to detect if market cycles align with Prime Numbers.
+    - Coherence: Power(Primes) / Power(Total).
+    - Signal: Phase of the Dominant Prime Harmonic.
     """
+    
     def __init__(self):
         super().__init__("Riemann_Swarm")
-
-    async def process(self, context) -> SwarmSignal:
-        df_m5 = context.get('df_m5')
-        if df_m5 is None or len(df_m5) < 50: return None
+        self.primes = [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53]
+        self.min_data_points = 60 # Need at least 60 candles for FFT clarity
         
-        closes = df_m5['close']
-        
-        # 1. Define Geodesics
-        sma = closes.rolling(window=20).mean()
-        ema = closes.ewm(span=20, adjust=False).mean()
-        
-        # 2. Calculate Separation Vector (J)
-        # J = EMA - SMA
-        separation = ema - sma
-        
-        # We need the derivatives of separation Magnitude |J|
-        # J_t = first derivative (Velocity of separation)
-        # J_tt = second derivative (Acceleration of separation)
-        
-        sep_values = separation.values
-        
-        # Use last 10 points for smooth derivative
-        if len(sep_values) < 10: return None
-        
-        # First Derivative (Velocity of Spread)
-        vel_sep = np.gradient(sep_values)
-        
-        # Second Derivative (Acceleration of Spread)
-        acc_sep = np.gradient(vel_sep)
-        
-        # 3. Estimate Sectional Curvature (K)
-        # From Jacobi Eq: J'' + KJ = 0  => K = -J'' / J
-        # We clamp J to avoid division by zero
-        
-        current_J = sep_values[-1]
-        current_acc = acc_sep[-1]
-        
-        if abs(current_J) < 0.0001: 
-            K = 0 # Flat space
-        else:
-            K = -current_acc / current_J
+    async def process(self, context: Dict[str, Any]) -> Optional[SwarmSignal]:
+        candles = context.get('candles')
+        if candles is None or len(candles) < self.min_data_points:
+            return None
             
-        # 4. Interpret Curvature
+        # Extract Closing Prices
+        closes = candles['close'].values
         
-        signal = "WAIT"
-        confidence = 0.0
-        reason = ""
-        meta_data = {}
+        # 1. Detrending (Remove linear trend to find cycles)
+        x = np.arange(len(closes))
+        p = np.polyfit(x, closes, 1)
+        trend = np.polyval(p, x)
+        detrended = closes - trend
         
-        # Determine Trend Direction from EMA
-        trend_direction = "BUY" if ema.iloc[-1] > ema.iloc[-2] else "SELL"
+        # 2. Fast Fourier Transform (FFT)
+        # Transform Time Domain to Frequency Domain
+        fft_vals = np.fft.rfft(detrended)
+        fft_freq = np.fft.rfftfreq(len(detrended))
         
-        # Case A: K is Negative (Hyperbolic)
-        # Separation is accelerating away. (J and J'' have same sign? No, K = -J''/J. If J'' and J same sign, K negative).
-        # Example: J > 0 and accelerating up (J'' > 0) -> K < 0.
-        # This means Divergence -> TREND.
+        # Power Spectrum
+        power = np.abs(fft_vals) ** 2
         
-        if K < -0.1:
-            # Hyperbolic Expansion.
-            # The space is stretching.
-            signal = trend_direction
-            confidence = 85.0
-            reason = f"RIEMANN: Negative Curvature (K={K:.2f}). Hyperbolic Expansion. Trend accelerating."
+        # 3. Find Dominant Cycles
+        # Convert Freq to Period (Candles)
+        # Period = 1 / Freq
+        # Ignore DC component (index 0)
+        
+        valid_indices = np.where(fft_freq > 0)[0]
+        periods = 1 / fft_freq[valid_indices]
+        powers = power[valid_indices]
+        
+        # Sort by Power
+        # Get Top 3 Dominant Cycles
+        sorted_indices = np.argsort(powers)[::-1]
+        top_indices = sorted_indices[:3]
+        
+        total_power = np.sum(powers)
+        prime_power = 0.0
+        dominant_signal = "WAIT"
+        dominant_conf = 0.0
+        
+        # Track buy/sell pressure from primes
+        score_buy = 0.0
+        score_sell = 0.0
+        
+        reason_parts = []
+        
+        # 4. Check Prime Alignment (Riemann Hypothesis heuristic)
+        for idx in top_indices:
+            cycle_len = periods[idx]
+            cycle_power = powers[idx]
             
-        # Case B: K is Positive (Spherical)
-        # Separation is decelerating or reversing. (J > 0 but J'' < 0).
-        # Gravity is pulling them back together.
+            # Check proximity to nearest Prime
+            nearest_prime = min(self.primes, key=lambda x: abs(x - cycle_len))
+            error = abs(cycle_len - nearest_prime)
+            
+            # If error is small (< 15%), we have Harmonic Resonance
+            if error < (nearest_prime * 0.15):
+                score = (cycle_power / total_power) * 100
+                prime_power += score
+                
+                # Determine Phase (Are we at Top or Bottom of this Prime Wave?)
+                # Phase angle of FFT component
+                phase = np.angle(fft_vals[valid_indices[idx]])
+                
+                # Derivative (Slope) at t_last determines direction
+                t_last = len(detrended) - 1
+                freq = fft_freq[valid_indices[idx]]
+                omega = 2 * np.pi * freq
+                slope = -omega * np.sin(omega * t_last + phase)
+                
+                direction = "UP" if slope > 0 else "DOWN"
+                reason_parts.append(f"P({nearest_prime})->{direction}")
+                
+                if slope > 0:
+                     score_buy += score
+                else:
+                     score_sell += score
         
-        elif K > 0.1:
-            # Spherical Closure.
-            # The space is closing in.
-            # This suggests the Trend is ending or Reverting.
+        # 5. Synthesis
+        if prime_power > 10.0: # 10% of energy in Primes
+            if score_buy > score_sell:
+                dominant_signal = "BUY"
+                dominant_conf = score_buy * 2.0 # Amplify impact
+            elif score_sell > score_buy:
+                dominant_signal = "SELL"
+                dominant_conf = score_sell * 2.0
             
-            signal = "SELL" if trend_direction == "BUY" else "BUY" # Reversal
-            confidence = 80.0
-            reason = f"RIEMANN: Positive Curvature (K={K:.2f}). Spherical Closure. Geodesics converging (Reversal)."
+            meta = {
+                'prime_energy': prime_power,
+                'harmonics': ", ".join(reason_parts)
+            }
+            logger.info(f"RIEMANN ZETA: Prime Harmonics (Energy: {prime_power:.1f}%). {meta['harmonics']}")
             
-        else:
-            # Flat Space (Euclidean)
-            # Constant velocity separation?
-            pass
-
-        meta_data = {
-            'curvature_K': K,
-            'separation': current_J,
-            'reason': reason
-        }
-
-        if signal != "WAIT":
-             return SwarmSignal(
+            return SwarmSignal(
                 source=self.name,
-                signal_type=signal,
-                confidence=confidence,
-                timestamp=time.time(),
-                meta_data=meta_data
+                signal_type=dominant_signal,
+                confidence=min(dominant_conf, 95.0), 
+                timestamp=None, 
+                meta_data=meta
             )
             
         return None

@@ -52,6 +52,10 @@ from analysis.swarm.news_swarm import NewsSwarm
 from analysis.swarm.zero_point_swarm import ZeroPointSwarm
 from analysis.swarm.active_inference_swarm import ActiveInferenceSwarm
 from analysis.swarm.hawking_swarm import HawkingSwarm
+# Phase 111-114 imports
+from analysis.swarm.news_swarm import NewsSwarm
+# Phase 115
+from analysis.swarm.riemann_swarm import RiemannSwarm
 from analysis.swarm.event_horizon_swarm import EventHorizonSwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
@@ -241,9 +245,50 @@ class SwarmOrchestrator:
         self.active_agents.append(NewsSwarm())
         self.active_agents.append(ZeroPointSwarm())
         self.active_agents.append(ActiveInferenceSwarm())
-        self.active_agents.append(HawkingSwarm())
+        self.riemann_swarm = RiemannSwarm()
+
+        # --- Swarm Registration ---
+        self.swarms = [
+            self.game_swarm,
+            self.fractal_swarms[0], # Fractal Vision
+            self.sentiment_swarm,
+            self.counterfactual_engine,
+            self.spectral_swarm,
+            self.manifold_swarm,
+            self.scalper_swarm,
+            self.architect,
+            self.time_knife,
+            self.nexus,
+            self.event_horizon, # Phase 110 (Hawking)
+            self.gravity_swarm,
+            self.strange_attractor,
+            self.akashic_swarm,
+            self.gaussian_process,
+            self.thermo_swarm,
+            self.mirror_swarm,
+            self.kinematic_swarm,
+            self.dna_swarm, 
+            self.navier_stokes,
+            self.superluminal_swarm,
+            self.boltzmann_swarm,
+            self.fermi_swarm,
+            self.bose_einstein, # Phase 93
+            self.schrodinger_newton, # Phase 94
+            self.tachyon_swarm, # Phase 95
+            self.penrose_swarm, # Phase 106
+            self.riemann_swarm, # Phase 115
+            
+            # --- Meta-Cognitive Layers ---
+            self.weaver_swarm,   # Phase 97
+            self.laplace_swarm,  # Phase 98
+            self.physarum_swarm, # Phase 99
+            self.active_inference, # Phase 109
+            self.neural_lace,     # Phase 101
+            self.news_swarm,      # Phase 107 (Oracle)
+            self.zero_point_swarm # Phase 108
+        ]
         
-        logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
+        logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units (Legacy) + {len(self.swarms)} Advanced Units.")
         
         self.state = "CONSCIOUS"
         logger.info("State: CONSCIOUS. Waiting for Input.")
@@ -421,22 +466,24 @@ class SwarmOrchestrator:
         thoughts = self.bus.get_recent_thoughts()
         if not thoughts: return None
         
-        # --- PHASE 111 & 112: THE OMEGA POINT (MACRO-PHYSICS ARBITRATION) ---
+        # --- PHASE 114: THE BALANCE OF POWER (SOFT ARBITRATION) ---
         allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_ALL", "EXIT_LONG", "EXIT_SHORT", "VETO"]
         macro_bias_reason = ""
         strong_macro = False
+        macro_score = 0.0
         
         for t in thoughts:
             if t.source == "News_Swarm" and hasattr(t, 'meta_data'):
-                bias = t.meta_data.get('bias', 0.0)
-                # Phase 112: Raised Threshold to 0.4 (Only Strong News blocks Physics)
-                if bias > 0.40: 
+                macro_score = t.meta_data.get('bias', 0.0)
+                # Phase 114: Adaptive Thresholds
+                # We only "Hard Block" if News is EXTREME (> 0.60)
+                if macro_score > 0.60: 
                     allowed_actions = ["BUY", "WAIT", "EXIT_SHORT", "EXIT_ALL"]
-                    macro_bias_reason = f"Macro Bullish ({bias:.2f})"
+                    macro_bias_reason = f"Extreme Bullish News ({macro_score:.2f})"
                     strong_macro = True
-                elif bias < -0.40:
+                elif macro_score < -0.60:
                     allowed_actions = ["SELL", "WAIT", "EXIT_LONG", "EXIT_ALL"]
-                    macro_bias_reason = f"Macro Bearish ({bias:.2f})"
+                    macro_bias_reason = f"Extreme Bearish News ({macro_score:.2f})"
                     strong_macro = True
 
         # 1. Physics Reality Check (Phase 65: Clash of Gods)
@@ -445,12 +492,17 @@ class SwarmOrchestrator:
              action = physics_decision[0]
              conf = physics_decision[1]
              
-             # PHASE 112: THE PROPHET CLAUSE
-             # If Physics is > 98% (Hawking Singularity), it overrides even Strong News.
+             # PHASE 112: THE PROPHET CLAUSE (Infinite Certainty)
              if conf > 98.0:
-                 logger.info(f"PHYSICS SINGULARITY ({conf}%): Overriding everything, including News.")
+                 logger.info(f"PHYSICS SINGULARITY ({conf}%): Overriding everything.")
                  return (action, conf, physics_decision[2])
 
+             # PHASE 114: HIGH CONFIDENCE OVERRIDE
+             # If Physics is Strong (> 85%) and News is not Extreme (< 0.6), Physics Wins.
+             if conf > 85.0 and not strong_macro:
+                   logger.info(f"PHYSICS DOMINANCE: {action} ({conf}%) > Medium News ({macro_score}). Executing.")
+                   return (action, conf, physics_decision[2])
+                   
              if action not in allowed_actions:
                   logger.warning(f"PHYSICS BLOCKED BY MACRO: {action} denied due to {macro_bias_reason}.")
                   if action == "SELL" and "EXIT_SHORT" in allowed_actions:
@@ -483,25 +535,26 @@ class SwarmOrchestrator:
             
             weights = self.neuroplasticity.get_dynamic_weights()
             
-            active_signals_list = []
+            # active_signals_list = []
 
             for t in thoughts:
                 w = weights.get(t.source, 1.0)
                 if t.signal_type == "BUY": 
                     score_buy += t.confidence * w
-                    active_signals_list.append(t)
+                    # active_signals_list.append(t)
                 elif t.signal_type == "SELL": 
                     score_sell += t.confidence * w
-                    active_signals_list.append(t)
+                    # active_signals_list.append(t)
                 total_weight += w
             
             # Simple Synthesis
             final_decision = "WAIT"
             final_score = 0
             
+            if total_weight == 0: total_weight = 1.0
+
             if score_buy > score_sell:
-                raw_score = score_buy
-                # Normalize? Just check threshold
+                raw_score = score_buy # Normalize? Just check threshold
                 if raw_score > (total_weight * 25): # Rough threshold heuristic
                      final_decision = "BUY"
                      final_score = 80 # Conceptual

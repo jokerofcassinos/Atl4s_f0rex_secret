@@ -84,6 +84,10 @@ class ActiveInferenceSwarm(SubconsciousUnit):
         
         self.mu_2 += (self.learning_rate * 0.1) * epsi_2 # Slower update for Vol
         
+        # Stability Clamp (Phase 114 Fix)
+        # Avoid explosion of volatility belief
+        self.mu_2 = np.clip(self.mu_2, -5.0, 5.0) 
+        
         # --- INFERENCE ---
         
         # We track "Surprise" (Free Energy). 
