@@ -169,62 +169,28 @@ class OmegaSystem:
                     if 'last' not in tick:
                         tick['last'] = (tick['bid'] + tick['ask']) / 2
 
-                    # --- 0. EMERGENCY GUARDIAN (Latency Bypass) ---
-                    # CRITICAL: If profit is secured, skipping ALL heavy calculation/IO to close immediately.
-                    current_profit_guard = tick.get('profit', 0.0)
-                    best_profit_guard = tick.get('best_profit', -999.0)
-                    positions_guard = tick.get('positions', 0)
+                    # --- 0. INDIVIDUAL GUARDIAN (Latency Bypass) ---
+                    # Phase 122: Per-Order Management (No more "Stop All")
                     
-                    if positions_guard > 0:
-                        # DEBUG: What does Guardian see?
-                        # logger.info(f"GUARDIAN SCAN: BestProfit=${best_profit_guard:.2f} (Target=${self.config['virtual_tp']}) TotalProfit=${current_profit_guard:.2f}")
-
-                        # 1. SURGICAL PRIORITY: Close the big winner first.
-                        # Uses Dynamic VTP from Config
-                        if best_profit_guard > self.config['virtual_tp']:
-                             logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > ${self.config['virtual_tp']}. HARVESTING WINNERS.")
-                             
-                             # Harvest Winners for Primary
-                             self.executor.harvest_winners(self.symbol)
-                             
-                             # Harvest Winners for Basket (Just in case)
-                             for sec_symbol in self.flow_manager.active_symbols:
-                                 if sec_symbol != self.symbol:
-                                     self.executor.harvest_winners(sec_symbol)
-                                 
-                             await asyncio.sleep(0.5) 
-                             continue 
-                             
-                        # 2. GUARDIAN VIRTUAL SL (Phase 94 - Emergency Layer)
-                        # Uses Dynamic VSL from Config
-                        # If we bleed too much, cut the basket blindly.
-                        limit = -abs(self.config['virtual_sl']) # Ensure negative
-                        if current_profit_guard < limit:
-                             logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < ${limit}. SURGICAL PRUNING INITIATED.")
-                             
-                             # Primary Prune
-                             self.executor.prune_losers(self.symbol)
-                             
-                             # Dynamic Basket Prune
-                             for sec_symbol in self.flow_manager.active_symbols:
-                                 if sec_symbol != self.symbol:
-                                     self.executor.prune_losers(sec_symbol)
-
-                             await asyncio.sleep(0.5)
-                             continue
-
-                        # 3. GLOBAL SAFETY Profit (Hardcoded Basket Target)
-                        if current_profit_guard > 15.0:
-                            logger.critical(f"[!] GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $15.00. BASKET EXIT.")
-                            self.executor.close_all(self.symbol)
-                            
-                            # Dynamic Basket Closure
-                            for sec_symbol in self.flow_manager.active_symbols:
-                                if sec_symbol != self.symbol:
-                                    self.executor.close_all(sec_symbol)
-
-                            await asyncio.sleep(0.5)
-                            continue
+                    trades_snapshot = tick.get('trades_json', [])
+                    if trades_snapshot:
+                        # self.config['virtual_tp'] and ['virtual_sl'] are per-trade targets now
+                         self.executor.check_individual_guards(
+                             trades_snapshot, 
+                             self.config['virtual_tp'], 
+                             self.config['virtual_sl']
+                         )
+                         
+                         # Keep Global Catastrophe Guard (Optional, but good for safety)
+                         # Only triggered if Total Profit is absurdly negative (e.g. 5x SL)
+                         total_profit = tick.get('profit', 0.0)
+                         catastrophe_limit = -abs(self.config['virtual_sl']) * 5 
+                         
+                         if total_profit < catastrophe_limit:
+                             logger.critical(f"CATASTROPHE GUARD: Global Equity Dropped to ${total_profit:.2f}. EMERGENCY EJECT.")
+                             self.executor.close_all(self.symbol)
+                             await asyncio.sleep(1.0)
+                             continue # Reboot loop
 
                     # 2. Fetch/Update Context (Dataframes)
                     # Ideally, data_loader handles live updates via tick injection

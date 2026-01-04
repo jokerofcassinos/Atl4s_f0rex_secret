@@ -234,6 +234,32 @@ class ExecutionEngine:
         if self.bridge:
             self.bridge.send_command("HARVEST_WINNERS", [symbol])
 
+    def check_individual_guards(self, trades: list, v_tp: float, v_sl: float):
+        """
+        Phase 122: Granular Guard.
+        Checks each trade individually against Virtual TP and Virtual SL.
+        """
+        if not trades: return
+
+        for trade in trades:
+            ticket = trade.get('ticket')
+            profit = trade.get('profit', 0.0)
+            symbol = trade.get('symbol')
+            
+            # 1. Individual Take Profit (The Snipe)
+            if profit >= v_tp:
+                logger.info(f"INDIVIDUAL GUARD: Harvesting Ticket {ticket} ({symbol}) | Profit ${profit:.2f} >= ${v_tp:.2f}")
+                self.close_trade(ticket, symbol)
+                continue # One action per trade
+
+            # 2. Individual Stop Loss (The Shield)
+            # v_sl is usually positive in config (e.g. $40), so we check against -40
+            limit = -abs(v_sl) 
+            if profit <= limit:
+                logger.info(f"INDIVIDUAL GUARD: Pruning Ticket {ticket} ({symbol}) | Profit ${profit:.2f} <= ${limit:.2f}")
+                self.close_trade(ticket, symbol)
+                continue
+
     def close_longs(self, symbol: str):
         logger.warning(f"EXECUTION: Closing LONGS for {symbol}")
         if self.bridge: self.bridge.send_command("CLOSE_BUYS", [symbol])
