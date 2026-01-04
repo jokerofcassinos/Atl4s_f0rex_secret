@@ -1,6 +1,7 @@
 
 import logging
 import numpy as np
+import time
 from typing import Dict, Any, List, Tuple
 import json
 import os
@@ -135,5 +136,6 @@ class AkashicSwarm(SubconsciousUnit):
             source=self.name,
             signal_type=decision,
             confidence=confidence,
+            timestamp=time.time(), # Added Timestamp
             meta_data={'vector_hash': str(vector[:3])}
         )
