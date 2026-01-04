@@ -303,8 +303,9 @@ void ProcessCommand(string json) {
                 string sym = PositionGetSymbol(i);
                 double profit = PositionGetDouble(POSITION_PROFIT);
                 
-                // If Target matches (or ALL) AND Profit is negative
-                if((target_sym == "ALL" || sym == target_sym) && profit < 0) {
+                // If Target matches (or ALL) AND Profit is negative (Loss > Spread Buffer)
+                // We use -0.50 as a buffer to avoid closing trades that are just fighting spread.
+                if((target_sym == "ALL" || sym == target_sym) && profit < -0.50) {
                      trade.PositionClose(ticket);
                      Print("Pruned Losing Ticket ", ticket, " ($", profit, ")");
                 }

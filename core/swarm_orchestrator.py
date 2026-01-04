@@ -540,8 +540,9 @@ class SwarmOrchestrator:
         Physics Agents have Dominion over Statistical Agents.
         Hierarchy: Singularity (2.5) > Hyperdimensional (2.2) > Vortex (2.1) > Kinematic (2.0)
         """
-        physics_agents = ['SingularitySwarm', 'HyperdimensionalSwarm', 'KinematicSwarm', 'VortexSwarm']
-        high_command = [t for t in thoughts if t.source in physics_agents and t.confidence > 80.0]
+        physics_agents = ['SingularitySwarm', 'HyperdimensionalSwarm', 'KinematicSwarm', 'VortexSwarm', 'Schrodinger_Newton_Swarm']
+        # Tightened Threshold: Physics must be nearly certain (> 95%) to override Consensus.
+        high_command = [t for t in thoughts if t.source in physics_agents and t.confidence > 95.0]
         
         if not high_command: return None
         
@@ -549,7 +550,8 @@ class SwarmOrchestrator:
         # We need a map or just hardcode hierarchy
         hierarchy = {
             'SingularitySwarm': 3, 
-            'HyperdimensionalSwarm': 2.5, 
+            'HyperdimensionalSwarm': 2.5,
+            'Schrodinger_Newton_Swarm': 2.4, # High Authority due to Gravity Model
             'VortexSwarm': 2.2,
             'KinematicSwarm': 1
         }
