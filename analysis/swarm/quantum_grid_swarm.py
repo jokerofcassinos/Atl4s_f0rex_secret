@@ -1,45 +1,44 @@
 
 import logging
-import pandas as pd
+from typing import Dict, Any, Optional
 from core.interfaces import SubconsciousUnit, SwarmSignal
+from analysis.thirteenth_eye import ThirteenthEye
+import time
 
 logger = logging.getLogger("QuantumGridSwarm")
 
 class QuantumGridSwarm(SubconsciousUnit):
     """
-    The Micro-Scalper (Time Knife).
-    Operates on M1 Data for high-frequency setups.
+    Quantum Grid Swarm Wrapper (Thirteenth Eye).
+    The Time Knife: M1 Volatility Scalping (Grid).
     """
     def __init__(self):
         super().__init__("Quantum_Grid_Swarm")
+        self.engine = ThirteenthEye()
 
-    async def process(self, context) -> SwarmSignal:
+    async def process(self, context: Dict[str, Any]) -> Optional[SwarmSignal]:
         df_m1 = context.get('df_m1')
-        if df_m1 is None or len(df_m1) < 20: return None
+        if df_m1 is None: return None
         
-        last = df_m1.iloc[-1]
+        current_capital = context.get('balance', 1000.0) # Approx
+        current_time = time.time()
         
-        # 1. Boom Detector
-        # Body > 2x Avg Body
-        body = abs(last['close'] - last['open'])
-        df_m1['body'] = (df_m1['close'] - df_m1['open']).abs()
-        avg_body = df_m1['body'].rolling(10).mean().iloc[-1]
-        
-        if body > (avg_body * 2.5):
-            # BOOM!
-            direction = 1 if last['close'] > last['open'] else -1
-            action = "BUY" if direction == 1 else "SELL"
+        try:
+            res = self.engine.scan_for_reversal(df_m1, current_capital, current_time)
+            if not res: return None
             
-            # Momentum follow
+            signal = res['action']
+            slots = res['slots']
+            reason = res['reason']
+            
             return SwarmSignal(
                 source=self.name,
-                signal_type=action,
-                confidence=95.0, # High Conviction Scalar
-                timestamp=0,
-                meta_data={'reason': f"M1 BOOM: {body:.1f}pts (2.5x Avg)"}
+                signal_type=signal,
+                confidence=99.0, # High Conviction execution
+                timestamp=current_time,
+                meta_data={'slots': slots, 'reason': reason}
             )
+        except Exception as e:
+            logger.debug(f"Quantum Grid Error: {e}")
             
-        # 2. Exhaustion Detector (Fade)
-        # TODO: Implement Bollinger Fade logic here
-        
         return None
