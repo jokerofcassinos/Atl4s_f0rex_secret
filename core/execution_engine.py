@@ -49,12 +49,18 @@ class ExecutionEngine:
         cmd_type = 0 if command == 'BUY' else 1
         price = ask if cmd_type == 0 else bid
         
-        if price < 50: # BTCXAU
+        if price < 50: # LOW PRICE ASSETS (Silver? Cheap Crypto?)
+            # Keep hardcoded for now or adapt if needed
             tp_dist = 0.05 # 5 cents (~$0.50 profit)
             sl_dist = 0.12 # 12 cents (~$1.20 risk)
-        else: # BTCUSD (Price ~90,000)
-             tp_dist = price * 0.001 # 0.1% (~$90)
-             sl_dist = price * 0.002 # 0.2% (~$180)
+        else: 
+             # DYNAMIC LIMITS (Forex / Gold / High Crypto)
+             # Default to 0.1%/0.2% if not in config
+             tp_pct = self.config.get('phys_tp_pct', 0.001)
+             sl_pct = self.config.get('phys_sl_pct', 0.002)
+             
+             tp_dist = price * tp_pct
+             sl_dist = price * sl_pct
              
         # Override for tiny prices 
         if price < 5.0: 

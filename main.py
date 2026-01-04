@@ -66,6 +66,8 @@ class OmegaSystem:
             self.config["virtual_sl"] = 10.0  # Tight SL on Gold ($10)
             self.config["virtual_tp"] = 2.0   # Quick Scalp ($2)
             self.config["spread_limit"] = 0.02 # 0.02% limit (~0.40 on 2000)
+            self.config["phys_sl_pct"] = 0.005 # 0.5% Hard Stop
+            self.config["phys_tp_pct"] = 0.010 # 1.0% Hard Target
             
             # Update Opportunity Flow
             self.flow_manager.active_symbols = ["XAUUSD", "XAUAUD", "XAUEUR"]
@@ -76,6 +78,8 @@ class OmegaSystem:
             self.config["virtual_sl"] = 40.0 # Wide SL for Crypto
             self.config["virtual_tp"] = 5.0  # Bigger moves
             self.config["spread_limit"] = 0.05 # 0.05% limit
+            self.config["phys_sl_pct"] = 0.020 # 2.0% Hard Stop
+            self.config["phys_tp_pct"] = 0.050 # 5.0% Hard Target
             
             # Update Opportunity Flow
             self.flow_manager.active_symbols = ["ETHUSD", "BTCUSD"]
@@ -153,15 +157,14 @@ class OmegaSystem:
                              best_ticket = tick.get('best_ticket')
                              logger.critical(f"[!] GUARDIAN INTERVENTION: SURGICAL PROFIT ${best_profit_guard:.2f} > ${self.config['virtual_tp']}. CLOSING TICKET {best_ticket}.")
                              
-                             # FIX: We don't know the symbol of best_ticket from 'tick' alone.
-                             # But we know it's likely either self.symbol OR 'BTCUSD' (based on user logs).
-                             # We try closing via self.symbol first.
-                             self.executor.close_trade(best_ticket, self.symbol) 
-                             # Redundant Safety: If it's the other symbol, we might need to send to that bridge client?
-                             # For now, let's assume MQL5 'CLOSE_TRADE' can handle ticket regardless of symbol IF we fix MQL5 side.
-                             # But sticking to Python fix:
-                             if self.symbol != "BTCUSD":
-                                 self.executor.close_trade(best_ticket, "BTCUSD")
+                             # Dynamic Closure Logic
+                             # Try primary symbol first
+                             self.executor.close_trade(best_ticket, self.symbol)
+                             
+                             # Try all other active symbols (Just in case the ticket belongs to them)
+                             for sec_symbol in self.flow_manager.active_symbols:
+                                 if sec_symbol != self.symbol:
+                                     self.executor.close_trade(best_ticket, sec_symbol)
                                  
                              await asyncio.sleep(0.2) 
                              continue 
@@ -173,7 +176,12 @@ class OmegaSystem:
                         if current_profit_guard < limit:
                              logger.critical(f"[!] GUARDIAN INTERVENTION: VIRTUAL SL ${current_profit_guard:.2f} < ${limit}. EMERGENCY BASKET EXIT.")
                              self.executor.close_all(self.symbol) # Try primary
-                             self.executor.close_all("BTCUSD")    # Try secondary (Hardcoded for now as quick fix)
+                             
+                             # Dynamic Basket Closure
+                             for sec_symbol in self.flow_manager.active_symbols:
+                                 if sec_symbol != self.symbol:
+                                     self.executor.close_all(sec_symbol)
+
                              await asyncio.sleep(0.5)
                              continue
 
@@ -181,7 +189,12 @@ class OmegaSystem:
                         if current_profit_guard > 15.0:
                             logger.critical(f"[!] GUARDIAN INTERVENTION: GLOBAL PROFIT ${current_profit_guard:.2f} > $15.00. BASKET EXIT.")
                             self.executor.close_all(self.symbol)
-                            if self.symbol != "BTCUSD": self.executor.close_all("BTCUSD")
+                            
+                            # Dynamic Basket Closure
+                            for sec_symbol in self.flow_manager.active_symbols:
+                                if sec_symbol != self.symbol:
+                                    self.executor.close_all(sec_symbol)
+
                             await asyncio.sleep(0.5)
                             continue
 
