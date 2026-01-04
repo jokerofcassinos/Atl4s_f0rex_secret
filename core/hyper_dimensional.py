@@ -12,28 +12,28 @@ D = 10000
 _hdc_lib = None
 try:
     import ctypes
-    import os
-    _dll_path = os.path.join("cpp_core", "hdc_core.dll")
-    if os.path.exists(_dll_path):
-        _hdc_lib = ctypes.CDLL(_dll_path)
-        
-        # void bind_vectors(const int8_t* val_a, const int8_t* val_b, int8_t* result, int size)
-        _hdc_lib.bind_vectors.argtypes = [
-            ctypes.POINTER(ctypes.c_int8), ctypes.POINTER(ctypes.c_int8), 
-            ctypes.POINTER(ctypes.c_int8), ctypes.c_int
-        ]
-        
-        # void bundle_vectors(const int8_t* inputs, int num, int8_t* result, int size)
-        _hdc_lib.bundle_vectors.argtypes = [
-            ctypes.POINTER(ctypes.c_int8), ctypes.c_int, 
-            ctypes.POINTER(ctypes.c_int8), ctypes.c_int
-        ]
-        
-        # double cosine_similarity(const int8_t* val_a, const int8_t* val_b, int size)
-        _hdc_lib.cosine_similarity.argtypes = [
-            ctypes.POINTER(ctypes.c_int8), ctypes.POINTER(ctypes.c_int8), ctypes.c_int
-        ]
-        _hdc_lib.cosine_similarity.restype = ctypes.c_double
+    from core.cpp_loader import load_dll
+    
+    _hdc_lib = load_dll("hdc_core.dll")
+    
+    # void bind_vectors(const int8_t* val_a, const int8_t* val_b, int8_t* result, int size)
+    # void bind_vectors(const int8_t* val_a, const int8_t* val_b, int8_t* result, int size)
+    _hdc_lib.bind_vectors.argtypes = [
+        ctypes.POINTER(ctypes.c_int8), ctypes.POINTER(ctypes.c_int8), 
+        ctypes.POINTER(ctypes.c_int8), ctypes.c_int
+    ]
+    
+    # void bundle_vectors(const int8_t* inputs, int num, int8_t* result, int size)
+    _hdc_lib.bundle_vectors.argtypes = [
+        ctypes.POINTER(ctypes.c_int8), ctypes.c_int, 
+        ctypes.POINTER(ctypes.c_int8), ctypes.c_int
+    ]
+    
+    # double cosine_similarity(const int8_t* val_a, const int8_t* val_b, int size)
+    _hdc_lib.cosine_similarity.argtypes = [
+        ctypes.POINTER(ctypes.c_int8), ctypes.POINTER(ctypes.c_int8), ctypes.c_int
+    ]
+    _hdc_lib.cosine_similarity.restype = ctypes.c_double
         
         # logger.info("HDC: Silicon Memory Active (C++)")
 except Exception as e:

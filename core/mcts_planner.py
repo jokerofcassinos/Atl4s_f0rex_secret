@@ -41,6 +41,15 @@ class MCTSPlanner:
         self.oracle = FractalMonteCarlo()
         self.simulation_depth = 5 # Look 5 steps (candles) ahead
         self.iterations = 50 # Simulations per decision (HFT constrained)
+        
+        # Verify C++ Bridge on Startup
+        try:
+             from core.cpp_loader import load_dll
+             load_dll("mcts_core.dll")
+             logger.info("MCTS ENGINE: C++ CORE ACTIVE [TURBO MODE]")
+        except Exception as e:
+             logger.info("MCTS ENGINE: PYTHON FALLBACK [STANDARD MODE]")
+             # logger.warning(f"MCTS Startup Error: {e}")
 
     def _run_simulation_bridge(self, root_state: Dict, drift: float) -> str:
         """
@@ -49,13 +58,11 @@ class MCTSPlanner:
         # Try Loading C++ DLL
         try:
             import ctypes
-            import os
+            from core.cpp_loader import load_dll
             
-            dll_path = os.path.join("cpp_core", "mcts_core.dll")
-            if not os.path.exists(dll_path):
-                raise FileNotFoundError("DLL not compiled")
-                
-            lib = ctypes.CDLL(dll_path)
+            lib = load_dll("mcts_core.dll")
+            
+            # Signature: run_mcts_simulation(price, entry, dir, vol, drift, iter, depth)
             
             # Signature: run_mcts_simulation(price, entry, dir, vol, drift, iter, depth)
             lib.run_mcts_simulation.argtypes = [
@@ -91,7 +98,7 @@ class MCTSPlanner:
             
         except Exception as e:
             # Fallback to Python
-            # logger.warning(f"MCTS C++ Unavailable ({e}). Using Python Fallback.")
+            logger.warning(f"MCTS C++ Runtime Error ({e}). Using Python Fallback.")
             return self._run_simulation_python(root_state, drift)
 
     def _run_simulation_python(self, root_state: Dict, drift: float) -> str:

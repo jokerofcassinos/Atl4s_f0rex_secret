@@ -154,25 +154,23 @@ class RiemannSwarm(SubconsciousUnit):
     def _calculate_curvature_bridge(self, closes: np.ndarray) -> float:
         """Calculates Sectional Curvature (C++ or Py Fallback)"""
         try:
-             import ctypes
-             import os
-             dll_path = os.path.join("cpp_core", "physics_core.dll")
-             
-             if os.path.exists(dll_path):
-                 lib = ctypes.CDLL(dll_path)
+            import ctypes
+            from core.cpp_loader import load_dll
+            
+            lib = load_dll("physics_core.dll")
+            
+            # double calculate_sectional_curvature(double* prices, int length, int window_size)
+            lib.calculate_sectional_curvature.argtypes = [
+                ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int
+            ]
+            lib.calculate_sectional_curvature.restype = ctypes.c_double
+            
+            # Prepare Array
+            array_type = ctypes.c_double * len(closes)
+            c_closes = array_type(*closes)
                  
-                 # double calculate_sectional_curvature(double* prices, int length, int window_size)
-                 lib.calculate_sectional_curvature.argtypes = [
-                     ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int
-                 ]
-                 lib.calculate_sectional_curvature.restype = ctypes.c_double
-                 
-                 # Prepare Array
-                 array_type = ctypes.c_double * len(closes)
-                 c_closes = array_type(*closes)
-                 
-                 k = lib.calculate_sectional_curvature(c_closes, len(closes), 20)
-                 return k
+            k = lib.calculate_sectional_curvature(c_closes, len(closes), 20)
+            return k
         except Exception:
             pass
             

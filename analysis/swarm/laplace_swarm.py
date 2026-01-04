@@ -68,36 +68,34 @@ class LaplaceSwarm(SubconsciousUnit):
         # Try C++ Acceleration
         cpp_active = False
         try:
-             import ctypes
-             import os
-             dll_path = os.path.join("cpp_core", "physics_core.dll")
-             
-             if os.path.exists(dll_path):
-                 lib = ctypes.CDLL(dll_path)
-                 
-                 class TrajectoryResult(ctypes.Structure):
-                     _fields_ = [
-                         ("terminal_price", ctypes.c_double),
-                         ("max_deviation", ctypes.c_double),
-                         ("steps_taken", ctypes.c_int),
-                         ("total_distance", ctypes.c_double)
-                     ]
-                 
-                 lib.simulate_trajectory.argtypes = [
-                     ctypes.c_double, ctypes.c_double, ctypes.c_double,
-                     ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int
-                 ]
-                 lib.simulate_trajectory.restype = TrajectoryResult
-                 
-                 # Call C++
-                 res = lib.simulate_trajectory(
-                     current_price, v_smooth, acceleration, 
-                     mass, friction_coeff, 1.0, 100
-                 )
-                 
-                 terminal_price = res.terminal_price
-                 cpp_active = True
-                 # logger.debug(f"Laplace [C++]: Terminal {terminal_price:.2f}")
+            import ctypes
+            from core.cpp_loader import load_dll
+            
+            lib = load_dll("physics_core.dll")
+            
+            class TrajectoryResult(ctypes.Structure):
+                _fields_ = [
+                    ("terminal_price", ctypes.c_double),
+                    ("max_deviation", ctypes.c_double),
+                    ("steps_taken", ctypes.c_int),
+                    ("total_distance", ctypes.c_double)
+                ]
+            
+            lib.simulate_trajectory.argtypes = [
+                ctypes.c_double, ctypes.c_double, ctypes.c_double,
+                ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int
+            ]
+            lib.simulate_trajectory.restype = TrajectoryResult
+            
+            # Call C++
+            res = lib.simulate_trajectory(
+                current_price, v_smooth, acceleration, 
+                mass, friction_coeff, 1.0, 100
+            )
+            
+            terminal_price = res.terminal_price
+            cpp_active = True
+            # logger.debug(f"Laplace [C++]: Terminal {terminal_price:.2f}")
                  
         except Exception as e:
             # logger.warning(f"Laplace C++ Error: {e}")
