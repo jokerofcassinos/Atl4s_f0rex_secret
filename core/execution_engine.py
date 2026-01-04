@@ -5,7 +5,7 @@ from typing import Dict, Any
 from risk.dynamic_leverage import DynamicLeverage
 from risk.great_filter import GreatFilter
 
-from risk.event_horizon import EventHorizonRisk
+from core.risk.event_horizon import EventHorizonRisk
 
 logger = logging.getLogger("ExecutionEngine")
 
