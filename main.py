@@ -68,9 +68,10 @@ class OmegaSystem:
             self.config["spread_limit"] = 0.02 # 0.02% limit (~0.40 on 2000)
             self.config["phys_sl_pct"] = 0.005 # 0.5% Hard Stop
             self.config["phys_tp_pct"] = 0.010 # 1.0% Hard Target
+            self.config["phys_tp_pct"] = 0.010 # 1.0% Hard Target
             
             # Update Opportunity Flow
-            self.flow_manager.active_symbols = ["XAUUSD", "XAUAUD", "XAUEUR"]
+            self.flow_manager.active_symbols = ["XAUUSD", "XAUEUR", "XAUGBP", "XAUAUD"]
             
         else:
             print(">> PROFILE: CRYPTO ACTIVATED.")

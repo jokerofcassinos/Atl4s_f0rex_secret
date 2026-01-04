@@ -28,9 +28,12 @@ class DataLoader:
             "XRPUSD": "XRP-USD",
             "LTCUSD": "LTC-USD",
             "BNBUSD": "BNB-USD",
-            "XAUUSD": "GC=F", # Gold Futures (Often better vol than XAUUSD=X) or "XAUUSD=X"
+            "XAUUSD": "GC=F", # Gold Futures (High Volume)
+            "XAUEUR": "XAUEUR=X",
+            "XAUGBP": "XAUGBP=X",
+            "XAUAUD": "XAUAUD=X",
+            "XAUCHF": "XAUCHF=X",
             "XAGUSD": "SI=F", # Silver
-            "EURUSD": "EURUSD=X",
             "GBPUSD": "GBPUSD=X",
             "USDJPY": "USDJPY=X",
             "AUDUSD": "AUDUSD=X",
