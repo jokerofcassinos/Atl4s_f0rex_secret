@@ -89,8 +89,17 @@ class ExecutionEngine:
         
         # 4. Fire
         # Format: "symbol|cmd|lots|sl|tp"
-        params = [symbol, str(cmd_type), f"{lots:.2f}", f"{sl:.2f}", f"{tp:.2f}"]
-        logger.info(f"EXECUTION: {command} {lots} lots @ {price:.2f} | Conf: {confidence:.1f}% | SL: {sl:.2f} TP: {tp:.2f}")
+        
+        # Phase 106: Dynamic Precision
+        params_sl = f"{sl:.2f}"
+        params_tp = f"{tp:.2f}"
+        
+        if price < 50:
+             params_sl = f"{sl:.5f}"
+             params_tp = f"{tp:.5f}"
+        
+        params = [symbol, str(cmd_type), f"{lots:.2f}", params_sl, params_tp]
+        logger.info(f"EXECUTION: {command} {lots} lots @ {price:.5f} | Conf: {confidence:.1f}% | SL: {params_sl} TP: {params_tp}")
         
         if self.bridge:
              self.bridge.send_command("OPEN_TRADE", params)
