@@ -32,6 +32,7 @@ class ZmqBridge:
         self.conn_lock = threading.Lock()
         
         self.latest_tick = None
+        self.latest_trades = [] # Store open trades buffer
         self.buffer = ""
         self.running = True
         
@@ -101,6 +102,9 @@ class ZmqBridge:
                         # Process Data (Update internal state)
                         if fields.get('type') == 'TICK':
                             self.latest_tick = fields
+                        elif fields.get('type') == 'TRADES_JSON':
+                            self.latest_trades = fields.get('trades', [])
+                            # logger.debug(f"Received Trades Update: {len(self.latest_trades)} trades")
                             
         except ConnectionResetError:
             logger.warning(f"Connection Reset: {detected_symbol}")
@@ -160,7 +164,10 @@ class ZmqBridge:
     def get_tick(self):
         # This is simple/naive (last tick from *any* symbol)
         # Main.py might need to filter.
-        return self.latest_tick
+        t = self.latest_tick
+        if t:
+            t['trades_json'] = self.latest_trades
+        return t
 
     def send_command(self, action, params=None):
         """
@@ -209,3 +216,17 @@ class ZmqBridge:
 
     def send_dashboard(self, state):
         pass
+
+    # --- VISUALIZATION COMMANDS ---
+    def send_draw_rect(self, symbol, name, p1, p2, t1, t2, color):
+        # DRAW_RECT|NAME|P1|P2|TIME1|TIME2|COLOR
+        # Need to route to symbol
+        self.send_command("DRAW_RECT", [symbol, name, p1, p2, int(t1), int(t2), color])
+
+    def send_draw_line(self, symbol, name, p1, p2, t1, t2, color):
+        # DRAW_LINE|NAME|P1|P2|TIME1|TIME2|COLOR
+        self.send_command("DRAW_LINE", [symbol, name, p1, p2, int(t1), int(t2), color])
+
+    def send_draw_text(self, symbol, name, price, time, text, color):
+        # DRAW_TEXT|NAME|PRICE|TIME|TEXT|COLOR
+        self.send_command("DRAW_TEXT", [symbol, name, price, int(time), text, color])

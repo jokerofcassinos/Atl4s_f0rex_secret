@@ -40,7 +40,12 @@ class DataLoader:
             "AUDUSD": "AUDUSD=X",
             "USDCAD": "USDCAD=X",
             "USDCHF": "USDCHF=X",
-            "NZDUSD": "NZDUSD=X"
+            "NZDUSD": "NZDUSD=X",
+            "AUDCAD": "AUDCAD=X",
+            "AUDJPY": "AUDJPY=X",
+            "CADJPY": "CADJPY=X",
+            "CNHJPY": "CNHJPY=X",
+            "EURUSD": "EURUSD=X"
         }
         
         if s in mapping:
@@ -163,30 +168,7 @@ class DataLoader:
         return ticker_map.get(symbol, symbol)
 
 
-    def _fetch_single(self, symbol, interval, cache_file, days=55):
-        # YFinance Limits: 1m = 7 days max, 5m = 60 days max.
-        # We set safer defaults.
-        if interval == "1m": days = 5
-        if interval == "5m": days = 55
-        
-        # 1. Load Cache
-        cached_df = self._load_cache(cache_file)
-        
-        if cached_df is not None and not cached_df.empty:
-            last_date = cached_df.index[-1]
-            start_date = (last_date - timedelta(days=1)).strftime('%Y-%m-%d')
-        else:
-            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
 
-        # Map internal symbol using dynamic logic or map
-        ticker_map = {
-            "XAUUSD": "GC=F",
-            "BTCUSD": "BTC-USD",
-            "ETHUSD": "ETH-USD",
-            "EURUSD": "EURUSD=X"
-        }
-        yf_ticker = ticker_map.get(symbol, symbol) # Fallback to raw symbol
-        
     def _fetch_with_cache(self, symbol, interval, cache_file, days=55):
         """
         Manages the Caching Layer + Calling the Robust Fetcher.
@@ -206,14 +188,8 @@ class DataLoader:
             start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
 
         # Map internal symbol
-        ticker_map = {
-            "XAUUSD": "GC=F",
-            "BTCUSD": "BTC-USD",
-            "BTCXAU": "BTC-USD", # PROXY
-            "ETHUSD": "ETH-USD",
-            "EURUSD": "EURUSD=X"
-        }
-        yf_ticker = ticker_map.get(symbol, symbol)
+        # Map internal symbol
+        yf_ticker = self._normalize_symbol(symbol)
         
         # 2. Fetch New Data (Using Robust Fetcher)
         new_df = self._fetch_single(yf_ticker, start=start_date, interval=interval)
@@ -251,19 +227,37 @@ class DataLoader:
                 time.sleep(random.uniform(0.5, 2.0))
                 
                 # Fetch data
-                df = yf.download(
+                df_raw = yf.download(
                     tickers=ticker,
                     start=start,
                     end=end,
-                    period=period, # 'period' can be used instead of 'start'/'end'
+                    period=period,
                     interval=interval,
                     progress=False,
-                    threads=False, # Threading can cause issues with curl
-                    timeout=20, # Increase timeout
-                    auto_adjust=True # Silence Warning
+                    threads=False,
+                    timeout=20,
+                    auto_adjust=True
                 )
                 
-                if df is None or df.empty:
+                df = df_raw
+                # Handle Dict return (Multi-ticker or error format)
+                if isinstance(df, dict):
+                    # Sometimes yf returns a dict of DataFrames or Errors
+                    if ticker in df:
+                        df = df[ticker]
+                    else:
+                        # Attempt to find the first DataFrame value
+                        found = False
+                        for k, v in df.items():
+                            if isinstance(v, pd.DataFrame):
+                                df = v
+                                found = True
+                                break
+                        if not found:
+                             logger.warning(f"yfinance returned dict without usable DF: {df.keys()}")
+                             df = None
+
+                if not isinstance(df, pd.DataFrame) or df.empty:
                     # If yf.download returns an empty DataFrame without error,
                     # it might mean no data for the period or ticker.
                     # Treat as a soft failure for retry, or return None if it's the last attempt.

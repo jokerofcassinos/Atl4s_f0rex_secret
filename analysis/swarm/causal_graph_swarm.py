@@ -1,85 +1,111 @@
 
+
 import logging
 import numpy as np
 import pandas as pd
 from core.interfaces import SubconsciousUnit, SwarmSignal
+from analysis.order_flow import OrderFlowEngine
 
 logger = logging.getLogger("CausalGraphSwarm")
 
 class CausalGraphSwarm(SubconsciousUnit):
     """
-    The Architect.
-    maintains a Causal DAG to distinguish Correlation from Causation.
+    Phase 120: The Architect (Causal Inference).
+    
+    Constructs a Causal DAG (Directed Acyclic Graph) to validate market moves.
+    Causal Chain: News (Info) -> OrderFlow (Aggression) -> Price (Result).
+    
+    If 'Result' happens without 'Cause', it is an Anomaly (Trap).
     """
     def __init__(self):
         super().__init__("Causal_Graph_Swarm")
-        # Simplified DAG Structure: Force -> Movement
-        # Nodes: Volume -> Volatility -> Price
+        self.order_flow = OrderFlowEngine()
+        # Causal Edges Probabilities
         self.edges = {
-            ('volume', 'volatility'): 0.5,
-            ('volatility', 'price_change'): 0.5
+            ('delta', 'price'): 0.5,
+            ('volume', 'volatility'): 0.5
         }
 
     async def process(self, context) -> SwarmSignal:
         df_m5 = context.get('df_m5')
         if df_m5 is None or len(df_m5) < 50: return None
         
-        # 1. Update Causal Weights (Granger Proxy)
-        # Does Lagged Volume predict Volatility?
-        vol = df_m5['volume']
-        # Approx volatility as High-Low range
-        volatility = df_m5['high'] - df_m5['low']
-        price_change = df_m5['close'].diff().abs()
+        # 1. Analyze Cause (Order Flow)
+        flow_state = self.order_flow.analyze_flow(df_m5)
+        if not flow_state: return None
         
-        # Simple Correlation of lags as proxy for Causality (Fast)
-        # Real-time Granger is too slow python-side without acceleration
-        corr_vol_volat = vol.shift(1).corr(volatility)
-        corr_volat_price = volatility.shift(1).corr(price_change)
+        delta = flow_state['delta'] # Net Aggression
+        is_whale = flow_state['is_whale']
+        is_absorption = flow_state['is_absorption']
         
-        self.edges[('volume', 'volatility')] = corr_vol_volat
-        self.edges[('volatility', 'price_change')] = corr_volat_price
+        # 2. Analyze Effect (Price)
+        price_change = df_m5['close'].iloc[-1] - df_m5['open'].iloc[-1]
+        is_bullish_candle = price_change > 0
         
-        # 2. Causality Check for Current State
-        # If we see a Price Spike, is it CAUSED by the graph?
-        last_vol = vol.iloc[-1]
-        avg_vol = vol.iloc[-20:].mean()
-        
-        last_volatility = volatility.iloc[-1]
-        
-        is_volume_spike = last_vol > avg_vol * 1.5
-        is_volatility_spike = last_volatility > volatility.iloc[-20:].mean() * 1.5
-        
-        # Logic: If Price moved, but Volume/Volatility didn't preceed/accompany it, it's 'Acausal' (Noise/Manipulation)
-        
+        # 3. Causal Validation (The Why)
         signal = "WAIT"
-        confidence = 0
+        confidence = 0.0
         reason = ""
         
-        if is_volume_spike and is_volatility_spike:
-            # The "Force" is present. The movement is Causal.
-            # We endorse the trend.
-            trend = df_m5['close'].iloc[-1] - df_m5['open'].iloc[-1]
-            if trend > 0:
-                signal = "BUY"
-                confidence = 80 + (corr_vol_volat * 10) # Boost by causal strength
-                reason = "Causal Validation: vol->price link strong"
-            elif trend < 0:
-                signal = "SELL"
-                confidence = 80 + (corr_vol_volat * 10)
-                reason = "Causal Validation: vol->price link strong"
-        else:
-            # Weak Causality.
-            # If price moved heavily without this, it might be a Stop Hunt (which LiquiditySwarm handles)
-            # or just noise.
-            pass
+        # Case A: Valid Move (Cause == Effect)
+        # Price UP AND Delta POSITIVE (Aggressive Buying)
+        if is_bullish_candle and delta > 0:
+            signal = "BUY"
+            confidence = 75.0
+            if is_whale: 
+                confidence += 15.0 # Whale support
+                reason = "VALID: Whale Buying supporting Price."
+            else:
+                reason = "VALID: Delta supports Price."
+
+        # Case B: Valid Move (Cause == Effect)
+        # Price DOWN AND Delta NEGATIVE (Aggressive Selling)    
+        elif not is_bullish_candle and delta < 0:
+            signal = "SELL"
+            confidence = 75.0
+            if is_whale:
+                confidence += 15.0
+                reason = "VALID: Whale Selling supporting Price."
+            else:
+                reason = "VALID: Delta supports Price."
+                
+        # Case C: Divergence / Absorption (Trap)
+        # Price UP but Delta NEGATIVE (Limit Sellers absorbing Market Buys? No, wait)
+        # Price UP but Delta NEGATIVE -> Means more SELLING aggression, but Price went UP?
+        # This implies Limit BUY orders absorbed the selling and pushed price up (Passive Buyers).
+        # OR Stop Hunt (triggered stops = market buys).
+        # Commonly: "Effort vs Result" anomaly.
+        
+        elif is_bullish_candle and delta < 0:
+            # Trap? Or Reversal?
+            # Rising Price on Selling Volume is suspicious.
+            signal = "SELL" # Fade the move?
+            confidence = 60.0
+            reason = "ANOMALY: Price Rising on Selling Delta (Divergence)"
             
+        elif not is_bullish_candle and delta > 0:
+            # Price Dropping on Buying Volume.
+            signal = "BUY" # Fade the drop
+            confidence = 60.0
+            reason = "ANOMALY: Price Dropping on Buying Delta (Divergence)"
+            
+        # Case D: Absorption (Doji High Vol)
+        if is_absorption:
+            # High Vol, No Move. Reversal likely.
+            # If recent trend was UP, Sell.
+            # Simple heuristic:
+            signal = "WAIT" # Volatile, let's wait for the break.
+            confidence = 0.0
+            reason = "ABSORPTION: High Effort, No Result."
+
         if signal != "WAIT":
              return SwarmSignal(
                 source=self.name,
                 signal_type=signal,
                 confidence=confidence,
                 timestamp=0,
-                meta_data={'edges': str(self.edges)}
+                meta_data={'reason': reason, 'delta': delta, 'whale': is_whale}
             )
             
         return None
+

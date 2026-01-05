@@ -218,7 +218,32 @@ class SwarmOrchestrator:
         self.active_agents.append(ZeroPointSwarm())
         self.active_agents.append(ActiveInferenceSwarm())
         self.active_agents.append(HawkingSwarm())
+        self.active_agents.append(HawkingSwarm())
         self.active_agents.append(RiemannSwarm())
+        
+        # Phase 118: Time Crystals
+        from analysis.swarm.chronos_swarm import ChronosSwarm
+        self.active_agents.append(ChronosSwarm())
+        
+        # Phase 119: Manifold Engine
+        from analysis.swarm.ricci_swarm import RicciSwarm
+        self.active_agents.append(RicciSwarm())
+        
+        # Phase 120: Technical Omniscience
+        from analysis.swarm.technical_swarm import TechnicalSwarm
+        self.active_agents.append(TechnicalSwarm())
+        
+        # Phase 122: Smart Money (SMC) & Visuals
+        from analysis.swarm.smc_swarm import SmartMoneySwarm
+        self.active_agents.append(SmartMoneySwarm())
+
+    def inject_bridge(self, bridge):
+        """
+        Injects the ZmqBridge into capable agents for drawing.
+        """
+        for agent in self.active_agents:
+            if hasattr(agent, 'set_bridge'):
+                agent.set_bridge(bridge)
         
         # Phase 117: Holographic Associative Memory
         self.holographic_memory = HolographicMemory()
@@ -240,11 +265,35 @@ class SwarmOrchestrator:
             outcome_score = np.tanh(delta * 0.5) 
             self.holographic_memory.store_experience(self.last_consensus_state, outcome_score)
             
+        # --- PHASE 125: NEUROPLASTICITY (Self-Correction) ---
+        # Learning Trigger: New Candle (or every N ticks)
+        # We need to access the LAST candle's close from df_m5 if available
+        # or just use the rolling price delta in valid ticks.
+        
+        # Simplified Learning: Every 5 minutes (approx 300 seconds), check result of LAST vote.
+        now_time = tick.get('time_msc', time.time()*1000)
+        if not hasattr(self, 'last_learning_time'): self.last_learning_time = 0
+        if not hasattr(self, 'last_vote_snapshot'): self.last_vote_snapshot = {}
+        if not hasattr(self, 'last_price_snapshot'): self.last_price_snapshot = current_price
+        
+        if now_time - self.last_learning_time > 300000: # 5 Minutes
+            price_delta = current_price - self.last_price_snapshot
+            
+            if self.last_vote_snapshot:
+                 logger.info(f"NEUROPLASTICITY: Analyzing Past 5m. Delta: {price_delta:.2f}. Adjusting Synapses...")
+                 self.neuroplasticity.register_outcome(self.last_vote_snapshot, price_delta)
+                 
+                 # Save Memories (Dreams) to Disk
+                 self.holographic_memory.save_memory()
+                 
+            self.last_learning_time = now_time
+            self.last_price_snapshot = current_price
+            
         self.last_price = current_price
 
         # Context for Swarms
         df_m5 = data_map.get('M5')
-        if df_m5 is not None and not df_m5.empty:
+        if isinstance(df_m5, pd.DataFrame) and not df_m5.empty:
              context = {
                 'tick': tick,
                 'data_map': data_map,
@@ -272,6 +321,11 @@ class SwarmOrchestrator:
         self.last_consensus_state = swarm_snapshot
 
         # Synthesize without await (Sync Method)
+        # Snapshot for Learning
+        self.last_vote_snapshot = {}
+        for t in thoughts:
+             self.last_vote_snapshot[t.source] = t.signal_type
+             
         decision, score, meta = self.synthesize_thoughts(thoughts, swarm_snapshot)
         return decision, score, meta
 
@@ -325,12 +379,53 @@ class SwarmOrchestrator:
                   logger.warning(f"DEJA VU: Holographic Danger (Score: {intuition:.2f}). Aborting.")
                   return ("WAIT", 0.0, {})
         
-        # 3. Simple Voting (Fallback)
+        # 0. Sovereign Executive Order (Meta-Cognition)
+        weights = {}
+        
+        # A. Neuroplasticity Weights (Long Term Memory)
+        learned_weights = self.neuroplasticity.get_dynamic_weights()
+        
+        # B. Sovereign Weights (Regime Adaptation)
+        sov_weights = {}
+        for t in thoughts:
+             if t.source == "Sovereign_Swarm" and t.signal_type == "META_INFO":
+                 sov_weights = t.meta_data.get('weight_vector', {})
+                 logger.info(f"SOVEREIGN ACT: Regime={t.meta_data.get('regime')} | Weights Applied.")
+        
+        # C. Merge (Sovereign * Learned)
+        # Allows Sovereign to Temporarily Override long-term learning if Regime changes drastically
+        all_keys = set(learned_weights.keys()).union(set(sov_weights.keys()))
+        for k in all_keys:
+             w_learn = learned_weights.get(k, 1.0) # Default to base
+             w_sov = sov_weights.get(k, 1.0)
+             weights[k] = w_learn * w_sov
+
+        # 3. Transformer Attention Consensus (AGI Brain)
+        if 'allowed_actions' not in locals(): allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_LONG", "EXIT_SHORT", "EXIT_ALL"]
+        
+        final_decision, final_score, meta_data = self._transformer_consensus(thoughts, weights, current_state_vector, allowed_actions)
+        # Harvester Override (Priority)
+        for t in thoughts:
+             if t.signal_type == "EXIT_ALL": return ("EXIT_ALL", 99.0, t.meta_data)
+             if t.signal_type == "VETO": return ("WAIT", 0.0, {})
+
+        return (final_decision, final_score, meta_data)
+
+        # --- LEGACY CODE BELOW (TO BE REMOVED) ---
         score_buy = 0
         score_sell = 0
         for t in thoughts:
-            if t.signal_type == "BUY": score_buy += t.confidence
-            elif t.signal_type == "SELL": score_sell += t.confidence
+            if t.signal_type == "META_INFO": continue # Skip Meta signals
+            
+            # Apply Sovereign Weight
+            w = weights.get(t.source, 1.0)
+            
+            # Log significant mod
+            if w != 1.0:
+                 logger.debug(f"Weight Mod: {t.source} * {w}")
+            
+            if t.signal_type == "BUY": score_buy += t.confidence * w
+            elif t.signal_type == "SELL": score_sell += t.confidence * w
             
         final_decision = "WAIT"
         final_score = 0
@@ -338,7 +433,7 @@ class SwarmOrchestrator:
         # CIVIL WAR CHECK (Both sides strong)
         if score_buy > 2000 and score_sell > 2000:
              ratio = score_buy / score_sell if score_sell > 0 else 1.0
-             if 0.8 < ratio < 1.2:
+             if 0.9 < ratio < 1.1: # Relaxed from 0.8-1.2 to 0.9-1.1 to allow more trades
                  logger.warning(f"CIVIL WAR DETECTED: Buyers({score_buy:.0f}) vs Sellers({score_sell:.0f}). Gridlock.")
                  return "WAIT", 0.0, {}
                  
@@ -366,3 +461,57 @@ class SwarmOrchestrator:
             top_signal = sorted(high_command, key=lambda x: x.confidence, reverse=True)[0]
             return (top_signal.signal_type, top_signal.confidence, top_signal.meta_data)
         return None
+
+    def _transformer_consensus(self, thoughts, weights, current_state_vector, allowed_actions):
+        """
+        Phase 117: Transformer Attention Consensus (AGI Brain).
+        Replaces simple voting with Self-Attention.
+        """
+        d_model = 64
+        vectors = []
+        
+        # Vector 0: Holographic Memory Context (The "RAG" Token)
+        rag_vec = np.zeros(d_model)
+        if current_state_vector:
+             intuition = self.holographic_memory.retrieve_intuition(current_state_vector)
+             rag_vec[0] = intuition
+             rag_vec[1] = 1.0 # Type: Memory
+        vectors.append(rag_vec)
+        
+        # Vectors 1..N: Agent Signals
+        for t in thoughts:
+             if t.signal_type == "META_INFO": continue
+             w = weights.get(t.source, 1.0)
+             val = 0
+             if t.signal_type == "BUY": val = 1
+             elif t.signal_type == "SELL": val = -1
+             
+             vec = np.zeros(d_model)
+             vec[0] = val * t.confidence / 100.0 * w
+             vec[1] = 0.5 # Type: Agent
+             vec[2] = w
+             h = hash(t.source) % 100
+             vec[3 + (h % 10)] = 1.0 
+             vectors.append(vec)
+             
+        if not vectors: return "WAIT", 0.0, {}
+        
+        x = np.array(vectors)
+        context_matrix, attn_weights = self.attention.forward(x)
+        swarm_vec = np.mean(context_matrix[1:], axis=0) if len(context_matrix) > 1 else context_matrix[0]
+        
+        decision_score = swarm_vec[0]
+        final_decision = "WAIT"
+        final_conf = abs(decision_score) * 100.0
+        
+        if decision_score > 0.05: final_decision = "BUY"
+        elif decision_score < -0.05: final_decision = "SELL"
+             
+        final_conf = min(100.0, final_conf * 5.0) 
+        
+        logger.info(f"AGI ATTENTION: Decision={final_decision} (Score={decision_score:.3f}) | Memory Bias={vectors[0][0]:.3f}")
+
+        if final_decision not in allowed_actions: final_decision = "WAIT"
+
+        return final_decision, final_conf, {'attention_weights': attn_weights.tolist()}
+

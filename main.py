@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import pandas as pd
+import datetime
 from core.zmq_bridge import ZmqBridge
 from core.swarm_orchestrator import SwarmOrchestrator
 from core.execution_engine import ExecutionEngine
@@ -46,6 +47,8 @@ class OmegaSystem:
         self.neuroplasticity = NeuroPlasticityEngine()
         self.attention = TransformerLite(embed_dim=64, head_dim=64) # Simple init stats
         self.grandmaster = MCTSPlanner()
+        
+
         
         # Inject into Cortex
         self.cortex = SwarmOrchestrator(
@@ -98,7 +101,11 @@ class OmegaSystem:
             self.config["phys_tp_pct"] = 0.010 # 1.0% Hard Target
             
             # Update Opportunity Flow
-            self.flow_manager.active_symbols = ["XAUUSD", "XAUEUR", "XAUGBP", "XAUAUD"]
+            # Update Opportunity Flow
+            # Removed AUDCAD and AUDJPY per user request (High fees/Bad performance)
+            # Update Opportunity Flow
+            # User Request: Majors for tight spreads
+            self.flow_manager.active_symbols = ["EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD", "USDCHF"]
             
         else:
             print(">> PROFILE: CRYPTO ACTIVATED.")
@@ -149,6 +156,7 @@ class OmegaSystem:
         self.executor.set_config(self.config)
         
         await self.cortex.initialize_swarm()
+        self.cortex.inject_bridge(self.bridge) # Link Visuals to Swarm (must be after init)
         logger.info("Cortex Online.")
         logger.info("System Ready. Waiting for Market Data...")
 
@@ -158,6 +166,14 @@ class OmegaSystem:
         
         while True:
             try:
+                # 0. Schedule Enforcement (Monday-Friday Only)
+                # 0 = Monday, 4 = Friday, 5 = Saturday, 6 = Sunday
+                weekday = datetime.datetime.now().weekday()
+                if weekday >= 5:
+                    logger.info("MARKET CLOSED (Weekend). Sleeping...")
+                    await asyncio.sleep(60)
+                    continue
+
                 # 1. Get Live Tick (Blocking or optimized async)
                 # In real prod, this should be non-blocking. 
                 # For this prototype, we poll.

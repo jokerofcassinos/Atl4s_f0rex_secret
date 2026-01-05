@@ -1,6 +1,7 @@
 
 import numpy as np
 import logging
+import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
@@ -148,8 +149,10 @@ class HolographicPlate:
 
 class HolographicMemory:
     """Wrapper for the System."""
-    def __init__(self):
-        self.plate = HolographicPlate(dimensions=4096) # 4k is sufficient for MVP
+    def __init__(self, persistence_file="brain/holographic_plate.npy"):
+        self.persistence_file = persistence_file
+        self.plate = HolographicPlate(dimensions=4096) 
+        self.load_memory()
         
     def store_experience(self, context: Dict, outcome: float):
         vec = self.plate.encode_state(context)
@@ -158,3 +161,25 @@ class HolographicMemory:
     def retrieve_intuition(self, context: Dict) -> float:
         vec = self.plate.encode_state(context)
         return self.plate.intuit(vec)
+
+    def save_memory(self):
+        """Persists the Holographic Plate to disk."""
+        try:
+             os.makedirs(os.path.dirname(self.persistence_file), exist_ok=True)
+             np.save(self.persistence_file, self.plate.memory_plate)
+             # We should also save the concept space if it's random but static?
+             # For now, concept space is rebuilt deterministically from seed (hash(concept)).
+             # So only the Plate needs saving.
+             logger.info(f"HOLOGRAPHIC MEMORY SAVED to {self.persistence_file}")
+        except Exception as e:
+             logger.error(f"Failed to Save Hologram: {e}")
+
+    def load_memory(self):
+        """Loads the Holographic Plate."""
+        if os.path.exists(self.persistence_file):
+             try:
+                 self.plate.memory_plate = np.load(self.persistence_file)
+                 logger.info(f"HOLOGRAPHIC MEMORY LOADED from {self.persistence_file}")
+             except Exception as e:
+                 logger.error(f"Failed to Load Hologram: {e}")
+

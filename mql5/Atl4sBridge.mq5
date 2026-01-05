@@ -120,10 +120,44 @@ public:
 // 3. HOLOGRAPHIC HUD
 class CHolographicHUD {
 public:
-   void DrawZone(string name, double price_start, double price_end, color clr) {
-      ObjectCreate(0, name, OBJ_RECTANGLE, 0, TimeCurrent(), price_start, TimeCurrent()+PeriodSeconds()*10, price_end);
+   // RECTANGLE (Zones)
+   void DrawZone(string name, double price_start, double price_end, color clr, datetime t1, datetime t2) {
+      if(ObjectFind(0, name) < 0) {
+         ObjectCreate(0, name, OBJ_RECTANGLE, 0, t1, price_start, t2, price_end);
+      } else {
+         // Update coordinates
+         ObjectSetInteger(0, name, OBJPROP_TIME, 0, t1);
+         ObjectSetDouble(0, name, OBJPROP_PRICE, 0, price_start);
+         ObjectSetInteger(0, name, OBJPROP_TIME, 1, t2);
+         ObjectSetDouble(0, name, OBJPROP_PRICE, 1, price_end);
+      }
       ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
       ObjectSetInteger(0, name, OBJPROP_FILL, true); 
+      ObjectSetInteger(0, name, OBJPROP_BACK, true);
+   }
+   
+   // TRENDLINE (Liquidity Sweeps)
+   void DrawLine(string name, double p1, double p2, color clr, datetime t1, datetime t2) {
+      if(ObjectFind(0, name) < 0) {
+          ObjectCreate(0, name, OBJ_TREND, 0, t1, p1, t2, p2);
+      } else {
+          ObjectSetInteger(0, name, OBJPROP_TIME, 0, t1);
+          ObjectSetDouble(0, name, OBJPROP_PRICE, 0, p1);
+          ObjectSetInteger(0, name, OBJPROP_TIME, 1, t2);
+          ObjectSetDouble(0, name, OBJPROP_PRICE, 1, p2);
+      }
+      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
+      ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+   }
+   
+   // TEXT (Labels)
+   void DrawText(string name, double price, string text, color clr, datetime t) {
+      if(ObjectFind(0, name) < 0) ObjectCreate(0, name, OBJ_TEXT, 0, t, price);
+      ObjectSetString(0, name, OBJPROP_TEXT, text);
+      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 10);
+      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT);
    }
 };
 
@@ -375,10 +409,23 @@ void ProcessCommand(string json) {
         }
     }
     // DRAWING LOGIC
-    else if (action == "DRAW_ZONE") {
-        // DRAW_ZONE|NAME|P1|P2|COLOR_INT
-        if(ArraySize(parts) >= 5) {
-            hud.DrawZone(parts[1], StringToDouble(parts[2]), StringToDouble(parts[3]), (color)StringToInteger(parts[4]));
+    // DRAWING LOGIC
+    else if (action == "DRAW_RECT") {
+        // DRAW_RECT|NAME|P1|P2|TIME1|TIME2|COLOR
+        if(ArraySize(parts) >= 7) {
+            hud.DrawZone(parts[1], StringToDouble(parts[2]), StringToDouble(parts[3]), (color)StringToInteger(parts[6]), (datetime)StringToInteger(parts[4]), (datetime)StringToInteger(parts[5]));
+        }
+    }
+    else if (action == "DRAW_LINE") {
+        // DRAW_LINE|NAME|P1|P2|TIME1|TIME2|COLOR
+        if(ArraySize(parts) >= 7) {
+             hud.DrawLine(parts[1], StringToDouble(parts[2]), StringToDouble(parts[3]), (color)StringToInteger(parts[6]), (datetime)StringToInteger(parts[4]), (datetime)StringToInteger(parts[5]));
+        }
+    }
+    else if (action == "DRAW_TEXT") {
+        // DRAW_TEXT|NAME|PRICE|TIME|TEXT|COLOR
+        if(ArraySize(parts) >= 6) {
+             hud.DrawText(parts[1], StringToDouble(parts[2]), parts[4], (color)StringToInteger(parts[5]), (datetime)StringToInteger(parts[3]));
         }
     }
 }

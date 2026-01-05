@@ -9,141 +9,90 @@ logger = logging.getLogger("GameSwarm")
 
 class GameSwarm(SubconsciousUnit):
     """
-    Phase 92: The Nash Swarm 2.0 (Evolutionary Game Theory).
+    Phase 92: Nash Equilibrium 3.0 (The Tri-State Game).
     
-    Models the market as an Evolutionary Game with Replicator Dynamics.
-    
-    Physics/Math:
-    - Replicator Equation: dx_i/dt = x_i * (f_i(x) - phi(x))
-    - x_i: Frequency of strategy i in population.
-    - f_i: Fitness of strategy i (Payoff).
-    - phi: Average fitness of population.
-    
-    Market Application:
-    - Species: Bulls (B) and Bears (S).
-    - Population State (x): Share of Volume Flow.
-    - Fitness (f): Realized Price Movement. 
-      - If Price UP: Bulls gain fitness, Bears lose.
-      - If Price DOWN: Bears gain fitness, Bulls lose.
-      
-    Signals:
-    1. ESS (Evolutionary Stable Strategy):
-       - Dominant species has Positive Growth (dx/dt > 0).
-       - MEANS: The trend is reinforced by outcomes. (STRONG TREND).
-       
-    2. Mutant Invasion (Instability):
-       - Dominant species has Negative Growth (dx/dt < 0).
-       - MEANS: Despite volume dominance, the payout is failing. (DIVERGENCE/REVERSAL).
+    Models the market as a non-cooperative game between:
+    1. Trend Followers (TF) - Bet on Continuation.
+    2. Mean Reverters (MR) - Bet on Reversal.
+    3. Market Makers (MM) - Bet on Liquidity (Stop Hunts).
     """
     def __init__(self):
         super().__init__("Game_Swarm")
 
+    def normalize(self, val):
+        return max(0.0, min(1.0, val))
+
     async def process(self, context) -> SwarmSignal:
-        df_m5 = context.get('df_m5')
-        if df_m5 is None or len(df_m5) < 30: return None
+        df = context.get('df_m5')
+        if df is None or len(df) < 50: return None
         
-        # 1. Determine Populations (x)
-        # We estimate Bull/Bear volume split using close-open delta
-        # Pure buy volume vs Pure sell volume is hard without tick data,
-        # so we approximate:
-        # If Close > Open: Bull Vol = Volume, Bear Vol = 0
-        # If Close < Open: Bear Vol = Volume, Bull Vol = 0
-        # Smooth this over time to get a "Population" state.
+        # 1. Player Incentives (Payoff Potential)
         
-        closes = df_m5['close'].values
-        opens = df_m5['open'].values
-        volumes = df_m5['volume'].values
+        # A. Trend Followers (TF)
+        # Incentive: High Momentum, Moving Average Slope
+        sma20 = df['close'].rolling(20).mean()
+        slope = (sma20.iloc[-1] - sma20.iloc[-5])
+        tf_incentive = self.normalize(abs(slope) * 1000) # Norm
         
-        rolling_window = 10
+        # B. Mean Reverters (MR)
+        # Incentive: Overbought/Oversold (RSI)
+        # 0.5 = Neutral, 1.0 = Extreme Deviation
+        rsi = df['rsi'].iloc[-1] if 'rsi' in df.columns else 50
+        dist_from_50 = abs(rsi - 50)
+        mr_incentive = self.normalize(dist_from_50 / 40.0) 
         
-        bull_vols = np.where(closes > opens, volumes, 0)
-        bear_vols = np.where(closes < opens, volumes, 0)
+        # C. Market Makers (MM)
+        # Incentive: Proximity to Liquidity (Highs/Lows)
+        last_high = df['high'].iloc[-20:].max()
+        last_low = df['low'].iloc[-20:].min()
+        curr_price = df['close'].iloc[-1]
         
-        # Population Fractions (x) - Moving Average
-        # We look at the SEQUENCE of x states to determine dx/dt
+        dist_h = abs(curr_price - last_high)
+        dist_l = abs(curr_price - last_low)
+        # Closer to level = Higher Incentive to Hunt
+        mm_incentive = self.normalize(1.0 - (min(dist_h, dist_l) / (last_high - last_low + 0.0001)))
         
-        limit = len(closes)
-        if limit < rolling_window + 5: return None
+        # 2. Nash Equilibrium Solver (Simplified)
+        # We assume the Market moves continuously to the state of Highest Total Pain (or Max Liquidity).
+        # Which player has the highest "Force" (Incentive * Volume)?
+        # For this prototype, we treat Incentives as Force.
         
-        # Calculate Rolling Sums
-        bull_series = pd.Series(bull_vols).rolling(window=rolling_window).sum()
-        bear_series = pd.Series(bear_vols).rolling(window=rolling_window).sum()
-        total_series = bull_series + bear_series
+        scores = {
+            'TREND': tf_incentive,
+            'REVERT': mr_incentive,
+            'HUNT': mm_incentive
+        }
         
-        # Avoid div by zero
-        x_B = (bull_series / total_series.replace(0, 1)).values
-        x_S = (bear_series / total_series.replace(0, 1)).values
-        
-        # 2. Determine Fitness (f)
-        # Fitness is simply the Price Return over the same window.
-        # But specifically:
-        # f_B (Bull Fitness) = % Change. (Positive if Up, Negative if Down)
-        # f_S (Bear Fitness) = -% Change. (Positive if Down, Negative if Up)
-        
-        price_change = pd.Series(closes).pct_change(periods=rolling_window).values * 100
-        
-        # 3. Analyze Dynamics at current time
-        idx = -1
-        
-        curr_xB = x_B[idx]
-        curr_xS = x_S[idx]
-        
-        curr_fB = price_change[idx]
-        curr_fS = -price_change[idx]
-        
-        # Average Fitness phi
-        phi = curr_xB * curr_fB + curr_xS * curr_fS
-        
-        # Replicator Dynamics (Growth Rates)
-        # dx/dt = x * (f - phi)
-        # We don't strictly need to compute this if we just check f vs phi, 
-        # but let's calculate the "Pressure".
-        
-        growth_B = curr_xB * (curr_fB - phi)
-        growth_S = curr_xS * (curr_fS - phi)
+        winner = max(scores, key=scores.get)
         
         signal = "WAIT"
         confidence = 0.0
         reason = ""
-        meta_data = {}
         
-        # 4. Signal Logic
-        
-        # Case A: Bulls Dominant (x_B > 0.6)
-        if curr_xB > 0.6:
-            if growth_B > 0:
-                # ESS: Bulls are dominant AND growing in fitness.
-                # Trend is Healthy.
-                signal = "BUY"
-                confidence = 80 + (curr_xB * 10)
-                reason = f"NASH ESS: Stable Bull Dominance (x={curr_xB:.2f}, growth={growth_B:.4f})"
-            elif growth_B < -0.01:
-                # INVASION: Bulls are dominant BUT losing fitness.
-                # Price is likely stalling or dropping despite Bull Volume.
-                # Divergence.
-                signal = "SELL" # Contrarian Reversal
-                confidence = 75.0
-                reason = f"NASH INVASION: Bully Trap. Dominance x={curr_xB:.2f} but Growth Negative."
-                
-        # Case B: Bears Dominant (x_S > 0.6)
-        elif curr_xS > 0.6:
-            if growth_S > 0:
-                # ESS: Bears are dominant AND growing.
-                signal = "SELL"
-                confidence = 80 + (curr_xS * 10)
-                reason = f"NASH ESS: Stable Bear Dominance (x={curr_xS:.2f}, growth={growth_S:.4f})"
-            elif growth_S < -0.01:
-                # INVASION: Bear Trap.
-                signal = "BUY"
-                confidence = 75.0
-                reason = f"NASH INVASION: Bear Trap. Dominance x={curr_xS:.2f} but Growth Negative."
-                
-        meta_data = {
-            'x_bull': curr_xB,
-            'x_bear': curr_xS,
-            'growth_bull': growth_B,
-            'reason': reason
-        }
+        if winner == 'TREND':
+            # Follow the slope
+            direction = "BUY" if slope > 0 else "SELL"
+            signal = direction
+            confidence = 85.0 * tf_incentive
+            reason = f"NASH: Trend Dominance (Score: {tf_incentive:.2f})"
+            
+        elif winner == 'REVERT':
+            # Fade the move
+            direction = "SELL" if rsi > 50 else "BUY"
+            signal = direction
+            confidence = 80.0 * mr_incentive
+            reason = f"NASH: Mean Reversion Dominance (Score: {mr_incentive:.2f})"
+            
+        elif winner == 'HUNT':
+            # Predatory Logic: If near High, Hunt High (Buy then Revert?)
+            # Usually MM pushes TO the level.
+            if dist_h < dist_l: # Near High
+                signal = "BUY" # Push to sweep
+                reason = f"NASH: Market Maker Hunt for Highs (Score: {mm_incentive:.2f})"
+            else: # Near Low
+                signal = "SELL" # Push to sweep
+                reason = f"NASH: Market Maker Hunt for Lows (Score: {mm_incentive:.2f})"
+            confidence = 90.0 * mm_incentive
 
         if signal != "WAIT":
              return SwarmSignal(
@@ -151,7 +100,7 @@ class GameSwarm(SubconsciousUnit):
                 signal_type=signal,
                 confidence=confidence,
                 timestamp=time.time(),
-                meta_data=meta_data
+                meta_data={'scores': scores, 'reason': reason}
             )
             
         return None
