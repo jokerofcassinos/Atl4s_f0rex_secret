@@ -941,16 +941,24 @@ void ProcessCommand(string json) {
         double sl = StringToDouble(parts[4]);
         double tp = StringToDouble(parts[5]);
         
+        // Read confidence from Python (6th parameter) if available
+        double py_confidence = 0.0;
+        if(ArraySize(parts) >= 7) {
+            py_confidence = StringToDouble(parts[6]);
+        }
+        
         // Check with risk manager
         if(!riskManager.CheckRisk(action, vol)) {
             Print("TRADE BLOCKED by Risk Manager");
             return;
         }
         
-        // Check with adaptive executor if enabled
+        // Check with adaptive executor if enabled - USE PYTHON CONFIDENCE
         if(EnableAdaptiveExecution) {
-            if(!adaptiveExec.ShouldExecute((cmd == 0 ? "BUY" : "SELL"), localIntel.GetConfidence())) {
-                Print("TRADE BLOCKED by Adaptive Executor");
+            // Use Python confidence if available (>0), otherwise fallback to local
+            double conf_to_use = (py_confidence > 0) ? py_confidence : localIntel.GetConfidence();
+            if(!adaptiveExec.ShouldExecute((cmd == 0 ? "BUY" : "SELL"), conf_to_use)) {
+                Print("TRADE BLOCKED by Adaptive Executor (Conf: ", conf_to_use, ")");
                 return;
             }
         }

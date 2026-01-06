@@ -186,7 +186,8 @@ class ExecutionEngine:
              params_sl = f"{sl:.5f}"
              params_tp = f"{tp:.5f}"
         
-        params = [symbol, str(cmd_type), f"{lots:.2f}", params_sl, params_tp]
+        # Include confidence as 6th parameter for MQL5 adaptive executor
+        params = [symbol, str(cmd_type), f"{lots:.2f}", params_sl, params_tp, f"{confidence:.1f}"]
         logger.info(f"EXECUTION: {command} {lots} lots @ {price:.5f} | Conf: {confidence:.1f}% | SL: {params_sl} TP: {params_tp}")
         
         if self.bridge:
