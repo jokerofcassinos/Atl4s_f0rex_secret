@@ -271,6 +271,10 @@ class ExecutionEngine:
             profit = trade.get('profit', 0.0)
             symbol = trade.get('symbol')
             
+            limit = -abs(v_sl)
+            # Debug log
+            logger.debug(f"VSL CHECK: Ticket {ticket} | Profit ${profit:.2f} | Limit ${limit:.2f} | VTP ${v_tp:.2f}")
+            
             # 1. Individual Take Profit (The Snipe)
             if profit >= v_tp:
                 logger.info(f"INDIVIDUAL GUARD: Harvesting Ticket {ticket} ({symbol}) | Profit ${profit:.2f} >= ${v_tp:.2f}")

@@ -42,6 +42,7 @@ logging.getLogger("HolographicMemory").setLevel(logging.WARNING)  # Spammy initi
 logging.getLogger("LaplaceSwarm").setLevel(logging.INFO)
 logging.getLogger("RiemannSwarm").setLevel(logging.INFO)
 logging.getLogger("OmegaProtocol").setLevel(logging.INFO)
+logging.getLogger("ExecutionEngine").setLevel(logging.DEBUG)  # Debug VSL checks
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
