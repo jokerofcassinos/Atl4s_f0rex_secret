@@ -370,6 +370,19 @@ class SwarmOrchestrator:
         
         if not thoughts: return "WAIT", 0.0, {}
         
+        # ===== PRIORITY OVERRIDES (Check FIRST, before any other logic) =====
+        # 1. VETO signals have absolute authority
+        for t in thoughts:
+            if t.signal_type == "VETO":
+                logger.warning(f"VETO OVERRIDE: {t.meta_data.get('reason', 'Unknown')} - Trade Blocked")
+                return ("WAIT", 0.0, {"blocked_by": "VETO", "reason": t.meta_data.get('reason', '')})
+        
+        # 2. EXIT_ALL signals (emergency close)
+        for t in thoughts:
+            if t.signal_type == "EXIT_ALL":
+                logger.critical(f"EMERGENCY EXIT: {t.meta_data.get('reason', 'Unknown')}")
+                return ("EXIT_ALL", 99.0, t.meta_data)
+        
         # Log all thoughts for visibility (Restored Feature)
         vote_strings = []
         for t in thoughts:
@@ -490,12 +503,19 @@ class SwarmOrchestrator:
         return (final_decision, final_score, {})
 
     def _resolve_physics_conflict(self, thoughts):
-        physics_agents = ['SingularitySwarm', 'HyperdimensionalSwarm', 'KinematicSwarm', 'VortexSwarm', 'Schrodinger_Newton_Swarm']
-        high_command = [t for t in thoughts if t.source in physics_agents and t.confidence > 95.0]
-        if high_command:
-            top_signal = sorted(high_command, key=lambda x: x.confidence, reverse=True)[0]
-            return (top_signal.signal_type, top_signal.confidence, top_signal.meta_data)
+        # DISABLED: This was causing 99% confidence on all trades
+        # Physics swarms were bypassing transformer consensus entirely
+        # Now all decisions go through proper confidence calculation
+        # TODO: Re-enable with proper confidence scaling if needed
         return None
+        
+        # Original code (kept for reference):
+        # physics_agents = ['SingularitySwarm', 'HyperdimensionalSwarm', 'KinematicSwarm', 'VortexSwarm', 'Schrodinger_Newton_Swarm']
+        # high_command = [t for t in thoughts if t.source in physics_agents and t.confidence > 95.0]
+        # if high_command:
+        #     top_signal = sorted(high_command, key=lambda x: x.confidence, reverse=True)[0]
+        #     return (top_signal.signal_type, top_signal.confidence, top_signal.meta_data)
+        # return None
 
     def _transformer_consensus(self, thoughts, weights, current_state_vector, allowed_actions):
         """
