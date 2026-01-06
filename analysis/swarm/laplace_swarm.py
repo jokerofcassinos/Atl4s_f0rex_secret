@@ -20,12 +20,28 @@ class LaplaceSwarm(SubconsciousUnit):
     def __init__(self):
         super().__init__("Laplace_Swarm")
         
+        self._cpp_lib = None
         try:
-             from core.cpp_loader import load_dll
-             load_dll("physics_core.dll")
-             logger.info("LAPLACE ENGINE: C++ CORE ACTIVE [TURBO MODE]")
-        except:
-             logger.info("LAPLACE ENGINE: PYTHON FALLBACK [STANDARD MODE]")
+            import ctypes
+            import os
+            
+            dll_paths = [
+                os.path.join(os.path.dirname(__file__), "..", "..", "cpp_core", "libphysics.dll"),
+                os.path.join(os.path.dirname(__file__), "..", "..", "cpp_core", "build", "bin", "libphysics.dll"),
+                os.path.join(os.path.dirname(__file__), "..", "..", "cpp_core", "physics_core.dll"),
+            ]
+            
+            for dll_path in dll_paths:
+                if os.path.exists(dll_path):
+                    self._cpp_lib = ctypes.CDLL(dll_path)
+                    logger.info(f"LAPLACE ENGINE: C++ CORE ACTIVE [TURBO MODE] ({os.path.basename(dll_path)})")
+                    break
+            
+            if self._cpp_lib is None:
+                logger.info("LAPLACE ENGINE: PYTHON FALLBACK [STANDARD MODE]")
+        except Exception as e:
+            logger.info(f"LAPLACE ENGINE: PYTHON FALLBACK [STANDARD MODE] ({e})")
+            
         self.mass_window = 20 # Average mass over 20 candles
         
     async def process(self, context: Dict[str, Any]) -> Optional[SwarmSignal]:
@@ -74,39 +90,35 @@ class LaplaceSwarm(SubconsciousUnit):
         
         # Try C++ Acceleration
         cpp_active = False
-        try:
-            import ctypes
-            from core.cpp_loader import load_dll
-            
-            lib = load_dll("physics_core.dll")
-            
-            class TrajectoryResult(ctypes.Structure):
-                _fields_ = [
-                    ("terminal_price", ctypes.c_double),
-                    ("max_deviation", ctypes.c_double),
-                    ("steps_taken", ctypes.c_int),
-                    ("total_distance", ctypes.c_double)
+        if self._cpp_lib is not None:
+            try:
+                import ctypes
+                
+                class TrajectoryResult(ctypes.Structure):
+                    _fields_ = [
+                        ("terminal_price", ctypes.c_double),
+                        ("max_deviation", ctypes.c_double),
+                        ("steps_taken", ctypes.c_int),
+                        ("total_distance", ctypes.c_double)
+                    ]
+                
+                self._cpp_lib.simulate_trajectory.argtypes = [
+                    ctypes.c_double, ctypes.c_double, ctypes.c_double,
+                    ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int
                 ]
-            
-            lib.simulate_trajectory.argtypes = [
-                ctypes.c_double, ctypes.c_double, ctypes.c_double,
-                ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int
-            ]
-            lib.simulate_trajectory.restype = TrajectoryResult
-            
-            # Call C++
-            res = lib.simulate_trajectory(
-                current_price, v_smooth, acceleration, 
-                mass, friction_coeff, 1.0, 100
-            )
-            
-            terminal_price = res.terminal_price
-            cpp_active = True
-            # logger.debug(f"Laplace [C++]: Terminal {terminal_price:.2f}")
-                 
-        except Exception as e:
-            # logger.warning(f"Laplace C++ Error: {e}")
-            pass
+                self._cpp_lib.simulate_trajectory.restype = TrajectoryResult
+                
+                # Call C++
+                res = self._cpp_lib.simulate_trajectory(
+                    current_price, v_smooth, acceleration, 
+                    mass, friction_coeff, 1.0, 100
+                )
+                
+                terminal_price = res.terminal_price
+                cpp_active = True
+                     
+            except Exception as e:
+                pass
             
         if not cpp_active:
             # Fallback Python Simulation

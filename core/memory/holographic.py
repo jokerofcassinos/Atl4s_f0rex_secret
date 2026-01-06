@@ -553,11 +553,16 @@ class HolographicMemory:
         # Fallback to numpy file
         if os.path.exists(self.persistence_file):
             try:
-                loaded_plate = np.load(self.persistence_file)
+                loaded_plate = np.load(self.persistence_file, allow_pickle=True)
                 if loaded_plate.shape[0] == self.dimensions:
                     self.plate.memory_plate = loaded_plate
                     logger.info(f"HOLOGRAPHIC MEMORY LOADED from {self.persistence_file}")
                 else:
                     logger.warning(f"Dimension mismatch: expected {self.dimensions}, got {loaded_plate.shape[0]}")
             except Exception as e:
-                logger.error(f"Failed to Load Hologram: {e}")
+                logger.debug(f"Failed to Load Hologram (will recreate): {e}")
+                # Remove corrupt file so it gets recreated
+                try:
+                    os.remove(self.persistence_file)
+                except:
+                    pass

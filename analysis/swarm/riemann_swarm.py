@@ -22,12 +22,27 @@ class RiemannSwarm(SubconsciousUnit):
         self.primes = [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53]
         self.min_data_points = 60 # Need at least 60 candles for FFT clarity
         
+        self._cpp_lib = None
         try:
-             from core.cpp_loader import load_dll
-             load_dll("physics_core.dll")
-             logger.info("RIEMANN ENGINE: C++ CORE ACTIVE [TURBO MODE]")
-        except:
-             logger.info("RIEMANN ENGINE: PYTHON FALLBACK [STANDARD MODE]")
+            import ctypes
+            import os
+            
+            dll_paths = [
+                os.path.join(os.path.dirname(__file__), "..", "..", "cpp_core", "libphysics.dll"),
+                os.path.join(os.path.dirname(__file__), "..", "..", "cpp_core", "build", "bin", "libphysics.dll"),
+                os.path.join(os.path.dirname(__file__), "..", "..", "cpp_core", "physics_core.dll"),
+            ]
+            
+            for dll_path in dll_paths:
+                if os.path.exists(dll_path):
+                    self._cpp_lib = ctypes.CDLL(dll_path)
+                    logger.info(f"RIEMANN ENGINE: C++ CORE ACTIVE [TURBO MODE] ({os.path.basename(dll_path)})")
+                    break
+            
+            if self._cpp_lib is None:
+                logger.info("RIEMANN ENGINE: PYTHON FALLBACK [STANDARD MODE]")
+        except Exception as e:
+            logger.info(f"RIEMANN ENGINE: PYTHON FALLBACK [STANDARD MODE] ({e})")
         
     async def process(self, context: Dict[str, Any]) -> Optional[SwarmSignal]:
         candles = context.get('candles')
@@ -160,26 +175,24 @@ class RiemannSwarm(SubconsciousUnit):
 
     def _calculate_curvature_bridge(self, closes: np.ndarray) -> float:
         """Calculates Sectional Curvature (C++ or Py Fallback)"""
-        try:
-            import ctypes
-            from core.cpp_loader import load_dll
-            
-            lib = load_dll("physics_core.dll")
-            
-            # double calculate_sectional_curvature(double* prices, int length, int window_size)
-            lib.calculate_sectional_curvature.argtypes = [
-                ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int
-            ]
-            lib.calculate_sectional_curvature.restype = ctypes.c_double
-            
-            # Prepare Array
-            array_type = ctypes.c_double * len(closes)
-            c_closes = array_type(*closes)
-                 
-            k = lib.calculate_sectional_curvature(c_closes, len(closes), 20)
-            return k
-        except Exception:
-            pass
+        if self._cpp_lib is not None:
+            try:
+                import ctypes
+                
+                # double calculate_sectional_curvature(double* prices, int length, int window_size)
+                self._cpp_lib.calculate_sectional_curvature.argtypes = [
+                    ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int
+                ]
+                self._cpp_lib.calculate_sectional_curvature.restype = ctypes.c_double
+                
+                # Prepare Array
+                array_type = ctypes.c_double * len(closes)
+                c_closes = array_type(*closes)
+                     
+                k = self._cpp_lib.calculate_sectional_curvature(c_closes, len(closes), 20)
+                return k
+            except Exception:
+                pass
             
         # Python Fallback (Simplified Discrete Curvature)
         # K ~ y'' / (1 + y'^2)^1.5
