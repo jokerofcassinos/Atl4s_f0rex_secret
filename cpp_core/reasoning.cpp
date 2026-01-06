@@ -287,7 +287,9 @@ EXPORT int find_similar_patterns(
     int match_count = 0;
     
     #pragma omp parallel for
-    for (int p = 0; p < num_patterns && match_count < max_matches; p++) {
+    for (int p = 0; p < num_patterns; p++) {
+        if (match_count >= max_matches) continue;
+        
         const double* pattern = pattern_database + p * pattern_size;
         
         // Compute cosine similarity

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <random>
 #include <fstream>
+#include <chrono>
 
 #ifdef _OPENMP
 #include <omp.h>
