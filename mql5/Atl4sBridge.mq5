@@ -442,8 +442,8 @@ public:
 
 class CSimpleNeuralNetwork {
 private:
-    double weights_ih[][]; // Input to Hidden
-    double weights_ho[][]; // Hidden to Output
+    double weights_ih[];  // Flattened: [input_size * hidden_size]
+    double weights_ho[];  // Flattened: [hidden_size * output_size]
     double biases_h[];
     double biases_o[];
     int input_size;
@@ -456,22 +456,18 @@ private:
         return 1.0 / (1.0 + MathExp(-x));
     }
     
+    // Helper to access 2D array stored as 1D
+    int GetIdx_IH(int i, int j) { return i * hidden_size + j; }
+    int GetIdx_HO(int i, int j) { return i * output_size + j; }
+    
 public:
     CSimpleNeuralNetwork() {
         input_size = 5;
         hidden_size = 8;
         output_size = 3;
         
-        ArrayResize(weights_ih, input_size);
-        for(int i = 0; i < input_size; i++) {
-            ArrayResize(weights_ih[i], hidden_size);
-        }
-        
-        ArrayResize(weights_ho, hidden_size);
-        for(int i = 0; i < hidden_size; i++) {
-            ArrayResize(weights_ho[i], output_size);
-        }
-        
+        ArrayResize(weights_ih, input_size * hidden_size);
+        ArrayResize(weights_ho, hidden_size * output_size);
         ArrayResize(biases_h, hidden_size);
         ArrayResize(biases_o, output_size);
         
@@ -479,12 +475,12 @@ public:
         MathSrand(GetTickCount());
         for(int i = 0; i < input_size; i++) {
             for(int j = 0; j < hidden_size; j++) {
-                weights_ih[i][j] = (MathRand() / 32768.0 - 0.5) * 0.2;
+                weights_ih[GetIdx_IH(i, j)] = (MathRand() / 32768.0 - 0.5) * 0.2;
             }
         }
         for(int i = 0; i < hidden_size; i++) {
             for(int j = 0; j < output_size; j++) {
-                weights_ho[i][j] = (MathRand() / 32768.0 - 0.5) * 0.2;
+                weights_ho[GetIdx_HO(i, j)] = (MathRand() / 32768.0 - 0.5) * 0.2;
             }
             biases_h[i] = 0;
         }
@@ -501,7 +497,7 @@ public:
         for(int j = 0; j < hidden_size; j++) {
             hidden[j] = biases_h[j];
             for(int i = 0; i < input_size && i < ArraySize(inputs); i++) {
-                hidden[j] += inputs[i] * weights_ih[i][j];
+                hidden[j] += inputs[i] * weights_ih[GetIdx_IH(i, j)];
             }
             hidden[j] = Sigmoid(hidden[j]);
         }
@@ -510,7 +506,7 @@ public:
         for(int k = 0; k < output_size; k++) {
             outputs[k] = biases_o[k];
             for(int j = 0; j < hidden_size; j++) {
-                outputs[k] += hidden[j] * weights_ho[j][k];
+                outputs[k] += hidden[j] * weights_ho[GetIdx_HO(j, k)];
             }
             outputs[k] = Sigmoid(outputs[k]);
         }
