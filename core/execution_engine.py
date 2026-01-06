@@ -272,8 +272,7 @@ class ExecutionEngine:
             symbol = trade.get('symbol')
             
             limit = -abs(v_sl)
-            # Debug log
-            logger.debug(f"VSL CHECK: Ticket {ticket} | Profit ${profit:.2f} | Limit ${limit:.2f} | VTP ${v_tp:.2f}")
+            # Only log when action will be taken (removed spam)
             
             # 1. Individual Take Profit (The Snipe)
             if profit >= v_tp:

@@ -92,7 +92,7 @@ class ZmqBridge:
                     # Process TRADES_JSON separately (no symbol field)
                     if fields and fields.get('type') == 'TRADES_JSON':
                         self.latest_trades = fields.get('trades', [])
-                        logger.debug(f"Received Trades Update: {len(self.latest_trades)} trades")
+                        # Silenced: Too spammy
                         continue
                     
                     if fields and 'symbol' in fields:
