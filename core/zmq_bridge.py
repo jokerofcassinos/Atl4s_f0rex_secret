@@ -88,6 +88,13 @@ class ZmqBridge:
                     
                     # Parse
                     fields = self._parse_line(line)
+                    
+                    # Process TRADES_JSON separately (no symbol field)
+                    if fields and fields.get('type') == 'TRADES_JSON':
+                        self.latest_trades = fields.get('trades', [])
+                        logger.debug(f"Received Trades Update: {len(self.latest_trades)} trades")
+                        continue
+                    
                     if fields and 'symbol' in fields:
                         sym = fields['symbol']
                         
@@ -102,9 +109,6 @@ class ZmqBridge:
                         # Process Data (Update internal state)
                         if fields.get('type') == 'TICK':
                             self.latest_tick = fields
-                        elif fields.get('type') == 'TRADES_JSON':
-                            self.latest_trades = fields.get('trades', [])
-                            # logger.debug(f"Received Trades Update: {len(self.latest_trades)} trades")
                             
         except ConnectionResetError:
             logger.warning(f"Connection Reset: {detected_symbol}")
