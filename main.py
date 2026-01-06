@@ -187,6 +187,9 @@ class OmegaSystem:
         self.interactive_startup()
         await self.boot_sequence()
         
+        tick_count = 0  # Heartbeat counter
+        last_heartbeat = datetime.datetime.now()
+        
         while True:
             try:
                 # 0. Schedule Enforcement (Monday-Friday Only)
@@ -196,6 +199,13 @@ class OmegaSystem:
                     logger.info("MARKET CLOSED (Weekend). Sleeping...")
                     await asyncio.sleep(60)
                     continue
+                
+                # Heartbeat Log (every 30 seconds)
+                now = datetime.datetime.now()
+                if (now - last_heartbeat).total_seconds() >= 30:
+                    logger.info(f"♥ HEARTBEAT: {tick_count} ticks processed | Mode: {self.config.get('mode', 'N/A')} | Status: ALIVE")
+                    last_heartbeat = now
+                    tick_count = 0
 
                 # 1. Get Live Tick (Blocking or optimized async)
                 # In real prod, this should be non-blocking. 
@@ -203,6 +213,7 @@ class OmegaSystem:
                 tick = self.bridge.get_tick()
                 
                 if tick:
+                    tick_count += 1
                     self.symbol = tick.get('symbol', 'XAUUSD')
                     
                     if 'last' not in tick:
