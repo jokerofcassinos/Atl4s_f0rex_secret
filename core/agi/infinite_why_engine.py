@@ -913,6 +913,11 @@ class InfiniteWhyEngine:
                 parent_id=parent_tree_node_id,
                 context={"dimension": dim},
             )
+            
+            # Check if node was actually created (create_node returns parent_id if max depth reached)
+            if child_tree_id == parent_tree_node_id:
+                # Max depth reached in ThoughtTree, stop recursion
+                continue
 
             # Exemplo: consulta padrões de sucesso/fracasso recentes do módulo
             patterns = module_memory.analyze_decision_patterns(lookback_days=30)
