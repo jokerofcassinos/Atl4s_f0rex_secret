@@ -13,9 +13,16 @@ logger = logging.getLogger("Atl4s-Data")
 class DataLoader:
     def _normalize_symbol(self, symbol: str) -> str:
         """
-        Converts MT5 symbols (e.g., 'DOGUSD', 'BTCUSD') to Yahoo Finance Tickers (e.g., 'DOGE-USD', 'BTC-USD').
+        Converts MT5 symbols (e.g., 'DOGUSD', 'BTCUSD', 'USDCADm') to Yahoo Finance Tickers (e.g., 'DOGE-USD', 'BTC-USD').
         """
         s = symbol.upper()
+        
+        # 0. Remove broker-specific suffixes (m, c, pro, raw, etc.)
+        broker_suffixes = ['M', '.M', 'C', '.C', 'PRO', '.PRO', 'RAW', '.RAW', 'ECN', '.ECN']
+        for suffix in broker_suffixes:
+            if s.endswith(suffix) and len(s) > len(suffix):
+                s = s[:-len(suffix)]
+                break
         
         # 1. Explicit Dictionary (The "Fixer" List)
         # Add any tricky ones here.
