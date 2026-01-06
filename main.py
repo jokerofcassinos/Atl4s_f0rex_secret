@@ -203,7 +203,7 @@ class OmegaSystem:
                 # Heartbeat Log (every 30 seconds)
                 now = datetime.datetime.now()
                 if (now - last_heartbeat).total_seconds() >= 30:
-                    logger.info(f"♥ HEARTBEAT: {tick_count} ticks processed | Mode: {self.config.get('mode', 'N/A')} | Status: ALIVE")
+                    logger.info(f"[HEARTBEAT] {tick_count} ticks | Mode: {self.config.get('mode', 'N/A')} | Status: ALIVE")
                     last_heartbeat = now
                     tick_count = 0
 
