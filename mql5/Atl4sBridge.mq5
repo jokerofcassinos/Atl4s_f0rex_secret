@@ -1020,6 +1020,40 @@ void ProcessCommand(string json) {
             }
         }
     }
+    // CLOSE_TRADE - Close a specific trade by ticket
+    else if(action == "CLOSE_TRADE") {
+        if(ArraySize(parts) >= 2) {
+            ulong ticket = (ulong)StringToInteger(parts[1]);
+            Print("PYTHON VSL/VTP: Closing Ticket ", ticket);
+            
+            if(PositionSelectByTicket(ticket)) {
+                bool result = trade.PositionClose(ticket);
+                if(result) {
+                    Print("SUCCESS: Closed ticket ", ticket);
+                } else {
+                    Print("FAILED: Could not close ticket ", ticket, " Error: ", GetLastError());
+                }
+            } else {
+                Print("WARNING: Ticket ", ticket, " not found or already closed");
+            }
+        }
+    }
+    // CLOSE_ALL - Close all positions for a symbol
+    else if(action == "CLOSE_ALL") {
+        string target_sym = parts[1];
+        Print("EMERGENCY: Closing ALL positions for ", target_sym);
+        
+        for(int i = PositionsTotal() - 1; i >= 0; i--) {
+            ulong ticket = PositionGetTicket(i);
+            if(PositionSelectByTicket(ticket)) {
+                string sym = PositionGetString(POSITION_SYMBOL);
+                if(sym == target_sym || target_sym == "ALL") {
+                    trade.PositionClose(ticket);
+                    Print("Closed position: ", ticket);
+                }
+            }
+        }
+    }
     else if(action == "PRUNE_LOSERS") {
         string target_sym = parts[1];
         Print("PRUNING LOSERS for ", target_sym);
