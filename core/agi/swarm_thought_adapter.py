@@ -67,13 +67,17 @@ class AGISwarmAdapter:
             module_name=f"swarm::{self.swarm_name}",
         )
 
-        deep = self.why_engine.deep_scan_recursive(
-            module_name=f"swarm::{self.swarm_name}",
-            query_event=ev,
-        )
-
-        root_id = deep.get("root_node_id")
-        scenario_branches = deep.get("scenario_branches", [])
+        # OPTIMIZATION: Skip deep recursive scan to prevent terminal freezing
+        # TODO: Re-enable with depth limit after performance optimization
+        # deep = self.why_engine.deep_scan_recursive(
+        #     module_name=f"swarm::{self.swarm_name}",
+        #     query_event=ev,
+        # )
+        # root_id = deep.get("root_node_id")
+        # scenario_branches = deep.get("scenario_branches", [])
+        
+        root_id = None
+        scenario_branches = []
 
         meta = {
             "thought_root_id": root_id,
