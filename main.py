@@ -32,16 +32,16 @@ logging.getLogger("peewee").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
-# === REASONING LOGS ENABLED ===
-# Enable detailed logs for cognitive/reasoning modules
-logging.getLogger("MCTS_Planner").setLevel(logging.DEBUG)
+# === REASONING LOGS - REDUCED SPAM ===
+# Set spammy initialization logs to WARNING to reduce noise
+logging.getLogger("MCTS_Planner").setLevel(logging.INFO)
 logging.getLogger("SwarmOrchestrator").setLevel(logging.INFO)
-logging.getLogger("InfiniteWhyEngine").setLevel(logging.INFO)
-logging.getLogger("ThoughtTree").setLevel(logging.INFO)  # Set to DEBUG for ultra-verbose
-logging.getLogger("HolographicMemory").setLevel(logging.INFO)
-logging.getLogger("LaplaceSwarm").setLevel(logging.DEBUG)
-logging.getLogger("RiemannSwarm").setLevel(logging.DEBUG)
-logging.getLogger("OmegaProtocol").setLevel(logging.DEBUG)
+logging.getLogger("InfiniteWhyEngine").setLevel(logging.WARNING)  # Spammy initialization
+logging.getLogger("ThoughtTree").setLevel(logging.WARNING)
+logging.getLogger("HolographicMemory").setLevel(logging.WARNING)  # Spammy initialization
+logging.getLogger("LaplaceSwarm").setLevel(logging.INFO)
+logging.getLogger("RiemannSwarm").setLevel(logging.INFO)
+logging.getLogger("OmegaProtocol").setLevel(logging.INFO)
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
