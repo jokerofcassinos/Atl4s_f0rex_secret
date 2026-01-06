@@ -135,16 +135,27 @@ class OmegaSystem:
         print("\nSelect Operational Mode:")
         print("1. SNIPER (Precision, 1 Order per Signal)")
         print("2. WOLF PACK (Aggressive, Scaled Burst Execution)")
+        print("3. HYBRID (Balanced, Adaptive Execution)")
+        print("4. AGI MAPPER (Full AGI Control, Self-Optimizing)")
         try:
-            sel = input("Selection [1/2]: ").strip()
-            if sel == "2": self.config['mode'] = "WOLF_PACK"
-            else: self.config['mode'] = "SNIPER"
+            sel = input("Selection [1/2/3/4]: ").strip()
+            if sel == "2": 
+                self.config['mode'] = "WOLF_PACK"
+            elif sel == "3": 
+                self.config['mode'] = "HYBRID"
+            elif sel == "4": 
+                self.config['mode'] = "AGI_MAPPER"
+            else: 
+                self.config['mode'] = "SNIPER"
         except: pass
         
-        if self.config['mode'] == "WOLF_PACK":
-             print(">> WOLF PACK MODE ENGAGED. UNLEASH THE HOUNDS.")
-        else:
-             print(">> SNIPER MODE ENGAGED. ONE SHOT, ONE KILL.")
+        mode_messages = {
+            "WOLF_PACK": ">> WOLF PACK MODE ENGAGED. UNLEASH THE HOUNDS.",
+            "SNIPER": ">> SNIPER MODE ENGAGED. ONE SHOT, ONE KILL.",
+            "HYBRID": ">> HYBRID MODE ENGAGED. ADAPTIVE PRECISION + AGGRESSION.",
+            "AGI_MAPPER": ">> AGI MAPPER MODE ENGAGED. FULL AUTONOMOUS CONTROL ACTIVE."
+        }
+        print(mode_messages.get(self.config['mode'], ">> UNKNOWN MODE"))
 
         print(f"\nConfiguration Loaded: Profile={self.symbol} | VSL=${self.config['virtual_sl']} | VTP=${self.config['virtual_tp']} | Mode={self.config['mode']}")
         print("="*50 + "\n")
@@ -268,6 +279,30 @@ class OmegaSystem:
                             elif confidence >= 85.0: max_burst = 3
                             elif confidence >= 80.0: max_burst = 2
                             else: max_burst = 1
+                        elif self.config['mode'] == "HYBRID":
+                            # Balanced approach: 2-3 orders based on confidence
+                            if confidence >= 90.0: max_burst = 3
+                            elif confidence >= 80.0: max_burst = 2
+                            else: max_burst = 1
+                        elif self.config['mode'] == "AGI_MAPPER":
+                            # AGI Full Control - Dynamic scaling based on MCTS recommendation
+                            mcts_action = self.grandmaster.search({
+                                'price': tick.get('bid', 0),
+                                'entry': tick.get('bid', 0),
+                                'side': decision,
+                                'pnl': 0,
+                                'volatility': 1.0
+                            }, trend_bias=confidence/100.0)
+                            
+                            # AGI can scale from 1-6 based on its decision
+                            if mcts_action in ["HOLD", "CLOSE"]:
+                                max_burst = 1  # Conservative
+                            elif mcts_action == "TRAIL":
+                                max_burst = 3  # Moderate
+                            elif mcts_action == "PARTIAL_TP":
+                                max_burst = 4  # Aggressive
+                            else:
+                                max_burst = min(6, int(confidence / 15))  # Dynamic
                             
                         # Existing Burst Logic (Simulates HFT volley)
                         # We use the 'max_burst' determined above.
@@ -275,6 +310,8 @@ class OmegaSystem:
                         current_positions = tick.get('positions', 0)
                         max_slots = 10 # Allow more slots in Wolf Mode?
                         if self.config['mode'] == "WOLF_PACK": max_slots = 15
+                        elif self.config['mode'] == "HYBRID": max_slots = 12
+                        elif self.config['mode'] == "AGI_MAPPER": max_slots = 20  # AGI gets max flexibility
 
                         tracker = self.burst_tracker.get(self.symbol, {'timestamp': 0, 'count': 0})
                         
@@ -286,8 +323,15 @@ class OmegaSystem:
                              logger.info(f"FIRE! Burst {tracker['count']+1}/{max_burst} | Slots {current_positions+1}/{max_slots}")
                              
                              # Fix: Method is execute_signal, and takes 'decision' string ("BUY"/"SELL"), not 'cmd' int.
-                             # Wolf Pack Mode: We allow lenient spreads (0.05) to ensure burst execution.
-                             spread_tol = 0.05 if self.config['mode'] == "WOLF_PACK" else None
+                             # Mode-based spread tolerance
+                             if self.config['mode'] == "WOLF_PACK": 
+                                 spread_tol = 0.05  # Lenient
+                             elif self.config['mode'] == "HYBRID":
+                                 spread_tol = 0.03  # Moderate
+                             elif self.config['mode'] == "AGI_MAPPER":
+                                 spread_tol = 0.02  # Tight - AGI knows best
+                             else:
+                                 spread_tol = None  # Default (SNIPER)
                              
                              await self.executor.execute_signal(decision, self.symbol, 
                                                                 tick.get('bid'), tick.get('ask'), 
