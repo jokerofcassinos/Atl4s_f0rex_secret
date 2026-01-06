@@ -537,12 +537,16 @@ class SwarmOrchestrator:
         
         decision_score = swarm_vec[0]
         final_decision = "WAIT"
-        final_conf = abs(decision_score) * 100.0
+        # Fixed: Use actual signal strength, not inflated 5x multiplier
+        # Scale from [-1, 1] decision score to [0, 100] confidence
+        final_conf = min(100.0, max(0.0, abs(decision_score) * 100.0))
         
         if decision_score > 0.05: final_decision = "BUY"
         elif decision_score < -0.05: final_decision = "SELL"
-             
-        final_conf = min(100.0, final_conf * 5.0) 
+        
+        # Boost confidence for strong consensus (but not artificially inflate)
+        if final_conf > 50:
+            final_conf = min(100.0, final_conf * 1.2)  # Max 20% boost instead of 5x 
         
         logger.info(f"AGI ATTENTION: Decision={final_decision} (Score={decision_score:.3f}) | Memory Bias={vectors[0][0]:.3f}")
 
