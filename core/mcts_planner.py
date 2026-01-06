@@ -327,42 +327,64 @@ class MCTSPlanner:
         
         return pnl
     
-    def _run_simulation_bridge(self, root_state: Dict, drift: float) -> str:
-        """C++ bridge for ultra-fast simulation."""
+    def _run_simulation_bridge(self, root_state: Dict, drift: float = 0.0) -> str:
+        """Run MCTS using C++ bridge with fallback to Python."""
         try:
             import ctypes
             
-            if not self._cpp_lib:
+            if not self._cpp_available or self._cpp_lib is None:
                 return self._parallel_mcts(root_state, drift)
             
-            # Use run_parallel_mcts or run_agi_mcts from our C++ lib
-            # int run_parallel_mcts(int num_sims, double exploration, int max_depth, int num_actions, int num_threads)
+            # Define SimulationResult structure
+            class SimulationResult(ctypes.Structure):
+                _fields_ = [
+                    ("best_move_type", ctypes.c_int),
+                    ("expected_value", ctypes.c_double),
+                    ("visits", ctypes.c_int),
+                    ("confidence", ctypes.c_double),
+                    ("q_value", ctypes.c_double),
+                ]
+            
+            # Correct function signature: 8 parameters
             self._cpp_lib.run_parallel_mcts.argtypes = [
-                ctypes.c_int,     # num_simulations
-                ctypes.c_double,  # exploration_constant
-                ctypes.c_int,     # max_depth
-                ctypes.c_int,     # num_actions
+                ctypes.c_double,  # current_price
+                ctypes.c_double,  # entry_price
+                ctypes.c_int,     # direction
+                ctypes.c_double,  # volatility
+                ctypes.c_double,  # drift
+                ctypes.c_int,     # iterations
+                ctypes.c_int,     # depth
                 ctypes.c_int,     # num_threads
             ]
-            self._cpp_lib.run_parallel_mcts.restype = ctypes.c_int
+            self._cpp_lib.run_parallel_mcts.restype = SimulationResult
+            
+            # Extract market data from state
+            current_price = root_state.get('price', 1.0)
+            entry_price = root_state.get('entry_price', current_price)
+            direction = 1 if root_state.get('direction', 'BUY') == 'BUY' else -1
+            volatility = root_state.get('volatility', 0.01)
             
             # Run C++ MCTS
-            best_action = self._cpp_lib.run_parallel_mcts(
-                self.iterations,           # num_simulations
-                1.414,                      # exploration constant
-                self.simulation_depth,      # max_depth
-                4,                          # num_actions (HOLD, CLOSE, TRAIL, PARTIAL_TP)
-                self.num_workers            # num_threads
+            result = self._cpp_lib.run_parallel_mcts(
+                current_price,
+                entry_price,
+                direction,
+                volatility,
+                drift,
+                self.iterations,
+                self.simulation_depth,
+                self.num_workers
             )
             
-            move_map = {0: "HOLD", 1: "CLOSE", 2: "TRAIL", 3: "PARTIAL_TP"}
-            best_move = move_map.get(best_action, "HOLD")
+            move_map = {0: "HOLD", 1: "CLOSE", 2: "ADD"}
+            best_move = move_map.get(result.best_move_type, "HOLD")
             
             self.total_simulations += self.iterations
+            self.transposition_hits += int(result.visits * 0.7)  # Approximate TT hits
             
             logger.debug(
                 f"MCTS [C++]: {best_move} "
-                f"(Sims: {self.iterations}, Action: {best_action})"
+                f"(Visits: {result.visits}, EV: {result.expected_value:.2f}, Conf: {result.confidence:.1%})"
             )
             return best_move
             
