@@ -1,54 +1,22 @@
+import logging
+from typing import Dict, Any, Optional
+
 import pandas as pd
 import ta
-import logging
+
+from core.agi.module_thought_adapter import AGIModuleAdapter, ModuleThoughtResult
 
 logger = logging.getLogger("Atl4s-Trend")
 
-class TrendArchitect:
-    def __init__(self):
-        pass
-
-    def analyze(self, df):
-        """
-        Analyzes the trend structure.
-        Returns:
-            score (int): Confidence score (0-100)
-            direction (int): 1 (Buy), -1 (Sell), 0 (Neutral)
-        """
-        if df is None or len(df) < 200:
-            logger.warning("Insufficient data for Trend Analysis")
-            return 0, 0
-
-        df = df.copy()
-
-        # Calculate Indicators using 'ta' library
-        
-        # Ensure inputs are 1D Series
-        close_series = df['close'].squeeze()
-        high_series = df['high'].squeeze()
-        low_series = df['low'].squeeze()
-        
-        if isinstance(close_series, pd.DataFrame): close_series = close_series.iloc[:, 0]
-        if isinstance(high_series, pd.DataFrame): high_series = high_series.iloc[:, 0]
-        if isinstance(low_series, pd.DataFrame): low_series = low_series.iloc[:, 0]
-
-        # EMA
-        df['EMA_50'] = ta.trend.EMAIndicator(close=close_series, window=50).ema_indicator()
-        df['EMA_200'] = ta.trend.EMAIndicator(close=close_series, window=200).ema_indicator()
-        
-        # Ichimoku
-        ichimoku = ta.trend.IchimokuIndicator(high=high_series, low=low_series, window1=9, window2=26, window3=52)
-import pandas as pd
-import ta
-import logging
-
-logger = logging.getLogger("Atl4s-Trend")
 
 class TrendArchitect:
-    def __init__(self):
-        pass
+    def __init__(self, symbol: str = "UNKNOWN", timeframe: str = "M5"):
+        self.symbol = symbol
+        self.timeframe = timeframe
+        # Camada AGI: conecta este módulo ao InfiniteWhyEngine
+        self.agi_adapter = AGIModuleAdapter(module_name="TrendArchitect")
 
-    def analyze(self, df_m5, df_h1=None):
+    def analyze(self, df_m5, df_h1: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
         """
         Analyzes Trend using Multi-Timeframe Context (The River) and ADX Regime.
         """
@@ -143,10 +111,35 @@ class TrendArchitect:
         
         # If Regime is RANGING, we ignore the River and trust the M5 Reversals (handled by Quant mostly)
         # But Trend Architect just reports what it sees on M5.
-        
-        return {
-            "score": min(score, 100), 
-            "direction": direction, 
+
+        raw_output: Dict[str, Any] = {
+            "score": min(score, 100),
+            "direction": direction,
             "regime": regime,
-            "river": river_dir
+            "river": river_dir,
         }
+
+        # --- 5. Camada de Pensamento Recursivo (Fase 8) ---
+        market_state: Dict[str, Any] = {
+            "price": float(close),
+            "ema20_m5": float(ema20),
+            "ema50_m5": float(ema50),
+            "adx": float(adx),
+            "river_dir": int(river_dir),
+        }
+
+        thought: ModuleThoughtResult = self.agi_adapter.think_on_analysis(
+            symbol=self.symbol,
+            timeframe=self.timeframe,
+            market_state=market_state,
+            raw_module_output=raw_output,
+        )
+
+        # Enriquecer saída original com metadados AGI
+        enriched = dict(raw_output)
+        enriched["agi_decision"] = thought.decision
+        enriched["agi_score"] = thought.score
+        enriched["thought_root_id"] = thought.thought_root_id
+        enriched["agi_meta"] = thought.meta
+
+        return enriched

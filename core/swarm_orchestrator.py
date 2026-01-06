@@ -4,11 +4,14 @@ import logging
 import time
 import random
 from typing import Dict, List, Any, Tuple
+
+import numpy as np
 import pandas as pd
+
 from .consciousness_bus import ConsciousnessBus
 from .interfaces import SwarmSignal, SubconsciousUnit
-from core.memory.holographic import HolographicMemory # Phase 117
-import numpy as np
+from core.memory.holographic import HolographicMemory  # Phase 117
+from core.agi.swarm_thought_adapter import AGISwarmAdapter, SwarmThoughtResult
 
 # --- SWARM MODULE IMPORTS ---
 # Core / Legacy
@@ -305,15 +308,47 @@ class SwarmOrchestrator:
              context = {'tick': tick} # Fallback
              
         # Collect Signals 
-        thoughts = []
-        swarm_snapshot = {} # For Memory
-        
+        thoughts: List[SwarmSignal] = []
+        swarm_snapshot: Dict[str, float] = {}  # For Memory
+
+        symbol = tick.get('symbol', 'UNKNOWN')
+        timeframe = config.get('timeframe', 'M5') if config else 'M5'
+        market_state_base: Dict[str, Any] = {
+            "price": float(current_price),
+        }
+
         for agent in self.active_agents:
             signal = await agent.process(context)
             if signal:
+                # Phase 9: Global AGI hook for ALL swarms (no file left behind)
+                try:
+                    adapter = AGISwarmAdapter(agent.name)
+                    swarm_output = {
+                        "decision": signal.signal_type,
+                        "score": signal.confidence,
+                        "reason": signal.meta_data.get("reason", ""),
+                        "aggregated_signal": signal.signal_type,
+                    }
+                    # Merge generic state with per-signal meta_data for richer memory
+                    market_state = {
+                        **market_state_base,
+                        **signal.meta_data,
+                    }
+                    thought: SwarmThoughtResult = adapter.think_on_swarm_output(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        market_state=market_state,
+                        swarm_output=swarm_output,
+                    )
+                    # Attach AGI introspection ids into meta_data for downstream modules
+                    signal.meta_data.setdefault("agi_thought_root_id", thought.thought_root_id)
+                    signal.meta_data.setdefault("agi_scenarios", thought.meta.get("scenario_count", 0))
+                except Exception as e:
+                    logger.error("Global AGI Swarm Hook error for %s: %s", agent.name, e)
+
                 thoughts.append(signal)
                 self.bus.register_thought(signal)
-                
+
                 # Build Consensus State for Memory
                 sign = 1.0 if signal.signal_type == "BUY" else (-1.0 if signal.signal_type == "SELL" else 0.0)
                 swarm_snapshot[agent.name] = signal.confidence * sign

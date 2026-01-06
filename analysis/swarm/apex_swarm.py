@@ -1,9 +1,12 @@
 
 import logging
+from typing import Dict, Any
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List
+
 from core.interfaces import SwarmSignal, SubconsciousUnit
+from core.agi.swarm_thought_adapter import AGISwarmAdapter, SwarmThoughtResult
 
 logger = logging.getLogger("ApexSwarm")
 
@@ -21,6 +24,7 @@ class ApexSwarm(SubconsciousUnit):
     """
     def __init__(self):
         super().__init__("ApexSwarm")
+        self.agi_adapter = AGISwarmAdapter("ApexSwarm")
 
     async def process(self, context: Dict[str, Any]) -> SwarmSignal:
         data_map = context.get('data_map', {})
@@ -40,9 +44,10 @@ class ApexSwarm(SubconsciousUnit):
              if len(basket) == 0 and df_m5_current is not None:
                  basket = {current_symbol: df_m5_current}
         
-        if not basket: return None
-        
-        scores = {}
+        if not basket:
+            return None
+
+        scores: Dict[str, float] = {}
         
         for symbol, df in basket.items():
             if df is None or len(df) < 50: continue
@@ -79,7 +84,8 @@ class ApexSwarm(SubconsciousUnit):
             
             scores[symbol] = score
             
-        if not scores: return None
+        if not scores:
+            return None
         
         # Identify Winner
         king_symbol = max(scores, key=scores.get)
@@ -98,7 +104,30 @@ class ApexSwarm(SubconsciousUnit):
         
         if (significant_gap or current_is_trash) and king_symbol != current_symbol:
             reason = f"Routing to {king_symbol} (Score {king_score:.2f} vs {current_score:.2f})"
-            
+
+            # Phase 9: Think as a swarm about asset selection decision
+            symbol = current_symbol or king_symbol
+            timeframe = context.get("timeframe", "M5")
+            market_state = {
+                "king_symbol": king_symbol,
+                "current_symbol": current_symbol,
+                "king_score": float(king_score),
+                "current_score": float(current_score),
+            }
+            swarm_output = {
+                "decision": "ROUTING",
+                "score": king_score,
+                "scores": scores,
+                "reason": reason,
+                "aggregated_signal": king_symbol,
+            }
+            swarm_thought: SwarmThoughtResult = self.agi_adapter.think_on_swarm_output(
+                symbol=symbol,
+                timeframe=timeframe,
+                market_state=market_state,
+                swarm_output=swarm_output,
+            )
+
             return SwarmSignal(
                 source="ApexSwarm",
                 signal_type="ROUTING", # Special Type
@@ -108,7 +137,9 @@ class ApexSwarm(SubconsciousUnit):
                     "reason": reason, 
                     "best_asset": king_symbol, 
                     "scores": scores,
-                    "action": "SWITCH_FOCUS"
+                    "action": "SWITCH_FOCUS",
+                    "agi_thought_root_id": swarm_thought.thought_root_id,
+                    "agi_scenarios": swarm_thought.meta.get("scenario_count", 0),
                 }
             )
             

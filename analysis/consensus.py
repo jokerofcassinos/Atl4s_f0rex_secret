@@ -1,4 +1,5 @@
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from .trend_architect import TrendArchitect
 from .sniper import Sniper
@@ -28,6 +29,13 @@ from .ninth_eye import NinthEye
 from .tenth_eye import TenthEye
 from .recursive_reasoner import RecursiveReasoner
 from .black_swan_adversary import BlackSwanAdversary
+from .agi.weekend_gap_predictor import WeekendGapPredictor
+from core.agi.thought_tree import GlobalThoughtOrchestrator, ThoughtTree
+from core.agi.decision_memory import GlobalDecisionMemory, ModuleDecisionMemory
+# AGI Ultra Imports (Phase 7)
+from core.agi.unified_reasoning import UnifiedReasoningLayer, ModuleInsight
+from core.agi.health_monitor import HealthMonitor, HealthStatus
+from core.agi.memory_integration import MemoryIntegrationLayer
 
 logger = logging.getLogger("Atl4s-Consensus")
 
@@ -61,6 +69,20 @@ class ConsensusEngine:
         self.architect = TenthEye() # The Meta Manager
         self.debater = RecursiveReasoner() # The Internal Critic
         self.adversary = BlackSwanAdversary() # The Stress Tester
+        self.weekend_gap = WeekendGapPredictor() # Phase 5: Weekend Gap Predictor
+        
+        # Phase 6: Thought Tree and Decision Memory
+        self.thought_orchestrator = GlobalThoughtOrchestrator()
+        self.decision_memory = GlobalDecisionMemory()
+        
+        # Phase 7: AGI Ultra Integration
+        self.unified_reasoning = UnifiedReasoningLayer(conflict_resolution_strategy="weighted_vote")
+        self.health_monitor = HealthMonitor(latency_threshold_ms=500, loop_detection_window=50)
+        self.memory_integration = MemoryIntegrationLayer()
+        
+        # Register core modules for health monitoring
+        for module_name in ['Trend', 'Sniper', 'Quant', 'Oracle', 'Council', 'Overlord']:
+            self.health_monitor.register_component(module_name)
         
         # Persistent Thread Pool for fast execution
         self.executor = ThreadPoolExecutor(max_workers=14)
@@ -135,7 +157,8 @@ class ConsensusEngine:
             'Council': lambda: self.council.deliberate(data_map),
             'Overlord': lambda: self.overlord.deliberate(data_map),
             'Sovereign': lambda: self.sovereign.deliberate(data_map),
-            'Singularity': lambda: self.singularity.deliberate(data_map)
+            'Singularity': lambda: self.singularity.deliberate(data_map),
+            'WeekendGap': lambda: self.weekend_gap.deliberate(data_map)  # Phase 5
         }
         
         results = {}
@@ -146,10 +169,121 @@ class ConsensusEngine:
         for future in as_completed(future_to_task):
             name = future_to_task[future]
             try:
+                start_t = time.time()
                 results[name] = future.result()
+                latency_ms = (time.time() - start_t) * 1000
+                self.health_monitor.update_component(name, latency_ms=latency_ms)
             except Exception as e:
                 logger.error(f"Analysis Error in {name}: {e}")
-                # We don't set anything so results.get(name, default) works
+                self.health_monitor.record_error(name, str(e))
+
+        # Phase 6: Recursive Thinking - Each module thinks about its decision
+        # Pergunta recursiva: "Por que pensei assim?", "Foi correto?", "Como agir agora?"
+        for module_name, result in results.items():
+            if result is None:
+                continue
+            
+            # Obtém ou cria árvore de pensamento para o módulo
+            tree = self.thought_orchestrator.get_or_create_tree(module_name)
+            
+            # Obtém ou cria memória de decisões
+            memory = self.decision_memory.get_or_create_memory(module_name)
+            
+            # Extrai decisão e score
+            decision = result.get('decision', 'WAIT') if isinstance(result, dict) else 'WAIT'
+            score = result.get('score', 0.0) if isinstance(result, dict) else 0.0
+            reasoning = result.get('reason', '') if isinstance(result, dict) else ''
+            
+            # Cria nó de pensamento raiz
+            root_node_id = tree.create_node(
+                question=f"Why did I decide {decision}?",
+                context={'result': result, 'data_map_keys': list(data_map.keys())},
+                confidence=abs(score) / 100.0 if score != 0 else 0.0
+            )
+            
+            # Responde o nó raiz
+            tree.answer_node(root_node_id, reasoning or f"Based on analysis: {decision}")
+            
+            # Perguntas recursivas adicionais
+            if decision != 'WAIT':
+                # Pergunta 1: "Foi correto?"
+                child1_id = tree.create_node(
+                    question="Was this decision correct?",
+                    parent_id=root_node_id,
+                    context={'parent_decision': decision}
+                )
+                # Busca decisões similares no passado
+                similar_decisions = memory.find_similar_decisions(
+                    {'decision': decision, 'score': score}, limit=5
+                )
+                if similar_decisions:
+                    success_rate = len([d for d in similar_decisions if d.result == "WIN"]) / len(similar_decisions)
+                    answer1 = f"Similar past decisions had {success_rate:.1%} success rate"
+                    tree.answer_node(child1_id, answer1, confidence=success_rate)
+                else:
+                    tree.answer_node(child1_id, "No similar past decisions found", confidence=0.0)
+                
+                # Pergunta 2: "Como agir agora?"
+                child2_id = tree.create_node(
+                    question="How should I act now?",
+                    parent_id=root_node_id,
+                    context={'current_decision': decision}
+                )
+                recommendation = memory.get_recommendation({'decision': decision, 'score': score})
+                tree.answer_node(child2_id, recommendation.get('reason', ''), 
+                               confidence=recommendation.get('confidence', 0.0))
+            
+            # Registra decisão na memória
+            decision_id = memory.record_decision(
+                decision=decision,
+                score=score,
+                context={'result': result, 'data_map_keys': list(data_map.keys())},
+                reasoning=reasoning,
+                confidence=abs(score) / 100.0 if score != 0 else 0.0
+            )
+            
+            # Adiciona perguntas recursivas à memória
+            if decision != 'WAIT':
+                memory.add_recursive_question(decision_id, "Why did I decide this?")
+                memory.add_recursive_question(decision_id, "Was this correct?", 
+                                            "Based on similar past decisions")
+                memory.add_recursive_question(decision_id, "How should I act now?", 
+                                            recommendation.get('reason', '') if decision != 'WAIT' else '')
+
+        # Phase 6: Meta-Thinking - Analyze other modules' thoughts
+        # Sistema de meta-pensamento: análise do pensamento de outros módulos
+        meta_insights = {}
+        for module_name in results.keys():
+            if module_name not in meta_insights:
+                meta_insights[module_name] = {}
+            
+            # Analisa o que outros módulos pensaram
+            for other_module in results.keys():
+                if other_module == module_name:
+                    continue
+                
+                insights = self.decision_memory.get_cross_module_insights(module_name, other_module)
+                meta_insights[module_name][other_module] = insights
+        
+        # Conecta pensamentos similares entre módulos
+        for module1 in results.keys():
+            tree1 = self.thought_orchestrator.get_or_create_tree(module1)
+            for module2 in results.keys():
+                if module1 == module2:
+                    continue
+                
+                # Busca pensamentos similares
+                similar = self.thought_orchestrator.find_similar_thoughts(
+                    module1, f"Decision analysis for {module1}", threshold=0.5
+                )
+                for mod_name, node_id, similarity in similar[:3]:  # Top 3
+                    if mod_name == module2:
+                        tree2 = self.thought_orchestrator.get_or_create_tree(module2)
+                        # Conecta nós similares
+                        self.thought_orchestrator.connect_cross_module(
+                            module1, tree1.root_nodes[-1] if tree1.root_nodes else "",
+                            module2, node_id
+                        )
 
         # Unpack Results
         # Trend
@@ -313,6 +447,13 @@ class ConsensusEngine:
         singularity_res = results.get('Singularity', {'decision': 'WAIT', 'score': 0})
         details['Singularity'] = singularity_res
         is_singularity = singularity_res['decision'] == "SINGULARITY_REACHED"
+        
+        # Phase 5: Weekend Gap Predictor
+        weekend_gap_res = results.get('WeekendGap', {'decision': 'WAIT', 'score': 0, 'reason': ''})
+        details['WeekendGap'] = weekend_gap_res
+        weekend_gap_score = weekend_gap_res.get('score', 0)
+        weekend_gap_decision = weekend_gap_res.get('decision', 'WAIT')
+        weekend_gap_dir = 1 if weekend_gap_decision == "BUY" else -1 if weekend_gap_decision == "SELL" else 0
         
         # --- AUDIT FLAGS ---
         market_state = {
@@ -565,17 +706,29 @@ class ConsensusEngine:
              # Supply chain bias is strong. Align with shock.
              confluence_boost += 15
              logger.info(f"CONFLUENCE: Supply Chain Shock Bias ({sc_impact:.2f}) provides macro tailwind.")
+        
+        # 15. Phase 5: Weekend Gap Predictor Confluence
+        if weekend_gap_dir != 0 and abs(weekend_gap_score) > 30:
+            # Weekend gap prediction is significant
+            if weekend_gap_dir == t_dir or weekend_gap_dir == k_dir:
+                confluence_boost += 20
+                logger.info(f"CONFLUENCE: Weekend Gap Predictor ({weekend_gap_decision}) aligns with momentum.")
+            elif weekend_gap_decision == "CLOSE_POSITIONS":
+                # Gap muito grande previsto, reduzir exposição
+                confluence_boost -= 30
+                logger.warning(f"WEEKEND GAP WARNING: Large gap predicted. Reducing exposure.")
 
         # --- HOLOGRAPHIC VECTOR LOGIC (v3.0) ---
         
         # 1. Momentum Vector (The "Push")
-        # Components: Trend, Kinematics, Fractal, Volatility(if Expansion), SupplyChain
+        # Components: Trend, Kinematics, Fractal, Volatility(if Expansion), SupplyChain, WeekendGap
         # Weights normalized for this vector
         v_momentum = (
             (t_score * t_dir * 1.0) +
             (abs(k_score) * k_dir * 0.8) +
             (abs(f_score) * f_dir * 0.5) +
-            (sc_impact * 20)
+            (sc_impact * 20) +
+            (weekend_gap_score * weekend_gap_dir * 0.3)  # Phase 5: Weekend Gap contribution
         )
         
         # 2. Reversion Vector (The "Pull")
@@ -752,6 +905,53 @@ class ConsensusEngine:
         if decision != "WAIT" or verbose:
             logger.info(f"Consensus Reached: {decision} (Score: {final_score:.2f})")
             
+        # Phase 6: Add Thought Tree and Decision Memory details
+        details['ThoughtTree'] = self.thought_orchestrator.get_global_thought_summary()
+        details['MetaThinking'] = meta_insights
+        
+        # Phase 7: AGI Ultra - Unified Reasoning Synthesis
+        if decision != "WAIT":
+            # Gather insights from key modules for unified reasoning
+            insights = []
+            for mod_name in ['Trend', 'Sniper', 'Oracle', 'Overlord', 'Sovereign']:
+                mod_res = results.get(mod_name)
+                if mod_res and isinstance(mod_res, dict):
+                    mod_decision = mod_res.get('decision', 'WAIT')
+                    mod_score = abs(mod_res.get('score', 0)) / 100.0
+                    mod_reason = mod_res.get('reason', '')
+                    insights.append(ModuleInsight(
+                        module_name=mod_name,
+                        decision=mod_decision,
+                        confidence=mod_score,
+                        reasoning=mod_reason,
+                        supporting_evidence=[]
+                    ))
+            
+            # Get unified decision
+            if insights:
+                unified_decision = self.unified_reasoning.synthesize(
+                    insights, 
+                    context={'regime': regime, 'hurst': hurst}
+                )
+                details['UnifiedReasoning'] = {
+                    'agreement': unified_decision.agreement_score,
+                    'conflict_type': unified_decision.conflict_type.value,
+                    'key_factors': unified_decision.key_factors[:3]
+                }
+                
+                # If low agreement, reduce confidence
+                if unified_decision.agreement_score < 0.5:
+                    final_score = final_score * 0.8
+                    logger.info(f"AGI: Low module agreement ({unified_decision.agreement_score:.1%}). Confidence reduced.")
+        
+        # Phase 7: Health Check
+        health_status = self.health_monitor.get_overall_health()
+        details['SystemHealth'] = health_status.value
+        if health_status == HealthStatus.CRITICAL:
+            logger.warning("AGI HEALTH: System in CRITICAL state. Forcing WAIT.")
+            decision = "WAIT"
+            final_score = 0
+        
         # Heartbeat Log (Show activity even if WAIT)
         if decision == "WAIT":
             logger.info(f"Consensus Heartbeat: Trend={t_score:.0f} Sniper={s_score:.0f} Quant={q_score:.0f} Vector={total_vector:.2f}")

@@ -1,13 +1,14 @@
 
 import logging
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
 from risk.dynamic_leverage import DynamicLeverage
 from risk.great_filter import GreatFilter
-
 from core.risk.event_horizon import EventHorizonRisk
 
 logger = logging.getLogger("ExecutionEngine")
+
 
 class ExecutionEngine:
     """
@@ -16,11 +17,12 @@ class ExecutionEngine:
     """
     def __init__(self, bridge=None):
         self.bridge = bridge
-        self.risk_filter = None 
+        # Phase 10: Risk Core AGI-aware filter
+        self.risk_filter = GreatFilter()
         self.leverage_manager = DynamicLeverage()
-        self.event_horizon = EventHorizonRisk() # Phase 116
-        self.config = {"spread_limit": 0.0005} 
-        self.last_stop_update = {} # {ticket: timestamp}
+        self.event_horizon = EventHorizonRisk()  # Phase 116
+        self.config = {"spread_limit": 0.0005}
+        self.last_stop_update = {}  # {ticket: timestamp}
 
     def set_config(self, config: Dict):
         self.config = config
@@ -85,7 +87,16 @@ class ExecutionEngine:
                          self.bridge.send_command("MODIFY_TRADE", [str(ticket), f"{new_stop_level:.2f}", f"{tp:.2f}"])
                          self.last_stop_update[ticket] = tick.get('time_msc', 0)
 
-    async def execute_signal(self, command: str, symbol: str, bid: float, ask: float, confidence: float = 80.0, account_info: Dict = None, spread_tolerance: float = None):
+    async def execute_signal(
+        self,
+        command: str,
+        symbol: str,
+        bid: float,
+        ask: float,
+        confidence: float = 80.0,
+        account_info: Optional[Dict] = None,
+        spread_tolerance: Optional[float] = None,
+    ):
         """
         Converts a Cortex Command into a Physical Order.
         Args:
@@ -95,9 +106,19 @@ class ExecutionEngine:
             confidence: 0-100 score
             account_info: info for lot sizing (optional)
         """
-        # 1. Great Filter Check (Skipped for now or adapted)
-        # if not self.risk_filter.validate_entry(...): return
-            
+        # 1. Great Filter Check (Phase 10 - AGI Risk Core)
+        if self.risk_filter:
+            risk_signal = {"type": command, "confidence": confidence}
+            # spread in raw price units; for Gold it's "points"
+            market_state = {
+                "spread": (ask - bid),
+                "is_crash": False,  # placeholder, could be wired to macro modules
+            }
+            verdict = self.risk_filter.validate_entry(risk_signal, market_state)
+            if not verdict.get("allowed", False):
+                logger.info("EXECUTION BLOCKED by GreatFilter: %s", verdict.get("reason"))
+                return None
+
         # 2. Dynamic Lots Calculation
         equity = account_info.get('equity', 1000.0) if account_info else 1000.0
         # Placeholder volatility (should come from market_state)
@@ -134,19 +155,22 @@ class ExecutionEngine:
         if self.bridge:
             # 3. Dynamic Spread Guard
             # Adaptive Threshold: MAX_SPREAD = Config % of Price
-            spread_limit = self.config.get('spread_limit', 0.0005)
+            spread_limit = spread_tolerance if spread_tolerance is not None else self.config.get('spread_limit', 0.0005)
             max_spread_allowed = price * spread_limit
-            
+
             # Hard cap minimum for Forex
-            if max_spread_allowed < 0.00050: max_spread_allowed = 0.00050
-            
-            # Override for User Settings if needed
-            # But this adaptive check is safer.
-            
+            if max_spread_allowed < 0.00050:
+                max_spread_allowed = 0.00050
+
             spread = ask - bid
             if spread > max_spread_allowed:
-                 logger.warning(f"SPREAD GUARD: Refused. Spread {spread:.3f} > {max_spread_allowed:.3f} ({spread_limit*100:.2f}% of Price).")
-                 return None # Changed from False to None to match original function's return type on refusal
+                logger.warning(
+                    "SPREAD GUARD: Refused. Spread %.3f > %.3f (%.2f%% of Price).",
+                    spread,
+                    max_spread_allowed,
+                    spread_limit * 100.0,
+                )
+                return None  # Changed from False to None to match original function's return type on refusal
         
         sl = price - sl_dist if cmd_type == 0 else price + sl_dist
         tp = price + tp_dist if cmd_type == 0 else price - tp_dist

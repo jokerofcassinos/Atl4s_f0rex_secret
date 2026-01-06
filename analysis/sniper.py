@@ -1,6 +1,10 @@
-import pandas as pd
-import numpy as np
 import logging
+from typing import Dict, Any
+
+import numpy as np
+import pandas as pd
+
+from core.agi.module_thought_adapter import AGIModuleAdapter, ModuleThoughtResult
 
 logger = logging.getLogger("Atl4s-Sniper")
 
@@ -57,23 +61,30 @@ class LevelMemory:
         return self.levels
 
 class Sniper:
-    def __init__(self):
+    def __init__(self, symbol: str = "UNKNOWN", timeframe: str = "M5"):
+        self.symbol = symbol
+        self.timeframe = timeframe
         self.memory = LevelMemory()
+        self.agi_adapter = AGIModuleAdapter(module_name="Sniper")
 
     def analyze(self, df):
         """
-        Analyzes Market Structure (FVG, Liquidity).
-        Returns:
-            score (int): Confidence score (0-100)
-            direction (int): 1 (Buy), -1 (Sell), 0 (Neutral)
+        Legacy interface: returns (score, direction) for compatibility.
+        """
+        result = self.analyze_with_thought(df)
+        return result["score"], result["direction"]
+
+    def analyze_with_thought(self, df) -> Dict[str, Any]:
+        """
+        Fase 8: Analyzes Market Structure (FVG, Liquidity) + camada AGI.
         """
         if df is None or len(df) < 5:
-            return 0, 0
+            return {"score": 0, "direction": 0}
 
         score = 0
         direction = 0
-        current_time = df.index[-1].timestamp() if hasattr(df.index[-1], 'timestamp') else 0
-        current_price = df.iloc[-1]['close']
+        current_time = df.index[-1].timestamp() if hasattr(df.index[-1], "timestamp") else 0
+        current_price = float(df.iloc[-1]["close"])
 
         # 1. Update Holographic Memory
         self.memory.decay(current_price, current_time)
@@ -128,19 +139,49 @@ class Sniper:
 
         # Cap score
         score = min(score, 100)
-        
-        # Fallback: Liquidity Sweep (Turtle Soup)
-        if score < 20: 
-             subset = df.iloc[-15:-2] 
-             recent_low = subset['low'].min()
-             recent_high = subset['high'].max()
-             last_low = df.iloc[-1]['low']
-             last_high = df.iloc[-1]['high']
-             last_close = df.iloc[-1]['close']
-             
-             if last_low < recent_low and last_close > recent_low:
-                 return 30, 1 # Bullish Sweep
-             if last_high > recent_high and last_close < recent_high:
-                 return 30, -1 # Bearish Sweep
 
-        return score, direction
+        # Fallback: Liquidity Sweep (Turtle Soup)
+        if score < 20:
+            subset = df.iloc[-15:-2]
+            recent_low = subset["low"].min()
+            recent_high = subset["high"].max()
+            last_low = df.iloc[-1]["low"]
+            last_high = df.iloc[-1]["high"]
+            last_close = df.iloc[-1]["close"]
+
+            if last_low < recent_low and last_close > recent_low:
+                raw_output = {"score": 30, "direction": 1, "pattern": "BullishSweep"}
+                return self._wrap_with_thought(df, current_price, raw_output)
+            if last_high > recent_high and last_close < recent_high:
+                raw_output = {"score": 30, "direction": -1, "pattern": "BearishSweep"}
+                return self._wrap_with_thought(df, current_price, raw_output)
+
+        raw_output: Dict[str, Any] = {
+            "score": score,
+            "direction": direction,
+            "levels": list(self.memory.levels),
+        }
+        return self._wrap_with_thought(df, current_price, raw_output)
+
+    def _wrap_with_thought(self, df, current_price: float, raw_output: Dict[str, Any]) -> Dict[str, Any]:
+        market_state: Dict[str, Any] = {
+            "price": float(current_price),
+            "bar_high": float(df.iloc[-1]["high"]),
+            "bar_low": float(df.iloc[-1]["low"]),
+            "num_levels": len(self.memory.levels),
+        }
+
+        thought: ModuleThoughtResult = self.agi_adapter.think_on_analysis(
+            symbol=self.symbol,
+            timeframe=self.timeframe,
+            market_state=market_state,
+            raw_module_output=raw_output,
+        )
+
+        enriched = dict(raw_output)
+        enriched["agi_decision"] = thought.decision
+        enriched["agi_score"] = thought.score
+        enriched["thought_root_id"] = thought.thought_root_id
+        enriched["agi_meta"] = thought.meta
+
+        return enriched

@@ -1,13 +1,20 @@
-import pandas as pd
-import numpy as np
-import scipy.stats as stats
 import logging
+from typing import Dict, Any
+
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
+
+from core.agi.module_thought_adapter import AGIModuleAdapter, ModuleThoughtResult
 
 logger = logging.getLogger("Atl4s-Quant")
 
+
 class Quant:
-    def __init__(self):
-        pass
+    def __init__(self, symbol: str = "UNKNOWN", timeframe: str = "M5"):
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.agi_adapter = AGIModuleAdapter(module_name="Quant")
 
     def analyze(self, df):
         """
@@ -17,7 +24,7 @@ class Quant:
             direction (int): 1 (Buy), -1 (Sell), 0 (Neutral)
         """
         if df is None or len(df) < 50:
-            return 0, 0
+            return 0, 0, "NEUTRAL"
 
         df = df.copy()
 
@@ -91,6 +98,36 @@ class Quant:
             signal_type = "PULLBACK_SELL"
             logger.info(f"Quant: Z-Score {z_score:.2f} (Premium/Pullback Zone)")
             
+        # Camada AGI: transformar em evento de memória + pensamento
+        raw_output: Dict[str, Any] = {
+            "score": score,
+            "direction": direction,
+            "z_score": float(z_score),
+            "signal_type": signal_type,
+        }
+
+        market_state: Dict[str, Any] = {
+            "price": current_close,
+            "mean": current_mean,
+            "std": current_std,
+            "z_score": float(z_score),
+        }
+
+        thought: ModuleThoughtResult = self.agi_adapter.think_on_analysis(
+            symbol=self.symbol,
+            timeframe=self.timeframe,
+            market_state=market_state,
+            raw_module_output=raw_output,
+        )
+
+        # Mantém API legada (score, direction, signal_type) mas injeta AGI em meta
+        logger.debug(
+            "Quant AGI: decision=%s score=%.1f root=%s",
+            thought.decision,
+            thought.score,
+            thought.thought_root_id,
+        )
+
         return score, direction, signal_type
 
     def calculate_hurst(self, series, min_window=10):

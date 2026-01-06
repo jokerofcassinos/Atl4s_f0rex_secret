@@ -1,10 +1,15 @@
 
 import logging
+from typing import Dict, Any
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any
+
 from core.interfaces import SubconsciousUnit, SwarmSignal
-from analysis.black_swan_adversary import BlackSwanAdversary # Reuse logic
+from analysis.black_swan_adversary import BlackSwanAdversary  # Reuse logic
+from core.agi.thought_tree import ThoughtTree
+from core.agi.decision_memory import ModuleDecisionMemory
+from core.agi.swarm_thought_adapter import AGISwarmAdapter, SwarmThoughtResult
 
 logger = logging.getLogger("VetoSwarm")
 
@@ -12,10 +17,19 @@ class VetoSwarm(SubconsciousUnit):
     """
     The Censor. 
     A Swarm of 'No-sayers' that must be silenced for a trade to pass.
+    
+    Phase 6: Enhanced with recursive thinking and decision memory.
     """
     def __init__(self):
         super().__init__("Veto_Swarm")
         self.adversary = BlackSwanAdversary()
+        
+        # Phase 6: Recursive Thinking
+        self.thought_tree = ThoughtTree("Veto_Swarm", max_depth=5)
+        self.decision_memory = ModuleDecisionMemory("Veto_Swarm", max_memory=500)
+
+        # Phase 9: Swarm-level AGI integration
+        self.agi_adapter = AGISwarmAdapter("Veto_Swarm")
 
     async def process(self, context: Dict[str, Any]) -> SwarmSignal:
         # VetoSwarm runs slightly differently. It inspects the 'Proposed Decision' if available.
@@ -84,20 +98,126 @@ class VetoSwarm(SubconsciousUnit):
         
         if day_of_week >= 5: # Saturday or Sunday
             if not is_crypto_profile:
+                 symbol = context.get('symbol', 'UNKNOWN')
                  votes.append(f"VETO: Market Closed (Weekend) for {symbol} (Profile: Forex)")
             else:
                  # It is Crypto Profile, allow it.
                  pass
                  
+        # Phase 6: Recursive Thinking about each veto
+        # Perguntas recursivas: "Por que veto?", "Foi correto?", "Qual contexto?"
+        veto_reasoning = {}
+        
         if votes:
             reason = " | ".join(votes)
+            
+            # Cria árvore de pensamento para este veto
+            root_node_id = self.thought_tree.create_node(
+                question="Why am I vetoing this trade?",
+                context={'votes': votes, 'market_state': market_state},
+                confidence=1.0
+            )
+            
+            # Responde com os motivos
+            self.thought_tree.answer_node(root_node_id, reason, confidence=1.0)
+            
+            # Pergunta recursiva 1: "Foi correto?"
+            child1_id = self.thought_tree.create_node(
+                question="Was this veto correct?",
+                parent_id=root_node_id,
+                context={'veto_reason': reason}
+            )
+            
+            # Busca vetos similares no passado
+            similar_vetos = self.decision_memory.find_similar_decisions(
+                {'votes': votes, 'market_state': market_state}, limit=5
+            )
+            
+            if similar_vetos:
+                # Analisa se os vetos passados foram corretos
+                correct_vetos = [v for v in similar_vetos if v.result == "WIN" or v.result == "BREAKEVEN"]
+                correctness_rate = len(correct_vetos) / len(similar_vetos) if similar_vetos else 0.0
+                answer1 = f"Similar past vetos had {correctness_rate:.1%} correctness rate"
+                self.thought_tree.answer_node(child1_id, answer1, confidence=correctness_rate)
+            else:
+                self.thought_tree.answer_node(child1_id, "No similar past vetos found", confidence=0.5)
+            
+            # Pergunta recursiva 2: "Qual contexto?"
+            child2_id = self.thought_tree.create_node(
+                question="What is the context of this veto?",
+                parent_id=root_node_id,
+                context={'votes': votes}
+            )
+            
+            context_analysis = f"Market state: {market_state}. Veto reasons: {len(votes)} conditions detected."
+            self.thought_tree.answer_node(child2_id, context_analysis, confidence=0.8)
+            
+            # Registra veto na memória
+            veto_id = self.decision_memory.record_decision(
+                decision="VETO",
+                score=-100.0,  # Veto sempre tem score negativo
+                context={'votes': votes, 'market_state': market_state, 'df_m5_length': len(df_m5) if df_m5 is not None else 0},
+                reasoning=reason,
+                confidence=1.0
+            )
+            
+            # Adiciona perguntas recursivas à memória
+            self.decision_memory.add_recursive_question(veto_id, "Why did I veto?", reason)
+            self.decision_memory.add_recursive_question(veto_id, "Was this correct?", 
+                                                       answer1 if similar_vetos else "Unknown")
+            self.decision_memory.add_recursive_question(veto_id, "What is the context?", context_analysis)
+
+            # Phase 9: Swarm-level thought integration in global AGI
+            symbol = context.get("symbol", "UNKNOWN")
+            timeframe = context.get("timeframe", "M5")
+            market_snapshot = {
+                "price": float(df_m5["close"].iloc[-1]),
+                "atr_pct": float(atr_pct),
+            }
+            swarm_output = {
+                "decision": "VETO",
+                "score": -100.0,
+                "votes": votes,
+                "reason": reason,
+            }
+            swarm_thought: SwarmThoughtResult = self.agi_adapter.think_on_swarm_output(
+                symbol=symbol,
+                timeframe=timeframe,
+                market_state={**market_state, **market_snapshot},
+                swarm_output=swarm_output,
+            )
+
             logger.info(f"VETO SWARM BLOCK: {reason}")
+            logger.debug(
+                "Phase 9: VetoSwarm thought root=%s scenario_count=%s",
+                swarm_thought.thought_root_id,
+                swarm_thought.meta.get("scenario_count"),
+            )
+
             return SwarmSignal(
                 source=self.name,
                 signal_type="VETO",
                 confidence=100.0,
                 timestamp=0,
-                meta_data={'reason': reason}
+                meta_data={
+                    'reason': reason,
+                    'thought_tree_nodes': len(self.thought_tree.nodes),
+                    'recursive_analysis': {
+                        'similar_past_vetos': len(similar_vetos),
+                        'correctness_rate': len([v for v in similar_vetos if v.result == "WIN"]) / len(similar_vetos) if similar_vetos else 0.0
+                    },
+                    'agi_thought_root_id': swarm_thought.thought_root_id,
+                    'agi_scenarios': swarm_thought.meta.get("scenario_count", 0),
+                }
             )
+        
+        # Se não há veto, também registra (para aprendizado)
+        no_veto_id = self.decision_memory.record_decision(
+            decision="ALLOW",
+            score=0.0,
+            context={'market_state': market_state, 'df_m5_length': len(df_m5) if df_m5 is not None else 0},
+            reasoning="No veto conditions detected",
+            confidence=0.5
+        )
             
         return None

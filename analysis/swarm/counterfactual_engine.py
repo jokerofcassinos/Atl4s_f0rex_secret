@@ -1,8 +1,10 @@
 
 import logging
+
 import numpy as np
+
 from core.interfaces import SubconsciousUnit, SwarmSignal
-from copy import deepcopy
+from core.agi.swarm_thought_adapter import AGISwarmAdapter, SwarmThoughtResult
 
 logger = logging.getLogger("CounterfactualEngine")
 
@@ -14,14 +16,16 @@ class CounterfactualEngine(SubconsciousUnit):
     """
     def __init__(self):
         super().__init__("Counterfactual_Engine")
+        self.agi_adapter = AGISwarmAdapter("Counterfactual_Engine")
 
     async def process(self, context) -> SwarmSignal:
         # Counterfactuals usually run *after* a draft decision is made, 
         # but as a Swarm Unit, we can analyze the *robustness* of the current setup.
         
         df_m5 = context.get('df_m5')
-        if df_m5 is None: return None
-        
+        if df_m5 is None:
+            return None
+
         # 1. Base Scenario
         last_close = df_m5['close'].iloc[-1]
         rsi_proxy = self._calc_rsi_proxy(df_m5)
@@ -57,14 +61,41 @@ class CounterfactualEngine(SubconsciousUnit):
             direction = "BUY" if trend_score > 0 else "SELL"
             signal = direction
             reason = "Robust to Noise Intervention"
-            
+
         if signal != "WAIT":
+            # Phase 9: Counterfactual imagination as explicit AGI thought node
+            symbol = context.get("symbol", "UNKNOWN")
+            timeframe = context.get("timeframe", "M5")
+            market_state = {
+                "price": float(last_close),
+                "trend_score": float(trend_score),
+                "noise": float(noise),
+                "robustness": int(robustness),
+            }
+            swarm_output = {
+                "decision": signal,
+                "score": 50 + conf_boost,
+                "reason": reason,
+                "robustness": robustness,
+                "aggregated_signal": signal,
+            }
+            swarm_thought: SwarmThoughtResult = self.agi_adapter.think_on_swarm_output(
+                symbol=symbol,
+                timeframe=timeframe,
+                market_state=market_state,
+                swarm_output=swarm_output,
+            )
+
             return SwarmSignal(
                 source=self.name,
                 signal_type=signal,
                 confidence=50 + conf_boost, # Low base confidence, mostly a booster
                 timestamp=0,
-                meta_data={'robustness': robustness}
+                meta_data={
+                    'robustness': robustness,
+                    'agi_thought_root_id': swarm_thought.thought_root_id,
+                    'agi_scenarios': swarm_thought.meta.get("scenario_count", 0),
+                }
             )
             
         return None
