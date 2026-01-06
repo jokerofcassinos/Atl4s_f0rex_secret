@@ -896,6 +896,37 @@ void OnTick() {
     int len = StringLen(msg);
     SocketSend(socket_handle, req, len);
     
+    // Send TRADES_JSON for Python VSL/VTP checks
+    if(PositionsTotal() > 0) {
+        string trades_json = "TRADES_JSON|[";
+        bool first = true;
+        
+        for(int i = 0; i < PositionsTotal(); i++) {
+            ulong ticket = PositionGetTicket(i);
+            if(PositionSelectByTicket(ticket)) {
+                string sym = PositionGetString(POSITION_SYMBOL);
+                int type = (int)PositionGetInteger(POSITION_TYPE);
+                double profit = PositionGetDouble(POSITION_PROFIT);
+                double open_price = PositionGetDouble(POSITION_PRICE_OPEN);
+                double sl = PositionGetDouble(POSITION_SL);
+                double tp = PositionGetDouble(POSITION_TP);
+                double volume = PositionGetDouble(POSITION_VOLUME);
+                
+                if(!first) trades_json += ",";
+                first = false;
+                
+                trades_json += StringFormat("{\"ticket\":%I64u,\"symbol\":\"%s\",\"type\":%d,\"profit\":%.2f,\"open_price\":%.5f,\"sl\":%.5f,\"tp\":%.5f,\"volume\":%.2f}",
+                                            ticket, sym, type, profit, open_price, sl, tp, volume);
+            }
+        }
+        trades_json += "]\n";
+        
+        uchar trades_req[];
+        StringToCharArray(trades_json, trades_req);
+        int trades_len = StringLen(trades_json);
+        SocketSend(socket_handle, trades_req, trades_len);
+    }
+    
     ReadCommands();
 }
 
