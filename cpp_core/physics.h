@@ -286,6 +286,13 @@ extern "C" {
         double* transition_point
     );
 
+    // Fisher Information Metric (Regime Detection)
+    EXPORT double calculate_fisher_information(
+        double* prices,
+        int length,
+        int window
+    );
+
     // ============================================================================
     // UTILITY FUNCTIONS
     // ============================================================================

@@ -55,7 +55,9 @@ EXPORT void bundle_vectors(
         if (sum_vec[i] > 0) result[i] = 1;
         else if (sum_vec[i] < 0) result[i] = -1;
         else {
-            result[i] = (rand() % 2 == 0) ? 1 : -1;
+            // Deterministic tie-breaking (pseudo-random based on index)
+            // rand() causes non-determinism which breaks identity recall
+            result[i] = ((i * 12345 + 54321) % 2 == 0) ? 1 : -1;
         }
     }
 }

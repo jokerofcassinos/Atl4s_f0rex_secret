@@ -142,17 +142,38 @@ struct State {
 // ROLLOUT POLICIES
 // ============================================================================
 
-double rollout_random(State state, int max_depth, double drift, double volatility, 
-                      int direction, double entry_price) {
+// Guided Rollout (AGI Bias)
+double rollout_guided(State state, int max_depth, double drift, double volatility, 
+                      int direction, double entry_price, double bias_strength, int bias_direction) {
     int depth = 0;
     while (state.active && depth < max_depth) {
-        int r = rand() % 3;
-        MoveType m = static_cast<MoveType>(r);
+        // Biased random choice
+        // bias_direction: 1 (Buy), -1 (Sell), 0 (Neutral)
+        double r = generate_uniform(); // 0.0 to 1.0
+        
+        MoveType m = HOLD;
+        
+        // Probability distribution [HOLD, CLOSE, ADD] modified by bias
+        // Base: [0.6, 0.3, 0.1] (Example)
+        double p_close = 0.3;
+        double p_add = 0.1;
+        
+        // Interpret bias: If bias aligns with current direction, reduced close prob, increased add prob
+        if (bias_direction == direction) {
+             p_close *= (1.0 - bias_strength);
+             p_add *= (1.0 + bias_strength);
+        } else if (bias_direction == -direction) {
+             p_close *= (1.0 + bias_strength);
+             p_add *= (1.0 - bias_strength);
+        }
+        
+        if (r < p_close) m = CLOSE;
+        else if (r < p_close + p_add) m = ADD;
+        else m = HOLD;
 
         if (m == CLOSE) {
             state.active = false;
         } else if (m == ADD) {
-            // Simulated add (increases exposure)
             state.pnl *= 1.5;
         } else {
             double shock = generate_normal(0, volatility);
@@ -162,6 +183,11 @@ double rollout_random(State state, int max_depth, double drift, double volatilit
         depth++;
     }
     return state.pnl;
+}
+
+double rollout_random(State state, int max_depth, double drift, double volatility, 
+                      int direction, double entry_price) {
+    return rollout_guided(state, max_depth, drift, volatility, direction, entry_price, 0.0, 0);
 }
 
 // ============================================================================
@@ -1184,6 +1210,113 @@ EXPORT void get_action_probs(
         probs_out[1] = 0.2;  // CLOSE
         probs_out[2] = 0.2;  // ADD
     }
+}
+
+// ============================================================================
+// GUIDED MCTS (AGI Integration)
+// ============================================================================
+
+EXPORT SimulationResult run_guided_mcts(
+    double current_price, 
+    double entry_price, 
+    int direction,
+    double volatility,
+    double drift,
+    int iterations,
+    int depth,
+    double bias_strength,
+    int bias_direction
+) {
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    Node* root = new Node(HOLD, nullptr);
+    State root_state = {current_price, 0.0, true, 0};
+    root_state.pnl = (direction == 1) ? (current_price - entry_price) : (entry_price - current_price);
+    
+    // Initial expansion
+    for (int i = 0; i < iterations; ++i) {
+        Node* node = root;
+        State state = root_state;
+        
+        // Selection
+        while (node->untried_moves.empty() && !node->children.empty()) {
+            double best_score = -1e9;
+            Node* best_child = nullptr;
+            for (Node* c : node->children) {
+                double uct = c->uct_value(1.41);
+                if (uct > best_score) {
+                    best_score = uct;
+                    best_child = c;
+                }
+            }
+            if (best_child) node = best_child;
+            if (node->move == CLOSE) state.active = false;
+        }
+        
+        // Expansion
+        if (!node->untried_moves.empty() && state.active) {
+            MoveType m = node->untried_moves.back();
+            node->untried_moves.pop_back();
+            
+            State next_state = state;
+            if (m == CLOSE) {
+                next_state.active = false;
+            } else {
+                double shock = generate_normal(0, volatility);
+                next_state.price += drift + shock;
+                next_state.pnl = (direction == 1) ? (next_state.price - entry_price) : (entry_price - next_state.price);
+            }
+            
+            Node* child = new Node(m, node);
+            node->children.push_back(child);
+            node = child;
+            state = next_state;
+        }
+        
+        // Guided Rollout
+        double reward = rollout_guided(state, depth, drift, volatility, direction, entry_price, bias_strength, bias_direction);
+        
+        // Backprop
+        while (node != nullptr) {
+            node->visits++;
+            node->wins += reward;
+            node = node->parent;
+        }
+    }
+    
+    // Select best
+    Node* best_child = nullptr;
+    int most_visits = -1;
+    for (Node* c : root->children) {
+        if (c->visits > most_visits) {
+            most_visits = c->visits;
+            best_child = c;
+        }
+    }
+    
+    SimulationResult res;
+    if (best_child) {
+        res.best_move_type = static_cast<int>(best_child->move);
+        res.expected_value = best_child->wins / best_child->visits;
+        res.visits = best_child->visits;
+        res.confidence = static_cast<double>(best_child->visits) / iterations;
+        res.q_value = res.expected_value;
+    } else {
+        res.best_move_type = 0;
+        res.expected_value = 0;
+        res.visits = 0;
+        res.confidence = 0;
+        res.q_value = 0;
+    }
+    
+    delete root;
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double, std::milli>(end - start).count();
+    g_total_simulations += iterations;
+    g_total_time_ms = g_total_time_ms.load() + elapsed;
+    
+    return res;
 }
 
 // ============================================================================

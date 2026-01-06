@@ -96,6 +96,7 @@ class ExecutionEngine:
         confidence: float = 80.0,
         account_info: Optional[Dict] = None,
         spread_tolerance: Optional[float] = None,
+        multiplier: float = 1.0,
     ):
         """
         Converts a Cortex Command into a Physical Order.
@@ -130,24 +131,29 @@ class ExecutionEngine:
             market_volatility=volatility
         )
         
+        # Apply Logic Multiplier (Sovereign/Singularity)
+        lots = round(lots * multiplier, 2)
+        
         # 3. Construct Order
         cmd_type = 0 if command == 'BUY' else 1
         price = ask if cmd_type == 0 else bid
+
+        # --- AGI SMART EXIT LOGIC ---
+        # Extract context
+        used_slots = account_info.get('positions', 0) if account_info else 0
+        max_slots = account_info.get('max_slots', 10) if account_info else 10
+        equity = account_info.get('equity', 1000.0) if account_info else 1000.0
         
-        if price < 50: # LOW PRICE ASSETS (Silver? Cheap Crypto?)
-            # Keep hardcoded for now or adapt if needed
-            tp_dist = 0.05 # 5 cents (~$0.50 profit)
-            sl_dist = 0.12 # 12 cents (~$1.20 risk)
-        else: 
-             # DYNAMIC LIMITS (Forex / Gold / High Crypto)
-             # Default to 0.1%/0.2% if not in config
-             tp_pct = self.config.get('phys_tp_pct', 0.001)
-             sl_pct = self.config.get('phys_sl_pct', 0.002)
-             
-             tp_dist = price * tp_pct
-             sl_dist = price * sl_pct
-             
-        # Override for tiny prices 
+        # Calculate Dynamic Exits
+        tp_dist, sl_dist = self.calculate_smart_exits(
+            price=price,
+            equity=equity,
+            used_slots=used_slots,
+            max_slots=max_slots,
+            volatility=volatility
+        )
+        
+        # Override for tiny prices (Safety)
         if price < 5.0: 
              sl_dist = price * 0.01
              tp_dist = price * 0.02
@@ -194,6 +200,49 @@ class ExecutionEngine:
              self.bridge.send_command("OPEN_TRADE", params)
              
         return "SENT"
+
+    def calculate_smart_exits(self, price: float, equity: float, used_slots: int, max_slots: int, volatility: float) -> tuple:
+        """
+        AGI-Driven Physical Exits.
+        Adjusts TP/SL based on 'Capital Saturation' and Sentiment.
+        
+        Logic:
+        1. Saturation Factor: If we are 'Heavy' (High Slots Used), we want to scalp quick (Tight TP) and protect strict (Tight SL).
+           If we are 'Light', we can let it run (Wide TP/SL).
+           
+        2. Whale Factor (Capital): Larger accounts (> $1000) target % moves. Small accounts tend to need fixed $ growth.
+        """
+        # Base Settings (Gold)
+        base_tp_dist = 2.0  # $2.00
+        base_sl_dist = 1.5  # $1.50
+        
+        # 1. Saturation Multiplier
+        # Saturation 0.0 to 1.0
+        saturation = used_slots / max(1, max_slots)
+        
+        if saturation > 0.8: # Heavy Load (>80% capacity)
+            # Defensive Mode: Tighten everything to clear exposure
+            sat_mult = 0.7 
+        elif saturation < 0.3: # Light Load
+            # Expansion Mode: Go for home runs
+            sat_mult = 1.5 
+        else:
+            sat_mult = 1.0
+            
+        # 2. Volatility Multiplier
+        # Volatility usually 0-100
+        # High Vol -> Widen SL to breathe, Widen TP to catch spikes
+        vol_mult = 1.0 + (volatility - 50.0) / 100.0 # e.g., Vol 80 -> 1.3x
+        
+        # Combined
+        final_tp = base_tp_dist * sat_mult * vol_mult
+        final_sl = base_sl_dist * sat_mult * vol_mult # SL also widens in Volatility to avoid whipsaw
+        
+        # Hard Safety Guard (Don't let SL get too tight or too wide)
+        final_sl = max(0.50, min(final_sl, 5.00))
+        final_tp = max(0.50, min(final_tp, 10.00))
+        
+        return final_tp, final_sl
 
     def check_predictive_exit(self, trade: Dict, current_tick: Dict):
         """

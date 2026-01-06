@@ -419,6 +419,10 @@ class SelfHealingManager:
             self.known_issues[issue]['solutions'][solution]['success'] += 1
 
 
+from core.agi.infinite_why_engine import InfiniteWhyEngine
+
+from core.agi.simulation.simulation_system import SimulationSystem
+
 class OmegaAGICore:
     """
     Core AGI components for OmegaSystem.
@@ -433,9 +437,19 @@ class OmegaAGICore:
         self.monitor = PerformanceMonitor()
         self.healer = SelfHealingManager()
         
+        # Project Awakening: The Causal Engine
+        self.infinite_why = InfiniteWhyEngine(
+            max_depth=16, # Start with reasonable depth
+            parallel_workers=4,
+            enable_meta_reasoning=True
+        )
+
+        # Innovation Level 5: The Dreamer (World Model)
+        self.simulation = SimulationSystem()
+        
         self.recent_decisions: deque = deque(maxlen=100)
         
-        logger.info("OmegaAGICore initialized")
+        logger.info("OmegaAGICore initialized with InfiniteWhyEngine & SimulationSystem")
     
     def pre_tick(self, tick: Dict, config: Dict) -> Dict[str, Any]:
         """Pre-tick AGI processing."""
@@ -456,6 +470,24 @@ class OmegaAGICore:
                 healing = self.healer.heal(issues)
                 adjustments.update(healing)
                 self.state_machine.transition(SystemState.HEALING, "Auto-healing triggered")
+                
+        # --- AGI DREAMER: MENTAL SIMULATION ---
+        # "Imagine the next 10 minutes..."
+        try:
+            current_state = {
+                'price': tick.get('bid', 0),
+                'value': tick.get('bid', 0), # Generic value
+            }
+            if current_state['price'] > 0:
+                sim_result = self.simulation.full_mental_simulation(current_state)
+                adjustments['premonition'] = {
+                    'direction': sim_result['recommendation'],
+                    'optimistic_outcome': sim_result['scenarios']['optimistic'],
+                    'pessimistic_outcome': sim_result['scenarios']['pessimistic'],
+                    'monte_carlo_prob': sim_result['monte_carlo']['positive_probability']
+                }
+        except Exception as e:
+            logger.warning(f"Dreamer Failure: {e}")
         
         return adjustments
     
@@ -463,6 +495,32 @@ class OmegaAGICore:
         """Post-tick AGI learning."""
         self.recent_decisions.append(decision)
         
+        # --- AGI CAUSAL REFLECTION ---
+        # The Infinite Why: Reason about the decision
+        try:
+            event = self.infinite_why.capture_event(
+                symbol="XAUUSD", # TODO: Pass dynamically
+                timeframe="M1", # TODO: Pass dynamically
+                market_state=result.get('market_state', {}),
+                analysis_state={},
+                decision=decision,
+                decision_score=0.0,
+                decision_meta=result,
+                module_name="OmegaCore"
+            )
+            
+            # Deep Scan on interesting events (Trades or unexpected Wait)
+            if decision in ["BUY", "SELL"] or (decision == "WAIT" and self.meta_loop.iteration % 100 == 0):
+                reflection = self.infinite_why.deep_scan_recursive(
+                    module_name="OmegaCore",
+                    query_event=event,
+                    max_depth=5 # Fast scan
+                )
+                logger.debug(f"InfiniteWhy Reflection: {len(reflection.get('why_root', {}).get('children', []))} branches analyzed")
+                
+        except Exception as e:
+            logger.warning(f"InfiniteWhy Failure: {e}")
+
         context = ExecutionContext(
             iteration=self.meta_loop.iteration,
             timestamp=time.time(),

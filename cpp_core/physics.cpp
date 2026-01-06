@@ -869,6 +869,51 @@ EXPORT int detect_phase_transition(double* prices, int length, double* transitio
 }
 
 // ============================================================================
+// INFORMATION GEOMETRY
+// ============================================================================
+
+EXPORT double calculate_fisher_information(double* prices, int length, int window) {
+    if (length < window + 1) return 0.0;
+    
+    // Estimate discrete Fisher Information Metric (FIM)
+    // Concept: Distance between probability distributions of price returns
+    
+    // 1. Calculate returns
+    std::vector<double> returns(length - 1);
+    for (int i = 0; i < length - 1; i++) {
+        returns[i] = std::log(prices[i+1] / prices[i]);
+    }
+    
+    // 2. Sliding window analysis
+    double total_fisher = 0.0;
+    int steps = length - 1 - window;
+    if (steps < 1) return 0.0;
+    
+    for (int t = 0; t < steps; t++) {
+        // Window A: t to t+window
+        // Window B: t+1 to t+window+1
+        
+        // Calculate mean and variance for Window A
+        double sum_a = 0, sum_sq_a = 0;
+        for (int i = 0; i < window; i++) {
+            double val = returns[t + i];
+            sum_a += val;
+            sum_sq_a += val * val;
+        }
+        double mu_a = sum_a / window;
+        double var_a = (sum_sq_a / window) - (mu_a * mu_a);
+        if (var_a < 1e-9) var_a = 1e-9;
+        
+        // Calculate partial derivatives w.r.t parameters (simplified)
+        // Fisher Information relative to mean parameter mu: 1/variance
+        
+        total_fisher += 1.0 / var_a;
+    }
+    
+    return total_fisher / steps;
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 

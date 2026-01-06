@@ -105,6 +105,8 @@ from .genetics import EvolutionEngine
 
 logger = logging.getLogger("SwarmOrchestrator")
 
+from core.agi.omni_cortex import OmniCortex
+
 class SwarmOrchestrator:
     def __init__(self, bus: ConsciousnessBus, evolution: EvolutionEngine, neuroplasticity: NeuroPlasticityEngine, attention: TransformerLite, grandmaster: MCTSPlanner):
         self.bus = bus
@@ -112,11 +114,21 @@ class SwarmOrchestrator:
         self.neuroplasticity = neuroplasticity
         self.attention = attention
         self.grandmaster = MCTSPlanner()
+        self.omni_cortex = OmniCortex() # High-Level Reasoning Engine
         
         self.active_agents = []
         self.alpha_threshold = 60.0 # Default
         self.short_term_memory = {'market_state': {}}
         self.synaptic_buffer = []
+        
+        # AGI Hierarchical Clusters (Brain Regions)
+        self.clusters = {
+            'PHYSICS': ['Laplace_Swarm', 'Riemann_Swarm', 'Fermi_Swarm', 'Bose_Swarm', 'Thermodynamics_Swarm', 'Gravity_Swarm', 'Navier_Stokes_Swarm', 'Maxwell_Swarm'],
+            'QUANTUM': ['Quantum_Grid', 'Schrodinger_Swarm', 'Heisenberg_Swarm', 'Antimatter_Swarm', 'Entanglement_Swarm', 'Zero_Point_Swarm', 'Tachyon_Swarm'],
+            'PRICING': ['Trending_Swarm', 'Sniper_Swarm', 'Technical_Swarm', 'Fractal_Vision', 'Wavelet_Swarm', 'Spectral_Swarm'],
+            'INSTITUTIONAL': ['Whale_Swarm', 'Order_Flow', 'Liquidity_Map', 'SMC_Swarm', 'News_Swarm', 'Apex_Swarm'],
+            'META': ['Veto_Swarm', 'Red_Team_Swarm', 'Dream_Swarm', 'Reflection_Swarm', 'Zen_Swarm', 'Council_Swarm', 'Overlord_Swarm', 'Sovereign_Swarm']
+        }
 
     async def initialize_swarm(self):
         logger.info("--- GENESIS PROTOCOL: AWAKENING SWARM ---")
@@ -239,6 +251,18 @@ class SwarmOrchestrator:
         # Phase 122: Smart Money (SMC) & Visuals
         from analysis.swarm.smc_swarm import SmartMoneySwarm
         self.active_agents.append(SmartMoneySwarm())
+
+        # Phase 123: AGI Awakening (The Dreamer & The Mirror)
+        from analysis.swarm.dream_swarm import DreamSwarm
+        from analysis.swarm.reflection_swarm import ReflectionSwarm
+        from analysis.swarm.zen_swarm import ZenSwarm
+        self.active_agents.append(DreamSwarm())
+        self.active_agents.append(ReflectionSwarm())
+        self.active_agents.append(ZenSwarm())
+
+        # Phase 130: The Adversary (Red Team / GAN)
+        from analysis.swarm.red_team_swarm import RedTeamSwarm
+        self.active_agents.append(RedTeamSwarm())
 
     def inject_bridge(self, bridge):
         """
@@ -387,7 +411,7 @@ class SwarmOrchestrator:
         vote_strings = []
         for t in thoughts:
              vote_strings.append(f"{t.source}={t.signal_type}({t.confidence:.0f}%)")
-        logger.debug(f"SWARM VOTES: {', '.join(vote_strings)}")
+        logger.info(f"SWARM VOTES: {', '.join(vote_strings)}")
         
         allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_ALL", "EXIT_LONG", "EXIT_SHORT", "VETO"]
         macro_bias_reason = ""
@@ -448,16 +472,106 @@ class SwarmOrchestrator:
              w_sov = sov_weights.get(k, 1.0)
              weights[k] = w_learn * w_sov
 
+        if 'market_data' in self.short_term_memory:
+             self.omni_cortex.perceive(self.short_term_memory['market_data'])
+
+        # D. Hierarchical Cluster Boosting (The Meta-Cortex)
+        # If a brain region (Cluster) is highly active/confident, boost its members.
+        cluster_scores = {}
+        for cluster_name, agents in self.clusters.items():
+            avg_conf = 0.0
+            count = 0
+            for t in thoughts:
+                # Approximate matching (Agent name might be formatted)
+                # t.source is "Sniper_Swarm", list has "Sniper_Swarm"
+                if any(start in t.source for start in agents): 
+                     avg_conf += t.confidence
+                     count += 1
+            if count > 0:
+                cluster_scores[cluster_name] = avg_conf / count
+        
+        # Apply Boosts
+        for cluster_name, score in cluster_scores.items():
+            if score > 80.0: # High Consensus in Region
+                boost = 1.25
+                if score > 90.0: boost = 1.5
+                # logger.debug(f"Cortex Region {cluster_name} Active ({score:.1f}%). Boosting Signals.")
+                for agent_key in all_keys:
+                     # Check if agent belongs to this cluster
+                     if any(start in agent_key for start in self.clusters[cluster_name]):
+                          weights[agent_key] *= boost
+
         # 3. Transformer Attention Consensus (AGI Brain)
         if 'allowed_actions' not in locals(): allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_LONG", "EXIT_SHORT", "EXIT_ALL"]
         
         final_decision, final_score, meta_data = self._transformer_consensus(thoughts, weights, current_state_vector, allowed_actions)
+        
+        # Inject Sovereign Signals into Metadata for Main Loop Multipliers
+        sovereign_state = "NEUTRAL"
+        for t in thoughts:
+             if t.source == "Sovereign_Swarm":
+                 # Check for Singularity
+                 if t.meta_data.get('decision') == "SINGULARITY_REACHED":
+                      sovereign_state = "SINGULARITY"
+                 elif "STRONG" in t.meta_data.get('decision', ''):
+                      sovereign_state = "STRONG"
+        
+        meta_data['sovereign_state'] = sovereign_state
+
         # Harvester Override (Priority)
         for t in thoughts:
              if t.signal_type == "EXIT_ALL": return ("EXIT_ALL", 99.0, t.meta_data)
              if t.signal_type == "VETO": return ("WAIT", 0.0, {})
 
         return (final_decision, final_score, meta_data)
+
+    def calculate_dynamic_slots(self, volatility: float, trend_strength: float, mode: str = "SNIPER") -> int:
+        """
+        Calculates the optimal number of operational slots (max positions).
+        
+        AGI Logic:
+        - High Volatility (Chaos) -> Reduce Slots (Shield).
+        - Strong Trend (Order) -> Increase Slots (Spear).
+        - Mode Factor -> Wolf Pack gets multiplier.
+        """
+        # Base Slots
+        base_slots = 5
+        
+        # 1. Mode Multiplier
+        if mode == "WOLF_PACK":
+            base_slots = 10
+        elif mode == "HYBRID":
+            base_slots = 8
+        elif mode == "AGI_MAPPER":
+            base_slots = 12
+            
+        # 2. Entropy / Volatility Damper
+        # Volatility 0-100
+        # If Vol > 50 (Choppy/Risky) -> Reduce
+        # If Vol < 20 (Calm) -> Neutral
+        entropy_factor = 1.0
+        if volatility > 60:
+            entropy_factor = 0.5 # Half slots in chaos
+        elif volatility > 40:
+            entropy_factor = 0.8
+            
+        # 3. Trend Spear
+        # Trend 0-100
+        # Strong Trend -> Add slots to pyramid
+        trend_factor = 1.0
+        if trend_strength > 70:
+            trend_factor = 1.5
+        elif trend_strength > 90:
+            trend_factor = 2.0
+            
+        final_slots = int(base_slots * entropy_factor * trend_factor)
+        
+        # Hard Limits
+        final_slots = max(1, min(final_slots, 25))
+        
+        # logger.debug(f"AGI SLOTS: Base {base_slots} * Ent {entropy_factor} * Trend {trend_factor} = {final_slots}")
+        
+        return final_slots
 
         # --- LEGACY CODE BELOW (TO BE REMOVED) ---
         score_buy = 0

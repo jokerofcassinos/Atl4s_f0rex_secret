@@ -171,6 +171,19 @@ extern "C" {
         int use_tt                // Use transposition table (0/1)
     );
 
+    // Guided MCTS (AGI Integration)
+    EXPORT SimulationResult run_guided_mcts(
+        double current_price, 
+        double entry_price, 
+        int direction,
+        double volatility,
+        double drift,
+        int iterations,
+        int depth,
+        double bias_strength,
+        int bias_direction
+    );
+
     // ============================================================================
     // NEURAL NETWORK GUIDANCE (AlphaZero-style)
     // ============================================================================

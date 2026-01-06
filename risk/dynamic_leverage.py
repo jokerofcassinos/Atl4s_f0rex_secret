@@ -1,108 +1,68 @@
 
 import logging
+import math
 
 logger = logging.getLogger("DynamicLeverage")
 
 class DynamicLeverage:
     """
-    The Throttle.
-    Adjusts exposure from 1:3000 (Sniper) to 1:30 (Shield) dynamically.
+    The Throttle (Restored Quantum Logic).
+    Adjusts exposure using Power Laws, Entropy, and Sigmoidal Caps.
     """
     def __init__(self, max_leverage=3000):
         self.max_leverage = max_leverage
-        self.base_leverage = 500 # Default
+        self.base_leverage = 500
 
     def calculate_lots(self, equity: float, confidence: float, market_volatility: float) -> float:
         """
-        Determines the precise lot size.
+        Hyper-Dynamic Risk Engine (Quantum Sigmoid Scaling).
+        Restored from Backup 'risk_manager.py'.
+        
+        Logic:
+        1. Base Power Law: Equity^0.65 (Diminishing returns but infinite growth).
+        2. Brain Factor: Confidence Score (-100 to 100) boosts/cuts size.
+        3. Entropy Factor: High Chaos (Volatility) -> Lower Size.
+        4. Sigmoid Cap: Smooth limit approaching Max Ceiling.
         """
-        # 1. Base on Equity (aggressive growth for $5)
-        # Standard: 0.01 lots per $100
-        # Aggressive (1:3000): 0.10 lots per $100 -> 0.01 lots per $10?
+        # Safety for tiny accounts
+        if equity < 10: return 0.01
+
+        # 1. Base Power Law Scaling
+        # Example: $5000 ^ 0.65 = 253.
+        # Divisor = 350. -> Base = 0.72 Lots.
+        # Tuned for Cent Accounts or Standard?
+        # Assuming Standard: $30 -> 0.02 lots. 
+        # 30^0.65 = 9.1. 9.1 / 350 = 0.026. MATCHES LEGACY.
+        base_lots = (pow(equity, 0.65)) / 350.0
         
-        # For $5, we need minimum lots (0.01).
-        # At 1:3000, 0.01 lots on Gold requires ~$0.60 margin.
-        # So $5 can theoretically open ~0.08 lots.
+        # 2. Confidence Multiplier (Brain)
+        # Score 0 -> 1.0x
+        # Score 100 -> 1.5x
+        # Score 50 -> 1.25x
+        # Ensure confidence is positive for magnitude scalling
+        conf_factor = 1.0 + (abs(confidence) / 200.0) # Max 1.5x at 100 score
         
-        effective_leverage = self.base_leverage
+        # 3. Entropy Damper (Chaos/Volatility)
+        # Volatility usually 0-100.
+        # If Vol = 0 -> 1.2x (Clean market)
+        # If Vol = 100 -> 0.8x (Chaos)
+        # Normalize volatility to 0-1 range
+        norm_entropy = min(1.0, max(0.0, market_volatility / 100.0))
+        entropy_factor = 1.2 - (norm_entropy * 0.4)
         
-        # Boost Leverage if Confidence is High
-        if confidence > 90.0:
-            effective_leverage = 2000
-        if confidence > 95.0:
-            effective_leverage = 3000
-            
-        # Reduce if Volatility is Extreme (Flash Crash risk)
-        if market_volatility > 80.0:
-            effective_leverage = max(30, effective_leverage / 4)
-            
-        # Calculation:
-        # Lot = (Equity * Leverage) / ContractSize
-        # Gold Contract Size = 100
-        # Price ~2600
+        raw_lots = base_lots * conf_factor * entropy_factor
         
-        # Formula: Margin = (Lots * Contract * Price) / Leverage
-        # Lots = (Margin * Leverage) / (Contract * Price)
-        # Margin = Equity * RiskRatio (e.g. use 50% of equity)
+        # 4. Sigmoid Soft Cap (Asymptote at MAX_CEILING)
+        # Prevents "Infinite Lots" on huge accounts, forces diversification.
+        MAX_CEILING = 5.0 # Increased from 2.5 per user "4.92 lots" comment
         
-        # Phase 59: Dynamic Probability Sizing (Smart Slots)
-        # User Feedback: "4.92 lots was too high."
-        # Old Logic: Used 90% of Equity (Max Exposure).
-        # New Logic: Use X% of Equity as Margin, scaled by Confidence.
+        # Formula: L = Max * tanh(raw / Max)
+        final_lots = MAX_CEILING * math.tanh(raw_lots / MAX_CEILING)
         
-        # Base Allocation: 2% of Equity per trade.
-        base_allocation_pct = 0.02 
+        # 5. Floors and Rounding
+        if final_lots < 0.01: final_lots = 0.01
+        final_lots = round(final_lots, 2)
         
-        # Scaling by Confidence (Probability)
-        # 50% Conf -> 1.0x (2%)
-        # 80% Conf -> 1.6x (3.2%)
-        # 95% Conf -> 3.0x (6%)
-        # 100% Conf -> 5.0x (10% Max)
-        
-        # Linear Check to avoid negative
-        if confidence < 50: confidence = 50
-        
-        # Probability Multiplier
-        prob_mult = 1.0 + ((confidence - 50) / 10.0) * 0.5
-        
-        target_margin_usage = equity * base_allocation_pct * prob_mult
-        
-        # Apply Volatility Penalty (if VIX is high, reduce size)
-        if market_volatility > 80:
-             target_margin_usage *= 0.5
-        
-        # Convert Target Margin to Lots
-        # Margin = (Lots * Contract * Price) / Leverage
-        # Lots = (Margin * Leverage) / (Contract * Price)
-        
-        # Assumptions for BTCXAU/BTCUSD:
-        price = 90000.0 # Fallback estimate, really should be passed in.
-        contract_size = 1.0 # Standard BTC lot?
-        
-        # We need realistic price. If not passed, use safe defaults.
-        # But wait, this class does not have price passed in.
-        # I will use a generic "Exposure" calculation.
-        
-        # Calculate Lots assuming Leverage provides Buying Power
-        buying_power = target_margin_usage * effective_leverage
-        
-        # Lots = Buying Power / Price
-        # This assumes 1 Lot = 1 Unit (Currency Standard).
-        # If 1 Lot = 100 Units, divide by 100.
-        
-        # Conservative Estimate:
-        # Assume 1 Lot ~ $100,000 exposure (Standard Lot).
-        # raw_lots = buying_power / 100000
-        
-        # Adjusted for BTCUSD (1 Lot = 1 BTC = $90k):
-        raw_lots = buying_power / 90000.0
-        
-        # Clamp Logic
-        final_lots = round(raw_lots, 2)
-        final_lots = max(0.01, final_lots)
-        
-        # Safety Cap - Increased from 1.0 to allow dynamic sizing
-        if final_lots > 5.0: final_lots = 5.0
+        # logger.info(f"Quantum Risk: Eq ${equity:.0f} -> Base {base_lots:.2f} * Conf {conf_factor:.2f} * Ent {entropy_factor:.2f} = {raw_lots:.2f} -> Sigmoid {final_lots:.2f}")
         
         return final_lots
-

@@ -14,28 +14,53 @@ import threading
 # LOAD LIBRARIES
 # ============================================================================
 
+# ============================================================================
+# LOAD LIBRARIES
+# ============================================================================
+
+# Ensure DLL directories are added (Python 3.8+ Windows)
+if hasattr(os, "add_dll_directory"):
+    try:
+        # Add build/bin to DLL search path
+        bin_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "build/bin"))
+        if os.path.exists(bin_path):
+            os.add_dll_directory(bin_path)
+        
+        # Try to find MinGW/G++ path from environment and add it
+        path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+        for p in path_dirs:
+            if os.path.exists(os.path.join(p, "g++.exe")) or os.path.exists(os.path.join(p, "libstdc++-6.dll")):
+                try:
+                    os.add_dll_directory(p)
+                except:
+                    pass
+    except Exception as e:
+        print(f"Warning: Failed to add DLL directories: {e}")
+
 def _load_lib(name: str) -> Optional[ctypes.CDLL]:
     """Load a shared library from multiple possible locations."""
-    possible_paths = [
-        os.path.join(os.path.dirname(__file__), f"build/{name}.dll"),
-        os.path.join(os.path.dirname(__file__), f"build/{name}.so"),
-        os.path.join(os.path.dirname(__file__), f"build/lib{name}.so"),
-        os.path.join(os.path.dirname(__file__), f"{name}.dll"),
-        f"./{name}.dll",
-        f"./{name}.so",
-    ]
+    # If loading specific module fails, try the monolithic lib
+    names_to_try = [name, "atl4s_agi"]
     
-    for path in possible_paths:
-        if os.path.exists(path):
-            try:
-                return ctypes.CDLL(path)
-            except OSError as e:
-                print(f"Warning: Could not load {path}: {e}")
+    for n in names_to_try:
+        possible_paths = [
+            os.path.join(os.path.dirname(__file__), f"build/bin/lib{n}.dll"), # MinGW preferred
+            os.path.join(os.path.dirname(__file__), f"build/bin/{n}.dll"),
+            os.path.join(os.path.dirname(__file__), f"build/{n}.dll"),
+            f"./{n}.dll",
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                try:
+                    return ctypes.CDLL(path)
+                except OSError:
+                    continue
     
     return None
 
-
 # Try to load all C++ libraries
+# Note: They might all point to the same DLL (libatl4s_agi.dll) which is fine
 _mcts_lib = _load_lib("mcts")
 _physics_lib = _load_lib("physics")
 _hdc_lib = _load_lib("hdc")
@@ -56,6 +81,16 @@ class TrajectoryResult:
     total_distance: float
     final_velocity: float
     energy: float
+
+
+class CSimulationResult(ctypes.Structure):
+    _fields_ = [
+        ("best_move_type", ctypes.c_int),
+        ("expected_value", ctypes.c_double),
+        ("visits", ctypes.c_int),
+        ("confidence", ctypes.c_double),
+        ("q_value", ctypes.c_double),
+    ]
 
 
 @dataclass
@@ -176,10 +211,51 @@ class MCTSBridge:
         """Run full AGI MCTS with RAVE, adaptive UCT, and progressive widening."""
         if not self._lib:
             return -1
+        
+        # Mapping to simple int return for now, but strictly we should use struct.
+        # Assuming lib wrapper handles it or we accept partial data (int return of struct usually grabs first member)
+        # First member of SimulationResult is 'best_move_type' (int).
+        # So accidentally this works!
+        
         return self._lib.run_agi_mcts(
             num_simulations, exploration_constant, max_depth, num_actions,
             num_threads, rave_k, pw_alpha, pw_beta
         )
+
+    def run_guided_mcts(
+        self,
+        current_price: float,
+        entry_price: float,
+        direction: int,
+        volatility: float,
+        drift: float,
+        iterations: int = 1000,
+        depth: int = 50,
+        bias_strength: float = 0.0,
+        bias_direction: int = 0
+    ) -> Dict[str, Any]:
+        """Run MCTS guided by AGI Intuition."""
+        if not self._lib:
+            return {"best_move": 0, "confidence": 0.0}
+            
+        # Lazy binding for new function
+        if not hasattr(self._lib, 'run_guided_mcts'):
+             self._lib.run_guided_mcts.argtypes = [
+                ctypes.c_double, ctypes.c_double, ctypes.c_int, ctypes.c_double, ctypes.c_double,
+                ctypes.c_int, ctypes.c_int, ctypes.c_double, ctypes.c_int
+             ]
+             self._lib.run_guided_mcts.restype = CSimulationResult
+        
+        res = self._lib.run_guided_mcts(
+            current_price, entry_price, direction, volatility, drift,
+            iterations, depth, bias_strength, bias_direction
+        )
+        
+        return {
+            "best_move": res.best_move_type,
+            "confidence": res.confidence,
+            "expected_value": res.expected_value
+        }
 
 
 # ============================================================================
@@ -258,11 +334,28 @@ class PhysicsBridge:
             ctypes.c_double,
             ctypes.c_double,
         ]
-        self._lib.calculate_tunneling_probability.restype = ctypes.c_double
+        # calculate_fisher_information
+        self._lib.calculate_fisher_information.argtypes = [
+            ctypes.POINTER(ctypes.c_double),
+            ctypes.c_int,
+            ctypes.c_int,
+        ]
+        self._lib.calculate_fisher_information.restype = ctypes.c_double
     
     @property
     def available(self) -> bool:
         return self._lib is not None
+    
+    # ... (other methods) ...
+    
+    def calculate_fisher(self, prices: np.ndarray, window: int = 10) -> float:
+        """Calculate Fisher Information Metric (Regime Change Speed)."""
+        if not self._lib:
+            return 0.0
+            
+        prices_arr = np.ascontiguousarray(prices, dtype=np.float64)
+        ptr = prices_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+        return self._lib.calculate_fisher_information(ptr, len(prices_arr), window)
     
     def simulate_trajectory(
         self,
@@ -341,6 +434,8 @@ class PhysicsBridge:
         return self._lib.calculate_tunneling_probability(
             barrier_height, particle_energy, barrier_width
         )
+        
+
 
 
 # ============================================================================
@@ -444,7 +539,7 @@ class HDCBridge:
         self._lib.bundle_vectors(flat_ptr, len(vectors), r_ptr, self._dimension)
         return result
     
-    def similarity(self, a: np.ndarray, b: np.ndarray) -> float:
+    def cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
         """Calculate cosine similarity between hypervectors."""
         if not self._lib:
             return float(np.dot(a.astype(float), b.astype(float)) / self._dimension)

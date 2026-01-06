@@ -16,6 +16,7 @@ from core.genetics import EvolutionEngine
 from core.neuroplasticity import NeuroPlasticityEngine
 from core.transformer_lite import TransformerLite
 from core.mcts_planner import MCTSPlanner
+from core.agi.omega_agi_core import OmegaAGICore # Project Awakening
 
 # Setup Logging
 logging.basicConfig(
@@ -60,6 +61,8 @@ class OmegaSystem:
         self.neuroplasticity = NeuroPlasticityEngine()
         self.attention = TransformerLite(embed_dim=64, head_dim=64) # Simple init stats
         self.grandmaster = MCTSPlanner()
+        self.agi = OmegaAGICore() # The Brain
+        
         
 
         
@@ -87,7 +90,72 @@ class OmegaSystem:
             "mode": "SNIPER",
             "spread_limit": 0.05
         }
+
+    def smart_startup(self):
+        """
+        AGI Logic for System Startup. ("The Interview")
+        """
+        print("\n" + "="*50)
+        print("   OMEGA PROTOCOL v5.0 - AWAKENED CORE   ")
+        print("="*50)
         
+        # --- AGI PRE-FLIGHT CHECK ---
+        print("\n[AGI]: Connecting to Market Matrix for Analysis...")
+        
+        # 1. Quick Data Fetch
+        try:
+            # Try to get a live tick to confirm connection
+            tick = self.bridge.get_tick()
+            if tick and 'symbol' in tick:
+                self.symbol = tick['symbol']
+                print(f"[AGI]: Connection Established. Target: {self.symbol}")
+            else:
+                print("[AGI]: No live tick from Bridge.")
+                sym_in = input(f"Enter Target Symbol [Default: {self.symbol}]: ").strip().upper()
+                if sym_in: self.symbol = sym_in
+
+            # 2. Populate DataLoader
+            print("[AGI]: Downloading Quantum History...")
+            self.data_loader.get_data(self.symbol) # Forces download/update
+            
+        except Exception as e:
+            print(f"[AGI WARNING]: Data fetch failed ({e}). Proceeding blind.")
+
+        from core.agi.profiler import AGIProfiler
+        profiler = AGIProfiler(self.data_loader)
+        rec = profiler.analyze_market_conditions()
+        
+        print(f"\n[AGI ANALYSIS]: {rec['reason']}")
+        print(f"RECOMMENDATION: Mode={rec['mode']} | Risk={rec['risk_profile']}")
+        
+        try:
+            # Non-blocking check for user override
+            print("\nAccept AGI Recommendation? [Y/n] (Auto-accept in 5s)")
+            use_rec = 'y' # Default
+            # In a real GUI/Terminal this would have a timeout input.
+            # For now we assume User wants AGI unless they type 'n' fast? 
+            # Actually, standard input() blocks. We'll use input() for now.
+            use_rec_in = input(f"Confirm {rec['mode']}? [Y/n]: ").strip().lower()
+            if use_rec_in: use_rec = use_rec_in
+        except:
+             use_rec = 'y'
+
+        if use_rec == 'n':
+            self.interactive_startup() # Fallback to manual
+        else:
+            self.config['mode'] = rec['mode']
+            self.symbol = "XAUUSD" if rec['risk_profile'] == "STANDARD" else "BTCUSD" # Simple fallback
+            if self.symbol == "XAUUSD":
+                # Apply Gold Standard
+                self.config["virtual_sl"] = 10.0
+                self.config["virtual_tp"] = 2.0
+                self.config["spread_limit"] = 0.02
+                self.config["phys_sl_pct"] = 0.005
+                self.config["phys_tp_pct"] = 0.010
+            print(f">> Applying {rec['mode']} Protocol.")
+            print(f"Configuration Loaded: Profile={self.symbol} | Mode={self.config['mode']}")
+            print("="*50 + "\n")
+            
     def interactive_startup(self):
         print("\n" + "="*50)
         print("   OMEGA PROTOCOL v4.0 - SINGULARITY EDITION   ")
@@ -185,7 +253,7 @@ class OmegaSystem:
         logger.info("System Ready. Waiting for Market Data...")
 
     async def run(self):
-        self.interactive_startup()
+        self.smart_startup()
         await self.boot_sequence()
         
         tick_count = 0  # Heartbeat counter
@@ -193,11 +261,10 @@ class OmegaSystem:
         
         while True:
             try:
-                # 0. Schedule Enforcement (Monday-Friday Only)
-                # 0 = Monday, 4 = Friday, 5 = Saturday, 6 = Sunday
-                weekday = datetime.datetime.now().weekday()
-                if weekday >= 5:
-                    logger.info("MARKET CLOSED (Weekend). Sleeping...")
+                # 0. AGI Schedule Enforcement
+                should_trade, reason = self.agi.should_trade_now(self.symbol)
+                if not should_trade:
+                    logger.info(f"AGI PAUSE: {reason}. Sleeping...")
                     await asyncio.sleep(60)
                     continue
                 
@@ -216,6 +283,16 @@ class OmegaSystem:
                 if tick:
                     tick_count += 1
                     self.symbol = tick.get('symbol', 'XAUUSD')
+                    
+                    # --- PROJECT AWAKENING: AGI PRE-TICK ---
+                    # The Brain reasons about the market before the Body moves.
+                    agi_adjustments = self.agi.pre_tick(tick, self.config)
+                    if agi_adjustments:
+                         # Apply self-healing or optimization adjustments
+                         if 'switch_mode' in agi_adjustments:
+                             # self.config['mode'] = agi_adjustments['switch_mode'] # Optional auto-switch
+                             pass 
+                         logger.info(f"AGI CORE: Adjustments Generated: {agi_adjustments}")
                     
                     if 'last' not in tick:
                         tick['last'] = (tick['bid'] + tick['ask']) / 2
@@ -294,6 +371,17 @@ class OmegaSystem:
                     if decision == "BUY" or decision == "SELL":
                         cmd = 0 if decision == "BUY" else 1
                         
+                        # --- SOVEREIGN MULTIPLIER (Restored) ---
+                        lot_multiplier = 1.0
+                        sov_state = metadata.get('sovereign_state', 'NEUTRAL')
+                        
+                        if sov_state == "SINGULARITY":
+                            lot_multiplier = 3.0
+                            logger.info(">>> !!! SINGULARITY STRIKE !!!: Multiplier 3.0x Active <<<")
+                        elif sov_state == "STRONG":
+                            lot_multiplier = 2.0
+                            logger.info(">>> SOVEREIGN ASSERTIVENESS: Multiplier 2.0x Active <<<")
+                        
                         # Phase 95: Wolf Pack Logic (Dynamic Burst)
                         max_burst = 1 # Default Sniper
                         
@@ -332,10 +420,23 @@ class OmegaSystem:
                         # We use the 'max_burst' determined above.
                         
                         current_positions = tick.get('positions', 0)
-                        max_slots = 10 # Allow more slots in Wolf Mode?
-                        if self.config['mode'] == "WOLF_PACK": max_slots = 15
-                        elif self.config['mode'] == "HYBRID": max_slots = 12
-                        elif self.config['mode'] == "AGI_MAPPER": max_slots = 20  # AGI gets max flexibility
+                        
+                        # --- AGI DYNAMIC SLOTS ---
+                        # Use Micro-Stats (Entropy) and Confidence (Trend Strength) to decide slot capacity on the fly.
+                        # This replaces the hardcoded limits.
+                        micro_stats = metadata.get('micro_stats', {})
+                        volatility_idx = micro_stats.get('volatility', 50.0) # Default to mid
+                        # Or use entropy * 100 if volatility is not directly available
+                        if 'entropy' in micro_stats:
+                             volatility_idx = micro_stats['entropy'] * 100.0
+                             
+                        max_slots = self.cortex.calculate_dynamic_slots(
+                            volatility=volatility_idx,
+                            trend_strength=confidence, # Use Cortex Confidence as Trend Strength Proxy
+                            mode=self.config['mode']
+                        )
+                        
+                        # logger.info(f"AGI SLOTS: {max_slots} (Vol: {volatility_idx:.1f}, Conf: {confidence:.1f})")
 
                         tracker = self.burst_tracker.get(self.symbol, {'timestamp': 0, 'count': 0})
                         
@@ -346,7 +447,6 @@ class OmegaSystem:
                         if current_positions < max_slots and tracker['count'] < max_burst:
                              logger.info(f"FIRE! Burst {tracker['count']+1}/{max_burst} | Slots {current_positions+1}/{max_slots}")
                              
-                             # Fix: Method is execute_signal, and takes 'decision' string ("BUY"/"SELL"), not 'cmd' int.
                              # Mode-based spread tolerance
                              if self.config['mode'] == "WOLF_PACK": 
                                  spread_tol = 0.05  # Lenient
@@ -361,7 +461,8 @@ class OmegaSystem:
                                                                 tick.get('bid'), tick.get('ask'), 
                                                                 confidence=confidence,
                                                                 account_info={'equity': tick.get('equity', 1000)},
-                                                                spread_tolerance=spread_tol) 
+                                                                spread_tolerance=spread_tol,
+                                                                multiplier=lot_multiplier) 
                              
                              tracker['count'] += 1
                              self.burst_tracker[self.symbol] = tracker
@@ -390,6 +491,16 @@ class OmegaSystem:
                              logger.warning(f"SURGICAL EXIT: Closing Ticket {ticket}. Reason: {meta_data.get('reason')}")
 
 
+                    # --- PROJECT AWAKENING: AGI POST-TICK ---
+                    # The Brain learns from the outcome of the Tick.
+                    result_feedback = {
+                        'decision': decision,
+                        'trade_executed': decision in ["BUY", "SELL"],
+                        'profit': tick.get('profit', 0.0), # Current PnL snapshot
+                        'success': tick.get('profit', 0.0) > 0 # Simple heuristic for now
+                    }
+                    self.agi.post_tick(decision, result_feedback)
+                    
                     state = {
                         'swarm_state': self.cortex.state,
                         'neuro_weights': self.cortex.neuroplasticity.get_dynamic_weights(),
