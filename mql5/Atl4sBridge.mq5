@@ -945,6 +945,9 @@ void ProcessCommand(string json) {
         double py_confidence = 0.0;
         if(ArraySize(parts) >= 7) {
             py_confidence = StringToDouble(parts[6]);
+            Print("PYTHON CONF: Received confidence = ", py_confidence, " from parts[6]='", parts[6], "' (ArraySize=", ArraySize(parts), ")");
+        } else {
+            Print("PYTHON CONF: No confidence in message (ArraySize=", ArraySize(parts), ", expected >= 7)");
         }
         
         // Check with risk manager
