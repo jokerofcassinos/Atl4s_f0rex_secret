@@ -101,23 +101,8 @@ class DynamicLeverage:
         final_lots = round(raw_lots, 2)
         final_lots = max(0.01, final_lots)
         
-        # Absolute Safety Cap based on User Feedback
-        if final_lots > 1.0: final_lots = 1.0 # Hard Cap restored but higher than 0.10
+        # Safety Cap - Increased from 1.0 to allow dynamic sizing
+        if final_lots > 5.0: final_lots = 5.0
         
         return final_lots
-        
-        if final_lots > 5.0: final_lots = 5.0 # Absolute Cap
-        
-        # Specific Adjustment for $5 account:
-        # If we have only $5, we can likely only do 0.01 or 0.02 safely-ish.
-        # 0.01 lots Gold = $1 per point. 500 point move kills it. 
-        # Actually 0.01 lots = $0.01 per point (tick value).
-        # No, 1 Lot XAUUSD = 100oz. 1 pip (0.01) = $1.
-        # 0.01 Lot = $0.01 per 0.01 move (1 cent per point).
-        
-        # Validating math:
-        # 1.00 move in Gold (2650 -> 2651)
-        # 0.01 Lot * 100 * 1 = $1 profit/loss.
-        # So $5 account survives 5 points move (approx 500 pips).
-        
-        return final_lots
+
