@@ -131,13 +131,29 @@ class MCTSPlanner:
         
         # Verify C++ Bridge on Startup
         self._cpp_available = False
+        self._cpp_lib = None
         try:
-            from core.cpp_loader import load_dll
-            load_dll("mcts_core.dll")
-            self._cpp_available = True
-            logger.info("MCTS ENGINE: C++ CORE ACTIVE [ULTRA TURBO MODE]")
-        except Exception:
-            logger.info("MCTS ENGINE: PYTHON [AGI ULTRA MODE]")
+            import ctypes
+            import os
+            
+            # Try multiple DLL locations
+            dll_paths = [
+                os.path.join(os.path.dirname(__file__), "..", "cpp_core", "libmcts.dll"),
+                os.path.join(os.path.dirname(__file__), "..", "cpp_core", "build", "bin", "libmcts.dll"),
+                os.path.join(os.path.dirname(__file__), "..", "cpp_core", "mcts_core.dll"),
+            ]
+            
+            for dll_path in dll_paths:
+                if os.path.exists(dll_path):
+                    self._cpp_lib = ctypes.CDLL(dll_path)
+                    self._cpp_available = True
+                    logger.info(f"MCTS ENGINE: C++ CORE ACTIVE [ULTRA TURBO MODE] ({os.path.basename(dll_path)})")
+                    break
+            
+            if not self._cpp_available:
+                logger.info("MCTS ENGINE: PYTHON [AGI ULTRA MODE]")
+        except Exception as e:
+            logger.info(f"MCTS ENGINE: PYTHON [AGI ULTRA MODE] ({e})")
     
     def search(self, root_state: Dict, trend_bias: float = 0.0) -> str:
         """
@@ -315,44 +331,38 @@ class MCTSPlanner:
         """C++ bridge for ultra-fast simulation."""
         try:
             import ctypes
-            from core.cpp_loader import load_dll
             
-            lib = load_dll("mcts_core.dll")
+            if not self._cpp_lib:
+                return self._parallel_mcts(root_state, drift)
             
-            lib.run_mcts_simulation.argtypes = [
-                ctypes.c_double, ctypes.c_double, ctypes.c_int,
-                ctypes.c_double, ctypes.c_double, ctypes.c_int, ctypes.c_int
+            # Use run_parallel_mcts or run_agi_mcts from our C++ lib
+            # int run_parallel_mcts(int num_sims, double exploration, int max_depth, int num_actions, int num_threads)
+            self._cpp_lib.run_parallel_mcts.argtypes = [
+                ctypes.c_int,     # num_simulations
+                ctypes.c_double,  # exploration_constant
+                ctypes.c_int,     # max_depth
+                ctypes.c_int,     # num_actions
+                ctypes.c_int,     # num_threads
             ]
+            self._cpp_lib.run_parallel_mcts.restype = ctypes.c_int
             
-            class SimResult(ctypes.Structure):
-                _fields_ = [
-                    ("best_move_type", ctypes.c_int),
-                    ("expected_value", ctypes.c_double),
-                    ("visits", ctypes.c_int)
-                ]
-            lib.run_mcts_simulation.restype = SimResult
-            
-            price = float(root_state['price'])
-            entry = float(root_state['entry'])
-            direction = 1 if root_state['side'] == 'BUY' else -1
-            vol = float(root_state.get('volatility', 1.0))
-            
-            # Ultra iterations with C++
-            turbo_iters = self.iterations
-            
-            res = lib.run_mcts_simulation(
-                price, entry, direction, vol, drift, 
-                turbo_iters, self.simulation_depth
+            # Run C++ MCTS
+            best_action = self._cpp_lib.run_parallel_mcts(
+                self.iterations,           # num_simulations
+                1.414,                      # exploration constant
+                self.simulation_depth,      # max_depth
+                4,                          # num_actions (HOLD, CLOSE, TRAIL, PARTIAL_TP)
+                self.num_workers            # num_threads
             )
             
             move_map = {0: "HOLD", 1: "CLOSE", 2: "TRAIL", 3: "PARTIAL_TP"}
-            best_move = move_map.get(res.best_move_type, "HOLD")
+            best_move = move_map.get(best_action, "HOLD")
             
-            self.total_simulations += res.visits
+            self.total_simulations += self.iterations
             
             logger.debug(
                 f"MCTS [C++]: {best_move} "
-                f"(Visits: {res.visits}, EV: {res.expected_value:.2f})"
+                f"(Sims: {self.iterations}, Action: {best_action})"
             )
             return best_move
             
