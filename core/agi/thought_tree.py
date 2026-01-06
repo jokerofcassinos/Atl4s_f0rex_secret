@@ -68,6 +68,7 @@ class ThoughtTree:
         self.max_depth = max_depth
         self.nodes: Dict[str, ThoughtNode] = {}
         self.root_nodes: List[str] = []  # IDs dos nós raiz
+        self._max_depth_warned = False  # Flag to only warn once
         
     def create_node(self, question: str, parent_id: Optional[str] = None, 
                    context: Optional[Dict[str, Any]] = None,
@@ -91,7 +92,9 @@ class ThoughtTree:
         if parent_id:
             depth = self._calculate_depth(parent_id)
             if depth >= self.max_depth:
-                logger.warning(f"ThoughtTree {self.module_name}: Max depth reached. Cannot create child node.")
+                if not self._max_depth_warned:
+                    logger.debug(f"ThoughtTree {self.module_name}: Max depth ({self.max_depth}) reached.")
+                    self._max_depth_warned = True
                 return parent_id  # Retorna o pai para evitar criar nó
         
         node = ThoughtNode(
