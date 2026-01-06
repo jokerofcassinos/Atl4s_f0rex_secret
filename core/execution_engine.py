@@ -272,7 +272,10 @@ class ExecutionEngine:
             symbol = trade.get('symbol')
             
             limit = -abs(v_sl)
-            # Only log when action will be taken (removed spam)
+            
+            # Debug: Show profit vs thresholds (only for positive profits)
+            if profit > 0:
+                logger.info(f"VTP CHECK: Ticket {ticket} | Profit ${profit:.2f} | VTP ${v_tp:.2f} | Trigger: {profit >= v_tp}")
             
             # 1. Individual Take Profit (The Snipe)
             if profit >= v_tp:
