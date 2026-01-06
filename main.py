@@ -28,8 +28,20 @@ logging.basicConfig(
 )
 # Filter noisy 3rd party logs
 logging.getLogger("yfinance").setLevel(logging.WARNING)
-logging.getLogger("peewee").setLevel(logging.WARNING) 
-# logging.getLogger("urllib3").setLevel(logging.WARNING) 
+logging.getLogger("peewee").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+# === REASONING LOGS ENABLED ===
+# Enable detailed logs for cognitive/reasoning modules
+logging.getLogger("MCTS_Planner").setLevel(logging.DEBUG)
+logging.getLogger("SwarmOrchestrator").setLevel(logging.INFO)
+logging.getLogger("InfiniteWhyEngine").setLevel(logging.INFO)
+logging.getLogger("ThoughtTree").setLevel(logging.INFO)  # Set to DEBUG for ultra-verbose
+logging.getLogger("HolographicMemory").setLevel(logging.INFO)
+logging.getLogger("LaplaceSwarm").setLevel(logging.DEBUG)
+logging.getLogger("RiemannSwarm").setLevel(logging.DEBUG)
+logging.getLogger("OmegaProtocol").setLevel(logging.DEBUG)
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)

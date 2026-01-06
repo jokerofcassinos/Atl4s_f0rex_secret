@@ -152,8 +152,9 @@ class ThoughtTree:
         """Calcula a profundidade de um nó."""
         depth = 0
         current_id = node_id
+        max_iterations = self.max_depth + 10  # Safety limit
         
-        while current_id and current_id in self.nodes:
+        while current_id and current_id in self.nodes and depth < max_iterations:
             parent_id = self.nodes[current_id].parent_id
             if parent_id is None:
                 break
