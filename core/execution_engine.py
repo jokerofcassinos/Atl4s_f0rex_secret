@@ -97,15 +97,14 @@ class ExecutionEngine:
         account_info: Optional[Dict] = None,
         spread_tolerance: Optional[float] = None,
         multiplier: float = 1.0,
+        atr_value: Optional[float] = None # Phase 3: AGI ATR Override
     ):
         """
         Converts a Cortex Command into a Physical Order.
         Args:
             command: "BUY" or "SELL", "XAUUSD" etc
-            bid: Current Bid
-            ask: Current Ask
             confidence: 0-100 score
-            account_info: info for lot sizing (optional)
+            atr_value: (Optional) Real ATR from AGI Profiler for dynamic stops.
         """
         # 1. Great Filter Check (Phase 10 - AGI Risk Core)
         if self.risk_filter:
@@ -150,14 +149,16 @@ class ExecutionEngine:
             equity=equity,
             used_slots=used_slots,
             max_slots=max_slots,
-            volatility=volatility
+            volatility=volatility,
+            atr_value=atr_value
         )
         
         # Override for tiny prices (Safety)
         if price < 5.0: 
-             sl_dist = price * 0.01
-             tp_dist = price * 0.02
-
+             # Forex/Altcoin Safety
+             if sl_dist < price * 0.005: sl_dist = price * 0.01
+             if tp_dist < price * 0.01: tp_dist = price * 0.02
+        
         if self.bridge:
             # 3. Dynamic Spread Guard
             # Adaptive Threshold: MAX_SPREAD = Config % of Price
@@ -194,28 +195,34 @@ class ExecutionEngine:
         
         # Include confidence as 6th parameter for MQL5 adaptive executor
         params = [symbol, str(cmd_type), f"{lots:.2f}", params_sl, params_tp, f"{confidence:.1f}"]
-        logger.info(f"EXECUTION: {command} {lots} lots @ {price:.5f} | Conf: {confidence:.1f}% | SL: {params_sl} TP: {params_tp}")
+        logger.info(f"EXECUTION: {command} {lots} lots @ {price:.5f} | Conf: {confidence:.1f}% | SL: {params_sl} TP: {params_tp} (ATR: {atr_value})")
         
         if self.bridge:
              self.bridge.send_command("OPEN_TRADE", params)
              
         return "SENT"
 
-    def calculate_smart_exits(self, price: float, equity: float, used_slots: int, max_slots: int, volatility: float) -> tuple:
+    def calculate_smart_exits(self, price: float, equity: float, used_slots: int, max_slots: int, volatility: float, atr_value: float = None) -> tuple:
         """
         AGI-Driven Physical Exits.
-        Adjusts TP/SL based on 'Capital Saturation' and Sentiment.
-        
-        Logic:
-        1. Saturation Factor: If we are 'Heavy' (High Slots Used), we want to scalp quick (Tight TP) and protect strict (Tight SL).
-           If we are 'Light', we can let it run (Wide TP/SL).
-           
-        2. Whale Factor (Capital): Larger accounts (> $1000) target % moves. Small accounts tend to need fixed $ growth.
+        Adjusts TP/SL based on ATR or 'Capital Saturation'.
         """
-        # Base Settings (Gold)
+        # Base Settings (Gold) - Fallback
         base_tp_dist = 2.0  # $2.00
         base_sl_dist = 1.5  # $1.50
         
+        # Phase 3: AGI ATR Override
+        if atr_value and atr_value > 0:
+             # Logic: Stop Loss = 1.5x ATR (To avoid noise)
+             # Logic: Take Profit = 2.0x ATR (2:1 Ratio attempt, or 1.5:1)
+             base_sl_dist = atr_value * 1.5
+             base_tp_dist = atr_value * 2.5 # Ambition
+             
+             # If ATR is crazy (News), clamp it
+             if base_sl_dist > 20.0: base_sl_dist = 20.0
+             
+             return base_tp_dist, base_sl_dist
+             
         # 1. Saturation Multiplier
         # Saturation 0.0 to 1.0
         saturation = used_slots / max(1, max_slots)

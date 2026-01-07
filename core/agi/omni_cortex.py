@@ -65,52 +65,57 @@ class OmniCortex:
             
         logger.debug(f"[OMNI-CORTEX] Fisher: {self.fisher_metric:.2f} | Regime: {self.current_regime}")
 
-    def run_deep_thought(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def run_deep_thought(
+        self, 
+        context: Dict[str, Any],
+        force_bias: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Trigger a Deep Thought (Guided MCTS simulation) if warranted.
-        Returns a 'Cognitive Packet' with simulation results.
+        Can be forced by Dialectic Engine with a specific bias direction.
         """
-        if self.current_regime == "STABLE":
+        # If forced, we ignore regime checks (Dialectic Debate is prioritized)
+        if not force_bias and self.current_regime == "STABLE":
             return None # Don't waste compute on stable markets
             
         # If volatile, run a Guided Simulation to see if we should survive
-        # We assume we have current price info
         current_price = context.get('current_price', 0.0)
         if current_price == 0: return None
         
         volatility = context.get('volatility', 0.001)
         
-        # Scenario: "What if the trend reverses?"
-        # We guide the MCTS to check for reversals (Bias towards Counter-Trend)
-        # Assuming 'direction' is roughly known, e.g. 1 (Bull) or -1 (Bear)
-        # We'll blindly test both or use a heuristic.
-        
-        # Test: BEARISH CRASH SCENARIO
-        # Bias the simulation to SELL (-1) with strength 0.3
-        result_crash = self.bridge.mcts.run_guided_mcts(
+        # Determine Bias Direction
+        bias_dir = -1 # Default: Fear of Crash
+        if force_bias is not None:
+             bias_dir = force_bias
+             
+        # Run Simulation
+        result = self.bridge.mcts.run_guided_mcts(
             current_price=current_price,
-            entry_price=current_price, # Hypothetical entry now
-            direction=1, # Assume we are Long, test if we die
+            entry_price=current_price, 
+            direction=1, # Assume Long for PnL calc
             volatility=volatility,
             drift=0.0,
-            iterations=5000, # Heavy compute
+            iterations=5000, 
             depth=50,
-            bias_strength=0.3,
-            bias_direction=-1 # Force "Sell/Down" pressure
+            bias_strength=0.3, # Strong enough to test, weak enough to not hallucinate
+            bias_direction=bias_dir # Force "Sell" or "Buy" pressure
         )
         
         # Result analysis
-        expected_value = result_crash.get('expected_value', 0.0)
+        expected_value = result.get('expected_value', 0.0)
+        confidence = result.get('visit_count', 0) / 5000.0 * 100.0 # Heuristic
         
         thought = {
-             "hypothesis": "Crash Simulation",
+             "hypothesis": f"Simulation Bias={bias_dir}",
              "regime": self.current_regime,
              "fisher_info": self.fisher_metric,
-             "crash_expectation": expected_value,
+             "expected_value": expected_value,
+             "confidence": confidence,
              "recommendation": "HOLD"
         }
         
-        if expected_value < -1.0: # If we expect to lose heavily even with just a 0.3 bias
+        if not force_bias and expected_value < -1.0:
              thought['recommendation'] = "VETO_LONG"
              
         self.latest_thought = thought

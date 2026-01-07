@@ -79,6 +79,7 @@ class ZmqBridge:
                 if not data: break
                 
                 text = data.decode('utf-8', errors='ignore')
+                logger.info(f"RAW: {text.strip()}") # DEBUG: Reveal what arrives
                 buffer += text
                 
                 while '\n' in buffer:

@@ -1,22 +1,25 @@
-﻿
-import asyncio
+﻿import asyncio
 import logging
 import pandas as pd
 import datetime
 from core.zmq_bridge import ZmqBridge
-from core.swarm_orchestrator import SwarmOrchestrator
-from core.execution_engine import ExecutionEngine
-from core.opportunity_flow import OpportunityFlowManager
-from data_loader import DataLoader
-import json
+from core.system_guard import SystemGuard # Zombie Defense
+# from core.api_server import APIServer # Next.js Dashboard Link (Future)
+from core.agi.omega import OmegaAGI
+from core.agi.swarm_training import SwarmTrainer
+from core.agi.cortex import NeoCortex
+from core.agi.omni_cortex import OmniCortex # New Hybrid AGI
+from core.execution.executor import ExecutionEngine
+from data.data_loader import DataLoader
+from analysis.sentiment_engine import SentimentEngine
+from analysis.flow_manager import FlowManager
+from analysis.burst_tracker import BurstTracker
+from core.grandmaster import GrandMaster
+from core.agi.profiler import AGIProfiler # Phase 3: Real Analysis
 
-# Sub-Engines
-from core.consciousness_bus import ConsciousnessBus
-from core.genetics import EvolutionEngine
-from core.neuroplasticity import NeuroPlasticityEngine
-from core.transformer_lite import TransformerLite
-from core.mcts_planner import MCTSPlanner
-from core.agi.omega_agi_core import OmegaAGICore # Project Awakening
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
 # Setup Logging
 logging.basicConfig(
@@ -60,8 +63,11 @@ class OmegaSystem:
         self.evolution = EvolutionEngine()
         self.neuroplasticity = NeuroPlasticityEngine()
         self.attention = TransformerLite(embed_dim=64, head_dim=64) # Simple init stats
-        self.grandmaster = MCTSPlanner()
+        self.grandmaster = GrandMaster() # The Apex DECISION ENGINE
         self.agi = OmegaAGICore() # The Brain
+        self.profiler = AGIProfiler(self.data_loader) # Phase 3: The Interviewer
+        self.agi_metrics = {'atr': 0.0, 'entropy': 0.5, 'volScore': 50.0}
+        self.last_profile_time = 0
         
         
 
@@ -165,12 +171,21 @@ class OmegaSystem:
         print("\nSelect Operational Profile:")
         print("1. CRYPTO (Weekend/Volatile) - High SL/TP, Wide Spreads")
         print("2. FOREX/GOLD (Weekday/Normal) - Tight SL/TP, Low Spreads")
+        print("3. INFINITY UPLINK (Github Sync) - Push Code to Cloud")
         
         try:
-            profile_sel = input("Selection [1/2]: ").strip()
+            profile_sel = input("Selection [1/2/3]: ").strip()
         except:
             profile_sel = "1"
             
+        if profile_sel == "3":
+             from core.github_uplink import GithubUplink
+             print(">> INFINITY UPLINK ACTIVATED.")
+             GithubUplink.sync_codebase()
+             input("Press Enter to continue...")
+             self.interactive_startup()
+             return
+
         if profile_sel == "2":
             print(">> PROFILE: FOREX/GOLD ACTIVATED.")
             self.symbol = "XAUUSD" # Reset to Gold
@@ -342,7 +357,19 @@ class OmegaSystem:
                         if now_msc - last_trade_fetch > 2000: # Every 2s
                              self.bridge.send_command("GET_OPEN_TRADES", [self.symbol])
                              self.last_trade_times['fetch'] = now_msc
-                             
+
+                    # --- PHASE 3: AGI PROFILER UPGRADE ---
+                    # Re-scan market every 5 minutes (300,000 ms)
+                    if now_msc - self.last_profile_time > 300000:
+                         logger.info("AGI PROFILER: Scheduled Re-Scan...")
+                         # We need to ensure DataLoader has fresh data first.
+                         # self.data_loader.get_data(self.symbol) # Heavy? Maybe relying on cache is safer.
+                         rec = self.profiler.analyze_market_conditions()
+                         if 'metrics' in rec:
+                              self.agi_metrics = rec['metrics']
+                              logger.info(f"AGI METRICS UPDATED: ATR={self.agi_metrics.get('atr',0):.2f}")
+                         self.last_profile_time = now_msc
+
                     # 2. Run Dynamic Stop Manager
                     # This relies on ZmqBridge merging TRADES_JSON into the tick
                     await self.executor.manage_dynamic_stops(tick)
@@ -366,7 +393,6 @@ class OmegaSystem:
                              # We continue to let loop refresh.
                              continue 
                     
-                    # 4. Neural Execution 
                     # 4. Neural Execution 
                     if decision == "BUY" or decision == "SELL":
                         cmd = 0 if decision == "BUY" else 1
@@ -430,6 +456,10 @@ class OmegaSystem:
                         if 'entropy' in micro_stats:
                              volatility_idx = micro_stats['entropy'] * 100.0
                              
+                        # Try to use Real Entropy if available
+                        if self.agi_metrics.get('entropy', 0) > 0:
+                             volatility_idx = self.agi_metrics['entropy'] * 100.0
+
                         max_slots = self.cortex.calculate_dynamic_slots(
                             volatility=volatility_idx,
                             trend_strength=confidence, # Use Cortex Confidence as Trend Strength Proxy
@@ -460,9 +490,10 @@ class OmegaSystem:
                              await self.executor.execute_signal(decision, self.symbol, 
                                                                 tick.get('bid'), tick.get('ask'), 
                                                                 confidence=confidence,
-                                                                account_info={'equity': tick.get('equity', 1000)},
+                                                                account_info={'equity': tick.get('equity', 1000), 'positions': current_positions, 'max_slots': max_slots},
                                                                 spread_tolerance=spread_tol,
-                                                                multiplier=lot_multiplier) 
+                                                                multiplier=lot_multiplier,
+                                                                atr_value=self.agi_metrics.get('atr', 0.0)) # AGI STOP OVERRIDE
                              
                              tracker['count'] += 1
                              self.burst_tracker[self.symbol] = tracker

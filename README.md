@@ -63,6 +63,27 @@ Traditional bots forget. ATL4S remembers.
     -   `omni_cortex.py`: High-level reasoning loop.
 -   **Interface**: Next.js (Cyberpunk Dashboard).
 
+## ⚡ Getting Started (Connection Guide)
+
+To awaken ATL4S, you must bridge the Python Core with the MetaTrader 5 Terminal.
+
+### 1. Python Core (The Brain)
+```bash
+pip install -r requirements.txt
+python main.py
+```
+*Wait for "ConsciousnessBus Online".*
+
+### 2. MetaTrader 5 (The Body)
+1.  Open **MetaTrader 5**.
+2.  Go to **Tools -> Options -> Expert Advisors**.
+3.  ✅ Check **"Allow DLL imports"** (Critical for ZeroMQ/Sockets).
+4.  Open the **Navigator** (Ctrl+N).
+5.  Drag the **`NativeBridge`** EA onto your chart (e.g., `GBPUSDm`).
+6.  Check the "Experts" tab for "Connected to Python".
+
+> **Troubleshooting**: If you see "No live tick from Bridge", ensure DLLs are enabled and the EA is running on the timeframe you want to trade (e.g., M1 or M5).
+
 ## 🔮 The Philosophy
 
 We are moving beyond "Technical Analysis". We are building a machine that understands the *physics* of market liquidity and the *psychology* of price movement. ATL4S is not a tool; it is a teammate.
