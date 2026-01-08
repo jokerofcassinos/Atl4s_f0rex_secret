@@ -1,0 +1,31 @@
+[
+    {
+        "ticket": 1001,
+        "profit": 50.0,
+        "meta": {
+            "strategy": "RSI"
+        },
+        "result": "WIN"
+    },
+    {
+        "ticket": 1002,
+        "profit": -20.0,
+        "meta": {
+            "strategy": "MACD"
+        },
+        "result": "LOSS"
+    },
+    {
+        "ticket": 1003,
+        "profit": 100.0,
+        "meta": {
+            "strategy": "Wolf"
+        },
+        "result": "WIN"
+    },
+    {
+        "ticket": 1004,
+        "profit": 10.0,
+        "meta": {}
+    }
+]

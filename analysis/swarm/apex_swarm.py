@@ -52,35 +52,66 @@ class ApexSwarm(SubconsciousUnit):
         for symbol, df in basket.items():
             if df is None or len(df) < 50: continue
             
-            # --- SCORING ENGINE ---
+            # --- AGGRESSIVE SCORING ENGINE v2 ---
             score = 0.0
+            score_breakdown = {}
             
-            # 1. Trend Quality (Hurst) - Using H1 data
+            # 1. Trend Quality (Hurst) - Always contribute points
             hurst = self._calculate_hurst(df['close'].tail(50).values)
-            if hurst > 0.6: score += 2.0
-            if hurst > 0.7: score += 1.0 # Bonus
-            if hurst < 0.4: score += 1.0 # High Mean Reversion Potential
+            hurst = max(0.0, min(1.0, hurst))
             
-            # 2. Volatility (Opportunity Size)
-            # ATR relative to Price
+            # Base 2 points + bonus for any extreme
+            hurst_score = 2.0
+            if hurst > 0.55:  # Trending
+                hurst_score += (hurst - 0.55) * 10.0  # Up to +4.5 pts
+            elif hurst < 0.45:  # Mean reverting
+                hurst_score += (0.45 - hurst) * 8.0   # Up to +3.6 pts
+            score += hurst_score
+            score_breakdown['hurst'] = f"{hurst:.2f}(+{hurst_score:.1f})"
+            
+            # 2. Trend Strength - 50 bar lookback, aggressive scaling
+            price_now = df['close'].iloc[-1]
+            price_50_ago = df['close'].iloc[-50] if len(df) >= 50 else df['close'].iloc[0]
+            trend_pct = abs((price_now - price_50_ago) / price_50_ago) * 100
+            
+            # Scale: 0.2% = 2 pts, 0.5% = 5 pts, 1% = 10 pts (capped at 10)
+            trend_score = min(10.0, trend_pct * 10.0)
+            score += trend_score
+            score_breakdown['trend'] = f"{trend_pct:.2f}%(+{trend_score:.1f})"
+            
+            # 3. Volatility - 10x multiplier for Forex
             atr = (df['high'] - df['low']).rolling(14).mean().iloc[-1]
             price = df['close'].iloc[-1]
             atr_pct = (atr / price) * 100
             
-            # We like volatility. 
-            score += atr_pct * 2.0 # Volatility drives score up
+            # 0.1% ATR = 1 pt, 0.5% = 5 pts, 1% = 10 pts
+            vol_score = min(10.0, atr_pct * 10.0)
+            score += vol_score
+            score_breakdown['vol'] = f"{atr_pct:.2f}%(+{vol_score:.1f})"
             
-            # 3. Momentum Clarity (RSI)
+            # 4. RSI Extremes - Super aggressive
             delta = df['close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(14).mean().iloc[-1]
             loss = (-delta.where(delta < 0, 0)).rolling(14).mean().iloc[-1]
             rs = gain / loss if loss > 0 else 0
             rsi = 100 - (100 / (1 + rs))
             
-            # Extreme RSI is actionable -> Score up
-            # Mid RSI (50) is noise -> Score down
+            # Cubic scaling for extremes: RSI 30 = 2.7 pts, RSI 20 = 5.8 pts, RSI 10 = 10 pts
             dist_from_50 = abs(rsi - 50)
-            score += (dist_from_50 / 50.0) # 0 to 1 point
+            rsi_score = min(10.0, (dist_from_50 / 50.0) ** 2 * 10.0)
+            score += rsi_score
+            score_breakdown['rsi'] = f"{rsi:.0f}(+{rsi_score:.1f})"
+            
+            # 5. Momentum Consistency (NEW) - Count directional bars
+            closes = df['close'].tail(20).values
+            up_bars = sum(1 for i in range(1, len(closes)) if closes[i] > closes[i-1])
+            down_bars = 20 - up_bars
+            consistency = abs(up_bars - down_bars) / 20.0  # 0 to 1
+            momentum_score = consistency * 5.0  # Up to 5 pts
+            score += momentum_score
+            score_breakdown['momentum'] = f"{consistency:.0%}(+{momentum_score:.1f})"
+            
+            # logger.debug(f"APEX DETAIL: {symbol} -> {' '.join([f'{k}={v}' for k,v in score_breakdown.items()])} = {score:.1f}")  # Silenced - too spammy
             
             scores[symbol] = score
             

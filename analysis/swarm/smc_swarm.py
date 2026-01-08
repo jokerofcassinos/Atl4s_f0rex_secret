@@ -29,11 +29,14 @@ class SmartMoneySwarm(SubconsciousUnit):
         
         # 2. DRAW ON CHART (Throttled 5s)
         if self.bridge and time.time() - self.last_draw_time > 5.0:
-            symbol = "XAUUSD" # Default, or get from context
+            # Get symbol from context or fallback
+            tick = context.get('tick', {})
+            symbol = tick.get('symbol', 'XAUUSD')
             
             # Clear old? No clear command yet. We overwrite by name.
             
-            # Draw FVGs
+            # Draw FVGs - extend to CURRENT time so they appear near current price
+            current_time = int(time.time())  # Use current time for right edge
             for i, fvg in enumerate(fvgs):
                 name = f"FVG_{i}"
                 color = 0x00FF00 if fvg['type'] == 'BULL_FVG' else 0x0000FF # Green/Red(BGR)
@@ -42,7 +45,8 @@ class SmartMoneySwarm(SubconsciousUnit):
                 
                 c = 65280 if fvg['type'] == 'BULL_FVG' else 255 # Green / Red
                 
-                self.bridge.send_draw_rect(symbol, name, fvg['bottom'], fvg['top'], fvg['time'], fvg['end_time'] + 3600, c)
+                # Extend rectangle from FVG start time to CURRENT time (visible on chart)
+                self.bridge.send_draw_rect(symbol, name, fvg['bottom'], fvg['top'], fvg['time'], current_time, c)
                 
             # Draw Sweeps
             for i, sweep in enumerate(sweeps):

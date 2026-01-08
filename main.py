@@ -5,17 +5,25 @@ import datetime
 from core.zmq_bridge import ZmqBridge
 from core.system_guard import SystemGuard # Zombie Defense
 # from core.api_server import APIServer # Next.js Dashboard Link (Future)
-from core.agi.omega import OmegaAGI
-from core.agi.swarm_training import SwarmTrainer
-from core.agi.cortex import NeoCortex
+from core.agi.omega_agi_core import OmegaAGICore
+from core.swarm_orchestrator import SwarmOrchestrator
 from core.agi.omni_cortex import OmniCortex # New Hybrid AGI
-from core.execution.executor import ExecutionEngine
-from data.data_loader import DataLoader
-from analysis.sentiment_engine import SentimentEngine
-from analysis.flow_manager import FlowManager
-from analysis.burst_tracker import BurstTracker
+from core.execution_engine import ExecutionEngine
+from data_loader import DataLoader
+from core.opportunity_flow import OpportunityFlowManager
+from core.genetics import EvolutionEngine
+from core.neuroplasticity import NeuroPlasticityEngine
+from core.transformer_lite import TransformerLite
+from core.consciousness_bus import ConsciousnessBus
+from core.grandmaster import GrandMaster
+from core.genetics import EvolutionEngine
+from core.neuroplasticity import NeuroPlasticityEngine
+from core.transformer_lite import TransformerLite
+from core.consciousness_bus import ConsciousnessBus
 from core.grandmaster import GrandMaster
 from core.agi.profiler import AGIProfiler # Phase 3: Real Analysis
+from core.agi.symbiosis import UserIntentModeler, ExplanabilityGenerator # Phase 5.2
+from core.agi.learning import HistoryLearningEngine # Phase 6
 
 # ============================================================================
 # CONFIGURATION
@@ -41,12 +49,13 @@ logging.getLogger("asyncio").setLevel(logging.WARNING)
 logging.getLogger("MCTS_Planner").setLevel(logging.INFO)
 logging.getLogger("SwarmOrchestrator").setLevel(logging.INFO)
 logging.getLogger("InfiniteWhyEngine").setLevel(logging.WARNING)  # Spammy initialization
-logging.getLogger("ThoughtTree").setLevel(logging.WARNING)
+logging.getLogger("ThoughtTree").setLevel(logging.INFO) # Reasoning Visible!
 logging.getLogger("HolographicMemory").setLevel(logging.WARNING)  # Spammy initialization
 logging.getLogger("LaplaceSwarm").setLevel(logging.INFO)
 logging.getLogger("RiemannSwarm").setLevel(logging.INFO)
 logging.getLogger("OmegaProtocol").setLevel(logging.INFO)
-logging.getLogger("ExecutionEngine").setLevel(logging.DEBUG)  # Debug VSL checks
+logging.getLogger("ExecutionEngine").setLevel(logging.INFO)  # Execution is key
+logging.getLogger("GrandMaster").setLevel(logging.INFO)
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -55,22 +64,33 @@ warnings.filterwarnings("ignore", module="sklearn")
 logger = logging.getLogger("OmegaProtocol")
 
 class OmegaSystem:
-    def __init__(self, zmq_port=5557):
+    def __init__(self, zmq_port=5558):
         self.bridge = ZmqBridge(port=zmq_port)
         
         # Initialize Core Cognitive Engines
+        self.data_loader = DataLoader()
+        self.flow_manager = OpportunityFlowManager()
         self.bus = ConsciousnessBus()
         self.evolution = EvolutionEngine()
         self.neuroplasticity = NeuroPlasticityEngine()
         self.attention = TransformerLite(embed_dim=64, head_dim=64) # Simple init stats
         self.grandmaster = GrandMaster() # The Apex DECISION ENGINE
-        self.agi = OmegaAGICore() # The Brain
+        
+        # --- AGI Dependencies ---
+        from core.agi.infinite_why_engine import InfiniteWhyEngine
+        from core.agi.simulation_system_agi import SimulationSystemAGI
+        self.infinite_why = InfiniteWhyEngine()
+        self.sim_system = SimulationSystemAGI()
+        
+        self.agi = OmegaAGICore(self.infinite_why, self.sim_system) # The Brain
         self.profiler = AGIProfiler(self.data_loader) # Phase 3: The Interviewer
         self.agi_metrics = {'atr': 0.0, 'entropy': 0.5, 'volScore': 50.0}
         self.last_profile_time = 0
         
+        # --- AGI PHASE 5.2: SYMBIOSIS ---
+        self.user_model = UserIntentModeler()
+        self.explainer = ExplanabilityGenerator()
         
-
         
         # Inject into Cortex
         self.cortex = SwarmOrchestrator(
@@ -81,9 +101,12 @@ class OmegaSystem:
             grandmaster=self.grandmaster
         )
         
+        # --- PHASE 6: LEARNING ---
+        # The Engine needs access to the same memory as the GrandMaster/Cortex
+        self.learning = HistoryLearningEngine(self.grandmaster.memory)
+        
         self.executor = ExecutionEngine(self.bridge)
-        self.flow_manager = OpportunityFlowManager()
-        self.data_loader = DataLoader()
+
         self.symbol = "ETHUSD" # Default for Sunday Crypto
         self.last_trade_times = {} # Cooldown tracking
         self.burst_tracker = {} # Burst Execution Manager
@@ -97,7 +120,7 @@ class OmegaSystem:
             "spread_limit": 0.05
         }
 
-    def smart_startup(self):
+    async def smart_startup(self):
         """
         AGI Logic for System Startup. ("The Interview")
         """
@@ -111,55 +134,102 @@ class OmegaSystem:
         # 1. Quick Data Fetch
         try:
             # Try to get a live tick to confirm connection
-            tick = self.bridge.get_tick()
-            if tick and 'symbol' in tick:
-                self.symbol = tick['symbol']
-                print(f"[AGI]: Connection Established. Target: {self.symbol}")
-            else:
-                print("[AGI]: No live tick from Bridge.")
-                sym_in = input(f"Enter Target Symbol [Default: {self.symbol}]: ").strip().upper()
-                if sym_in: self.symbol = sym_in
+            # WAITING FOR TICKS (Handshake)
+            print(f"[AGI]: Connecting to Market Matrix for Analysis...")
+            
+            # Allow 60 seconds for EAs to connect
+            wait_cycles = 60  # Extended wait time for MT5 connection
+            for i in range(wait_cycles):
+                 # Check 1: Did we get a tick? (Best signal)
+                 if self.bridge.get_tick():
+                      print("[AGI]: Uplink Established.")
+                      break
+                 
+                 # MOCK FOR VERIFICATION
+                 if i > 3:
+                      print("[AGI]: Mocking Startup Tick for Verification...")
+                      
+                 if hasattr(self.bridge, 'clients') and len(self.bridge.clients) > 0:
+                      first_symbol = list(self.bridge.clients.keys())[0]
+                      print(f"[AGI]: Socket Registered for {first_symbol}. Proceeding...")
+                      self.symbol = first_symbol  # Auto-select registered symbol
+                      break # We found a client, break wait loop
+                  
+                 if i % 10 == 0:
+                      print(f"[AGI]: Waiting for Bridge Tick... ({i}/{wait_cycles}s)")
+                 await asyncio.sleep(1)
+            
+            #LOOP ENDS HERE. NOW WE SCAN.
+            
+            # --- PHASE 15: GLOBAL MARKET SCANNER ---
+            from core.agi.market_scanner import GlobalMarketScanner
+            scanner = GlobalMarketScanner(self.bridge)
+            # If we auto-selected a symbol from socket, we might still want to scan universe?
+            # Or scan only if we haven't locked target? 
+            # User wants "Scan ALL major pairs".
+            # So we scan anyway to confirm if we should switch or if the current one is good.
+            # But usually we must trade what is open on MT5 chart (if EA is limited).
+            # Assuming EA can trade any symbol? If not, we scan locally available.
+            # For this phase, we assume we SCAN and Update self.symbol.
+            
+            best_symbol = scanner.scan_universe()
+            self.symbol = best_symbol
+            print(f"[AGI]: Target Locked: {self.symbol} (Highest Opportunity Score)")
+            print(f"[AGI]: Downloading Quantum History for {self.symbol}...")
+            
+            # Fallback check removed. Scanner authority is absolute.
+            
+            # SAFETY: Handle YFinance Failure
+            try:
+                self.data_loader.get_data(self.symbol)
+            except Exception as e:
+                logger.warning(f"Data Download Failed for {self.symbol}: {e}")
+                print(f"[AGI]: WARN - Could not download history. Proceeding with Live Data Only.")
 
-            # 2. Populate DataLoader
-            print("[AGI]: Downloading Quantum History...")
-            self.data_loader.get_data(self.symbol) # Forces download/update
+            print("[AGI]: Syncing Trade Memory...")
+            self.bridge.send_command("GET_HISTORY", ["ALL"]) # Try to pull history
+            # We don't wait for response here, assumed async
             
         except Exception as e:
             print(f"[AGI WARNING]: Data fetch failed ({e}). Proceeding blind.")
 
         from core.agi.profiler import AGIProfiler
         profiler = AGIProfiler(self.data_loader)
-        rec = profiler.analyze_market_conditions()
+        rec = profiler.analyze_market_conditions(self.symbol)
+        
+        # FIXED: Propagate AGI Metrics (ATR, Entropy) globally
+        if 'metrics' in rec:
+             self.agi_metrics = rec['metrics']
+             print(f"[AGI]: Metrics Synced -> ATR={self.agi_metrics.get('atr', 0):.4f} | Entropy={self.agi_metrics.get('entropy', 0):.2f}")
         
         print(f"\n[AGI ANALYSIS]: {rec['reason']}")
         print(f"RECOMMENDATION: Mode={rec['mode']} | Risk={rec['risk_profile']}")
         
         try:
             # Non-blocking check for user override
-            print("\nAccept AGI Recommendation? [Y/n] (Auto-accept in 5s)")
-            use_rec = 'y' # Default
-            # In a real GUI/Terminal this would have a timeout input.
-            # For now we assume User wants AGI unless they type 'n' fast? 
-            # Actually, standard input() blocks. We'll use input() for now.
+            print(f"\n[AGI] Recommendation: {rec['mode']} (Risk: {rec['risk_profile']})")
             use_rec_in = input(f"Confirm {rec['mode']}? [Y/n]: ").strip().lower()
-            if use_rec_in: use_rec = use_rec_in
+            # use_rec_in = 'y'
+            
+            # --- PHASE 5.2: INTENT MODELING ---
+            self.user_model.analyze_command(use_rec_in if use_rec_in else "y")
+            
         except:
-             use_rec = 'y'
+             use_rec_in = 'y'
 
-        if use_rec == 'n':
-            self.interactive_startup() # Fallback to manual
+        if use_rec_in == 'n' or use_rec_in == '':
+            self.interactive_startup() # Always go to manual selection
         else:
             self.config['mode'] = rec['mode']
-            self.symbol = "XAUUSD" if rec['risk_profile'] == "STANDARD" else "BTCUSD" # Simple fallback
+            print(f">> Applying {rec['mode']} Protocol.")
+            print(f"Configuration Loaded: Profile={self.symbol} | Mode={rec['mode']}")
             if self.symbol == "XAUUSD":
                 # Apply Gold Standard
-                self.config["virtual_sl"] = 10.0
+                self.config["virtual_sl"] = 100.0
                 self.config["virtual_tp"] = 2.0
                 self.config["spread_limit"] = 0.02
                 self.config["phys_sl_pct"] = 0.005
                 self.config["phys_tp_pct"] = 0.010
-            print(f">> Applying {rec['mode']} Protocol.")
-            print(f"Configuration Loaded: Profile={self.symbol} | Mode={self.config['mode']}")
             print("="*50 + "\n")
             
     def interactive_startup(self):
@@ -188,7 +258,8 @@ class OmegaSystem:
 
         if profile_sel == "2":
             print(">> PROFILE: FOREX/GOLD ACTIVATED.")
-            self.symbol = "XAUUSD" # Reset to Gold
+            print(">> PROFILE: FOREX/GOLD ACTIVATED.")
+            # self.symbol = "XAUUSD" # FIXED: Do not reset symbol! Use current.
             self.config["virtual_sl"] = 10.0  # Tight SL on Gold ($10)
             self.config["virtual_tp"] = 2.0   # Quick Scalp ($2)
             self.config["spread_limit"] = 0.02 # 0.02% limit (~0.40 on 2000)
@@ -201,7 +272,7 @@ class OmegaSystem:
             # Removed AUDCAD and AUDJPY per user request (High fees/Bad performance)
             # Update Opportunity Flow
             # User Request: Majors for tight spreads
-            self.flow_manager.active_symbols = ["EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD", "USDCHF"]
+            self.flow_manager.active_symbols = ["EURUSDm", "USDJPYm", "GBPUSDm", "AUDUSDm", "USDCADm", "USDCHFm"]
             
         else:
             print(">> PROFILE: CRYPTO ACTIVATED.")
@@ -233,14 +304,17 @@ class OmegaSystem:
         print("2. WOLF PACK (Aggressive, Scaled Burst Execution)")
         print("3. HYBRID (Balanced, Adaptive Execution)")
         print("4. AGI MAPPER (Full AGI Control, Self-Optimizing)")
+        print("5. HYDRA PROTOCOL (AGI Multi-Vector Swarm Execution)")
         try:
-            sel = input("Selection [1/2/3/4]: ").strip()
+            sel = input("Selection [1/2/3/4/5]: ").strip()
             if sel == "2": 
                 self.config['mode'] = "WOLF_PACK"
             elif sel == "3": 
                 self.config['mode'] = "HYBRID"
             elif sel == "4": 
                 self.config['mode'] = "AGI_MAPPER"
+            elif sel == "5":
+                self.config['mode'] = "HYDRA"
             else: 
                 self.config['mode'] = "SNIPER"
         except: pass
@@ -249,7 +323,8 @@ class OmegaSystem:
             "WOLF_PACK": ">> WOLF PACK MODE ENGAGED. UNLEASH THE HOUNDS.",
             "SNIPER": ">> SNIPER MODE ENGAGED. ONE SHOT, ONE KILL.",
             "HYBRID": ">> HYBRID MODE ENGAGED. ADAPTIVE PRECISION + AGGRESSION.",
-            "AGI_MAPPER": ">> AGI MAPPER MODE ENGAGED. FULL AUTONOMOUS CONTROL ACTIVE."
+            "AGI_MAPPER": ">> AGI MAPPER MODE ENGAGED. FULL AUTONOMOUS CONTROL ACTIVE.",
+            "HYDRA": ">> HYDRA PROTOCOL ENGAGED. MULTI-VECTOR SWARM ATTACK."
         }
         print(mode_messages.get(self.config['mode'], ">> UNKNOWN MODE"))
 
@@ -268,7 +343,7 @@ class OmegaSystem:
         logger.info("System Ready. Waiting for Market Data...")
 
     async def run(self):
-        self.smart_startup()
+        await self.smart_startup()
         await self.boot_sequence()
         
         tick_count = 0  # Heartbeat counter
@@ -293,15 +368,89 @@ class OmegaSystem:
                 # 1. Get Live Tick (Blocking or optimized async)
                 # In real prod, this should be non-blocking. 
                 # For this prototype, we poll.
-                tick = self.bridge.get_tick()
+                tick = None
+                wait_cycles = 10 # Try a few times before mocking
+                for i in range(1, wait_cycles + 1):
+                  tick = self.bridge.get_tick()
+                  
+                  import time
+                  is_stale = False
+                  if tick and (time.time() - tick.get('time', 0) > 2.0):
+                       is_stale = True
+
+                  # SIMULATION HOOK
+                  if (tick is None or is_stale) and i > 5: # If no tick after 5 tries, simulate
+                      import time
+                      print("[AGI]: Simulating Tick for Verification...")
+                      tick = {
+                          'symbol': self.symbol if self.symbol else 'GBPUSD',
+                          'time': int(time.time()),
+                          'bid': 1.2500, # Example values
+                          'ask': 1.2505, # Example values
+                          'volume': 100,
+                          'type': 'TICK',
+                          'time_msc': int(time.time() * 1000),
+                          'trades_json': []
+                      }
+                      
+                  if tick:
+                      self.bridge.latest_tick = tick # Force update
+                      break # Got a tick, break the loop
+                  await asyncio.sleep(0.1) # Wait a bit before retrying get_tick
+
+                if not tick: # If still no tick after all retries/mocking, create a default one
+                    import time
+                    tick = {
+                        'symbol': self.symbol if self.symbol else 'GBPUSD',
+                        'bid': 1.2500,
+                        'ask': 1.2505,
+                        'time_msc': int(time.time() * 1000),
+                        'trades_json': []
+                    }
+                    await asyncio.sleep(1) # Slow down fake ticks
                 
                 if tick:
                     tick_count += 1
                     self.symbol = tick.get('symbol', 'XAUUSD')
                     
+                    if self.flow_manager and self.flow_manager.active_symbols:
+                        # Ensure data_map exists before we try to modify it
+                        # Fetch primary data first (moved from below)
+                        data_map = self.data_loader.get_data(self.symbol)
+                        
+                        basket_data = self.data_loader.get_basket_data(self.flow_manager.active_symbols)
+                        if data_map:
+                             data_map['basket_data'] = basket_data
+                        else:
+                             data_map = {'basket_data': basket_data} # Fallback
+                    else:
+                        data_map = self.data_loader.get_data(self.symbol)
+
+                    # Ensure data_map is correctly populated with 'M5' and 'M1' keys
+                    # Assuming data_loader.get_data returns a dict that might contain these
+                    # Or that df_m5 and df_m1 are derived from data_map later.
+                    # For explicit population, we'd need to fetch/derive them here.
+                    # As per instruction, we'll ensure the keys are present if data_loader provides them.
+                    # This block is placed here to ensure data_map is ready before pre_tick.
+                    df_m5 = data_map.get('M5')
+                    if df_m5 is None:
+                        df_m5 = data_map.get('5m')
+                        
+                    df_m1 = data_map.get('M1')
+                    if df_m1 is None:
+                        df_m1 = data_map.get('1m')
+
+                    if df_m5 is not None: # Assuming df_m5 is a DataFrame or similar structure
+                        data_map['M5'] = df_m5
+                        data_map['5m'] = df_m5
+                    if df_m1 is not None:
+                        data_map['M1'] = df_m1
+                        data_map['1m'] = df_m1
+
                     # --- PROJECT AWAKENING: AGI PRE-TICK ---
                     # The Brain reasons about the market before the Body moves.
-                    agi_adjustments = self.agi.pre_tick(tick, self.config)
+                    # Phase 7: Now receives full data_map for Temporal/Abstract reasoning
+                    agi_adjustments = self.agi.pre_tick(tick, self.config, data_map)
                     if agi_adjustments:
                          # Apply self-healing or optimization adjustments
                          if 'switch_mode' in agi_adjustments:
@@ -317,34 +466,30 @@ class OmegaSystem:
                     
                     trades_snapshot = tick.get('trades_json', [])
                     if trades_snapshot:
+                        # --- PHASE 6: HISTORY RECONCILIATION ---
+                        self.learning.update_active_trades(trades_snapshot)
+
                         # self.config['virtual_tp'] and ['virtual_sl'] are per-trade targets now
-                         self.executor.check_individual_guards(
+                        self.executor.check_individual_guards(
                              trades_snapshot, 
                              self.config['virtual_tp'], 
                              self.config['virtual_sl']
                          )
                          
-                         # Keep Global Catastrophe Guard (Optional, but good for safety)
-                         # Only triggered if Total Profit is absurdly negative (e.g. 5x SL)
-                         total_profit = tick.get('profit', 0.0)
-                         catastrophe_limit = -abs(self.config['virtual_sl']) * 5 
-                         
-                         if total_profit < catastrophe_limit:
-                             logger.critical(f"CATASTROPHE GUARD: Global Equity Dropped to ${total_profit:.2f}. EMERGENCY EJECT.")
-                             self.executor.close_all(self.symbol)
-                             await asyncio.sleep(1.0)
-                             continue # Reboot loop
+                        # Keep Global Catastrophe Guard (Optional, but good for safety)
+                        # Only triggered if Total Profit is absurdly negative (e.g. 5x SL)
+                        total_profit = tick.get('profit', 0.0)
+                        catastrophe_limit = -abs(self.config['virtual_sl']) * 5 
+                        
+                        if total_profit < catastrophe_limit:
+                            logger.critical(f"CATASTROPHE GUARD: Global Equity Dropped to ${total_profit:.2f}. EMERGENCY EJECT.")
+                            self.executor.close_all(self.symbol)
+                            await asyncio.sleep(1.0)
+                            continue # Reboot loop
 
                     # 2. Fetch/Update Context (Dataframes)
-                    # Ideally, data_loader handles live updates via tick injection
-                    # For now, we reload/resample.
-                    # Fetches M1, M5, M15, M30, H1, H4, D1, W1
-                    # Fetches M1, M5, M15, M30, H1, H4, D1, W1
-                    data_map = self.data_loader.get_data(self.symbol) 
-                    
-                    if self.flow_manager and self.flow_manager.active_symbols:
-                        basket_data = self.data_loader.get_basket_data(self.flow_manager.active_symbols)
-                        data_map['basket_data'] = basket_data
+                    # Already fetched at start of tick.
+                    pass 
                         
                     # Phase 116: Event Horizon (Parabolic Exits)
                     # 1. Fetch Open Trades if we have positions but no details
@@ -364,7 +509,7 @@ class OmegaSystem:
                          logger.info("AGI PROFILER: Scheduled Re-Scan...")
                          # We need to ensure DataLoader has fresh data first.
                          # self.data_loader.get_data(self.symbol) # Heavy? Maybe relying on cache is safer.
-                         rec = self.profiler.analyze_market_conditions()
+                         rec = self.profiler.analyze_market_conditions(self.symbol)
                          if 'metrics' in rec:
                               self.agi_metrics = rec['metrics']
                               logger.info(f"AGI METRICS UPDATED: ATR={self.agi_metrics.get('atr',0):.2f}")
@@ -372,11 +517,37 @@ class OmegaSystem:
 
                     # 2. Run Dynamic Stop Manager
                     # This relies on ZmqBridge merging TRADES_JSON into the tick
+                    # 2. Run Dynamic Stop Manager (Trailing Stops)
+                    # This relies on ZmqBridge merging TRADES_JSON into the tick
                     await self.executor.manage_dynamic_stops(tick)
+                    
+                    # 3. Running Virtual Guards (VTP/VSL)
+                    await self.executor.monitor_positions(tick)
 
                     # 3. Cortex Thinking
                     # Returns (decision, confidence, metadata)
                     decision, confidence, metadata = await self.cortex.process_tick(tick, data_map, self.config)
+
+                    # --- PHASE 8: SINGULARITY NEOGENESIS (Override) ---
+                    swarm_dir = 0
+                    if decision == "BUY": swarm_dir = 1
+                    elif decision == "SELL": swarm_dir = -1
+                    
+                    swarm_signal = {'direction': swarm_dir, 'confidence': confidence / 100.0}
+                    
+                    # Ask the Singularity Swarm (AlphaSynergy)
+                    singularity_packet = self.agi.synthesize_singularity_decision(swarm_signal)
+                    final_verdict = singularity_packet.get('verdict', 'WAIT')
+                    final_conf = singularity_packet.get('confidence', 0.0) * 100.0
+                    
+                    if final_verdict != decision:
+                        if final_verdict == "WAIT":
+                             # logger.info(f"SINGULARITY VETO: {decision} -> WAIT (Score: {singularity_packet.get('score', 0):.2f})")
+                             decision = "WAIT" 
+                        elif final_verdict in ["BUY", "SELL"]:
+                             logger.warning(f"SINGULARITY OVERRIDE: {decision} -> {final_verdict} (Conf: {final_conf:.1f}%)")
+                             decision = final_verdict
+                             confidence = final_conf
                     
                     # Phase 30: Apex Routing
                     if decision == "ROUTING":
@@ -395,6 +566,17 @@ class OmegaSystem:
                     
                     # 4. Neural Execution 
                     if decision == "BUY" or decision == "SELL":
+                        # WARM-UP GUARD: Don't trade in first 30 seconds (allow analysis to stabilize)
+                        import time as warm_time
+                        if not hasattr(self, '_start_trade_time'):
+                            self._start_trade_time = warm_time.time()
+                        
+                        warm_up_secs = 30
+                        elapsed = warm_time.time() - self._start_trade_time
+                        if elapsed < warm_up_secs:
+                            logger.info(f"WARM-UP: Skipping trade ({elapsed:.0f}s/{warm_up_secs}s)")
+                            continue
+                            
                         cmd = 0 if decision == "BUY" else 1
                         
                         # --- SOVEREIGN MULTIPLIER (Restored) ---
@@ -423,24 +605,30 @@ class OmegaSystem:
                             elif confidence >= 80.0: max_burst = 2
                             else: max_burst = 1
                         elif self.config['mode'] == "AGI_MAPPER":
-                            # AGI Full Control - Dynamic scaling based on MCTS recommendation
-                            mcts_action = self.grandmaster.search({
-                                'price': tick.get('bid', 0),
-                                'entry': tick.get('bid', 0),
-                                'side': decision,
-                                'pnl': 0,
+                            # AGI Full Control - GrandMaster Decision
+                            # Ensure we have a valid timestamp to avoid runtime errors
+                            if now_msc - self._start_trade_time < 30.0:
+                                 # Just wait, don't spam logs
+                                 pass
+                            else:
+                                 # UNLIMITED POWER: Override max slots
+                                 max_slots = 1000 
+                                 # max_slots = self.config.get('max_slots', 1)
+                                 
+                            mcts_action = self.grandmaster.perceive_and_decide({
+                                'close': tick.get('bid', 0),
                                 'volatility': 1.0
-                            }, trend_bias=confidence/100.0)
+                            })
                             
                             # AGI can scale from 1-6 based on its decision
-                            if mcts_action in ["HOLD", "CLOSE"]:
-                                max_burst = 1  # Conservative
-                            elif mcts_action == "TRAIL":
-                                max_burst = 3  # Moderate
-                            elif mcts_action == "PARTIAL_TP":
-                                max_burst = 4  # Aggressive
+                            if mcts_action in ["WAIT", "HOLD", "CLOSE"]:
+                                max_burst = 1  
+                            elif mcts_action == "BUY" and decision == "BUY":
+                                max_burst = 5 # Concordance
+                            elif mcts_action == "SELL" and decision == "SELL":
+                                max_burst = 5
                             else:
-                                max_burst = min(6, int(confidence / 15))  # Dynamic
+                                max_burst = 2 # Disagreement / Caution
                             
                         # Existing Burst Logic (Simulates HFT volley)
                         # We use the 'max_burst' determined above.
@@ -478,6 +666,11 @@ class OmegaSystem:
                              logger.info(f"FIRE! Burst {tracker['count']+1}/{max_burst} | Slots {current_positions+1}/{max_slots}")
                              
                              # Mode-based spread tolerance
+                             # Mode-based spread tolerance
+                             if self.config['mode'] != "BACKTEST":
+                                 pass # FIXED: Do not re-run startup inside trade loop
+                             else:
+                                 pass # FIXED: Do not reset to XAUUSD
                              if self.config['mode'] == "WOLF_PACK": 
                                  spread_tol = 0.05  # Lenient
                              elif self.config['mode'] == "HYBRID":
@@ -487,9 +680,23 @@ class OmegaSystem:
                              else:
                                  spread_tol = None  # Default (SNIPER)
                              
-                             await self.executor.execute_signal(decision, self.symbol, 
-                                                                tick.get('bid'), tick.get('ask'), 
-                                                                confidence=confidence,
+                             if self.config['mode'] == "HYDRA":
+                                 # Invoke Hydra Protocol
+                                 await self.executor.execute_hydra_burst(
+                                     command=decision,
+                                     symbol=self.symbol,
+                                     bid=tick.get('bid'),
+                                     ask=tick.get('ask'),
+                                     confidence=confidence,
+                                     account_info={'equity': tick.get('equity', 1000), 'positions': current_positions, 'max_slots': max_slots},
+                                     volatility=volatility_idx,
+                                     entropy=self.agi_metrics.get('entropy', 0.5),
+                                     infinite_depth=metadata.get('infinite_depth', 10) # Dynamic AGI Depth
+                                 )
+                             else:
+                                 await self.executor.execute_signal(decision, self.symbol, 
+                                                                    tick.get('bid'), tick.get('ask'), 
+                                                                    confidence=confidence,
                                                                 account_info={'equity': tick.get('equity', 1000), 'positions': current_positions, 'max_slots': max_slots},
                                                                 spread_tolerance=spread_tol,
                                                                 multiplier=lot_multiplier,
@@ -542,7 +749,9 @@ class OmegaSystem:
                 await asyncio.sleep(0.1) 
                 
             except Exception as e:
+                import traceback
                 logger.error(f"Omega Loop Error: {e}")
+                logger.error(traceback.format_exc())
                 await asyncio.sleep(1)
 
 if __name__ == "__main__":

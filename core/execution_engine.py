@@ -23,9 +23,33 @@ class ExecutionEngine:
         self.event_horizon = EventHorizonRisk()  # Phase 116
         self.config = {"spread_limit": 0.0005}
         self.last_stop_update = {}  # {ticket: timestamp}
+        self.closed_tickets = set()  # Track already-closed tickets to prevent duplicate close commands
+
 
     def set_config(self, config: Dict):
         self.config = config
+        
+    async def monitor_positions(self, tick: Dict):
+        """
+        Orchestrates all position monitoring checks (VTP, VSL, Predictive).
+        """
+        if not self.bridge: return
+        
+        trades = tick.get('trades_json', [])
+        if not trades: return
+        
+        # 1. Config Thresholds
+        v_tp = self.config.get('virtual_tp', 2.0)
+        v_sl = self.config.get('virtual_sl', 10.0)
+        
+        # 2. Check Individual Guards (VTP / VSL)
+        self.check_individual_guards(trades, v_tp, v_sl)
+        
+        # 3. Check Predictive Exits (The Magnet)
+        for trade in trades:
+             if not isinstance(trade, dict): continue
+             self.check_predictive_exit(trade, tick)
+        
         
     async def manage_dynamic_stops(self, tick: Dict):
         """
@@ -46,6 +70,7 @@ class ExecutionEngine:
         symbol_spread = tick.get('ask', 0) - tick.get('bid', 0)
         
         for trade in trades:
+            if not isinstance(trade, dict): continue
             symbol = trade.get('symbol')
             if symbol != tick.get('symbol'): continue # Only manage current symbol tick matches
             
@@ -112,6 +137,7 @@ class ExecutionEngine:
             # spread in raw price units; for Gold it's "points"
             market_state = {
                 "spread": (ask - bid),
+                "typical_price": (ask + bid) / 2,  # For relative spread calculation
                 "is_crash": False,  # placeholder, could be wired to macro modules
             }
             verdict = self.risk_filter.validate_entry(risk_signal, market_state)
@@ -133,11 +159,113 @@ class ExecutionEngine:
         # Apply Logic Multiplier (Sovereign/Singularity)
         lots = round(lots * multiplier, 2)
         
-        # 3. Construct Order
+        # 3. Dynamic Geometry (Phase 14)
+        # Replacing 0.0/0.0 with intelligent stops
+        from core.agi.risk.dynamic_geometry import DynamicGeometryEngine
+        # Usually we'd instantiate this in __init__, but for hot-patching ease we do it here or assume singleton
+        # Ideally, move to __init__. I will assume self.geometry_engine exists or create it.
+        # For safety in this patch, I'll instantiate locally. Cost is negligible.
+        geometry_engine = DynamicGeometryEngine()
+        
+        entry_price = ask if command == 'BUY' else bid
+        # Mock market state for geometry (needs spread and ATR)
+        geo_market_state = {
+            'metrics': {'atr_value': atr_value if atr_value else 0.0005, 'volatility': 0.002}
+        }
+        
+        vsl, vtp = geometry_engine.calculate_geometry(geo_market_state, command, entry_price)
+        
+        # 4. Construct Order
         cmd_type = 0 if command == 'BUY' else 1
         price = ask if cmd_type == 0 else bid
+        
+        # Create params for bridge command
+        # Format: symbol, cmd_type, volume, sl, tp, confidence
+        # EA expects: parts[1]=symbol, parts[2]=cmd, parts[3]=vol, parts[4]=sl, parts[5]=tp, parts[6]=conf
+        params = [symbol, cmd_type, lots, f"{vsl:.5f}", f"{vtp:.5f}", confidence]
 
-        # --- AGI SMART EXIT LOGIC ---
+        if self.bridge:
+            logger.info(f"TRANSMITTING ORDER: {command} {symbol} @ {price:.5f} | Lots: {lots} | Conf: {confidence:.1f}%")
+            logger.info(f"DYNAMIC GEOMETRY: VSL={vsl:.5f}, VTP={vtp:.5f}")
+            self.bridge.send_command("OPEN_TRADE", params)
+            logger.info(f"ORDER SENT TO MT5: {params}")
+        else:
+            logger.warning("NO BRIDGE - Order not sent!")
+             
+        return "SENT"
+
+    async def execute_hydra_burst(
+        self,
+        command: str,
+        symbol: str,
+        bid: float,
+        ask: float,
+        confidence: float,
+        account_info: Optional[Dict] = None,
+        volatility: float = 50.0,
+        entropy: float = 0.5,
+        infinite_depth: int = 0
+    ):
+        """
+        PHASE 11: HYDRA PROTOCOL (AGI Multi-Vector Execution).
+        Dynamically multiplies execution vectors based on conviction (Confidence + Depth).
+        """
+        logger.info(f"HYDRA PROTOCOL: Initiating Burst Sequence for {symbol} ({command})")
+        
+        # 1. Determine Hydra Heads (Number of Orders)
+        # Base: 1 order.
+        # Conviction Bonus: +1 per 10% above 70% confidence.
+        # Depth Bonus: +1 per 1000 InfiniteWhy branches (simulated via depth arg).
+        
+        heads = 1
+        if confidence > 70: heads += 1
+        if confidence > 80: heads += 1
+        if confidence > 90: heads += 1
+        if confidence > 95: heads += 1 # Max 5 from confidence
+        
+        # AGI Depth Bonus (The "Ontological Nuance" Factor)
+        if infinite_depth >= 10: heads += 1
+        if infinite_depth >= 50: heads += 1 # Rare deep thought
+        
+        # Entropy Damper (If chaos is too high, reduce heads)
+        if entropy > 0.8:
+            heads = max(1, heads - 2)
+            logger.info(f"HYDRA: High Entropy ({entropy:.2f}) pruned heads to {heads}")
+            
+        # Hard Cap
+        heads = min(heads, 8)
+        
+        logger.info(f"HYDRA: Spawning {heads} Heads (Conf={confidence}%, Depth={infinite_depth})")
+        
+        # 2. Execute Burst
+        # We fire them sequentially with slight delays to avoid broker flood rejection,
+        # but logically they are a single "attack".
+        
+        for i in range(heads):
+            # Dynamic variance per head?
+            # Maybe slight limit offsets? For now, pure market swarm.
+            
+            # Recalculate price each time? No, rapid fire.
+            
+            # Logic: We invoke execute_signal for each head.
+            # We scale the individual lot size down? Or multiply total risk?
+            # User said "mutiplica o numero de ordens". Implies scaling UP total volume.
+            # We use standard sizing per order. Aggressive!
+            
+            await self.execute_signal(
+                command=command,
+                symbol=symbol,
+                bid=bid,
+                ask=ask,
+                confidence=confidence, # Pass original confidence
+                account_info=account_info,
+                multiplier=1.0 # Each head strikes with full force
+            )
+            
+            # Micro-sleep to prevent sequence errors in MT5
+            await asyncio.sleep(0.2)
+            
+        return f"HYDRA_SENT_{heads}"
         # Extract context
         used_slots = account_info.get('positions', 0) if account_info else 0
         max_slots = account_info.get('max_slots', 10) if account_info else 10
@@ -323,8 +451,19 @@ class ExecutionEngine:
         if not trades: return
 
         for trade in trades:
+            if not isinstance(trade, dict): continue
+            
             ticket = trade.get('ticket')
-            profit = trade.get('profit', 0.0)
+            
+            # Skip already-closed tickets to prevent duplicate close commands
+            if ticket in self.closed_tickets:
+                continue
+                
+            try:
+                profit = float(trade.get('profit', 0.0))
+            except:
+                profit = 0.0
+                
             symbol = trade.get('symbol')
             
             limit = -abs(v_sl)
@@ -333,10 +472,10 @@ class ExecutionEngine:
             if profit > 0:
                 logger.info(f"VTP CHECK: Ticket {ticket} | Profit ${profit:.2f} | VTP ${v_tp:.2f} | Trigger: {profit >= v_tp}")
             
-            # 1. Individual Take Profit (The Snipe)
             if profit >= v_tp:
                 logger.info(f"INDIVIDUAL GUARD: Harvesting Ticket {ticket} ({symbol}) | Profit ${profit:.2f} >= ${v_tp:.2f}")
                 self.close_trade(ticket, symbol)
+                self.closed_tickets.add(ticket)  # Mark as closed
                 continue # One action per trade
 
             # 2. Individual Stop Loss (The Shield)
@@ -345,6 +484,7 @@ class ExecutionEngine:
             if profit <= limit:
                 logger.info(f"INDIVIDUAL GUARD: Pruning Ticket {ticket} ({symbol}) | Profit ${profit:.2f} <= ${limit:.2f}")
                 self.close_trade(ticket, symbol)
+                self.closed_tickets.add(ticket)  # Mark as closed
                 continue
 
     def close_longs(self, symbol: str):

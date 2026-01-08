@@ -14,7 +14,7 @@ class SmartMoneyEngine:
     3. Session Levels (Asian Range, London Open).
     """
     
-    def detect_fvgs(self, df: pd.DataFrame, window=100) -> List[Dict]:
+    def detect_fvgs(self, df: pd.DataFrame, window=30) -> List[Dict]:
         """
         Scans for FVGs in the last N candles.
         Bullish FVG: Low of candle i-2 > High of candle i
@@ -24,6 +24,10 @@ class SmartMoneyEngine:
         
         fvgs = []
         df_slice = df.iloc[-window:]
+        
+        # Dynamic gap threshold (0.02% of price = ~3 pips for Forex)
+        current_price = df_slice['close'].iloc[-1]
+        min_gap = current_price * 0.0002  # 0.02% = ~3 pips for 1.34, ~0.03 for 156.x JPY
         
         for i in range(2, len(df_slice)):
             idx = df_slice.index[i]
@@ -42,7 +46,7 @@ class SmartMoneyEngine:
             # Low of candle i-2 is unmatched by High of candle i
             if c2_low > c0_high:
                 gap_size = c2_low - c0_high
-                if gap_size > 0.05: # Min size to filter noise
+                if gap_size > min_gap:
                     fvgs.append({
                         'type': 'BEAR_FVG',
                         'top': c2_low,
@@ -55,7 +59,7 @@ class SmartMoneyEngine:
             # High of candle i-2 is unmatched by Low of candle i
             elif c2_high < c0_low:
                 gap_size = c0_low - c2_high
-                if gap_size > 0.05:
+                if gap_size > min_gap:
                     fvgs.append({
                         'type': 'BULL_FVG',
                         'top': c0_low,
@@ -64,9 +68,8 @@ class SmartMoneyEngine:
                         'end_time': int(df_slice.index[i].timestamp())
                     })
                     
-        # Filter for only ACTIVE FVGs (price hasn't fully filled them yet? Or just return all)
-        # For drawing, return last 5
-        return fvgs[-5:]
+        # Filter for only ACTIVE FVGs - return last 3 only
+        return fvgs[-3:]
 
     def detect_liquidity_grabs(self, df: pd.DataFrame, lookback=20) -> List[Dict]:
         """

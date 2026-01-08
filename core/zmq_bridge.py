@@ -12,7 +12,7 @@ class ZmqBridge:
     Native Socket Bridge (Replacing ZMQ).
     Acts as a TCP Server. Multiplexes MQL5 Clients.
     """
-    def __init__(self, port=5557):
+    def __init__(self, port=5558):
         self.port = port
         self.host = "0.0.0.0"
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -23,7 +23,10 @@ class ZmqBridge:
             self.server_socket.setblocking(False) # Non-blocking accept
             logger.info(f"Bridge Server started on {self.host}:{self.port}")
         except Exception as e:
-            logger.error(f"Failed to bind port {self.port}: {e}")
+            logger.critical(f"FATAL: FAILED TO BIND PORT {self.port}: {e}")
+            logger.critical("There is likely a ZOMBIE process running.")
+            logger.critical("Please CLOSE ALL python windows and try again.")
+            raise SystemExit("ZOMBIE_PORT_CONFLICT")
 
         # Client Registry: Symbol -> Socket
         self.clients = {} 
@@ -53,7 +56,7 @@ class ZmqBridge:
             try:
                 client, addr = self.server_socket.accept()
                 logger.info(f"MQL5 Client Connected: {addr}")
-                client.setblocking(True) # Simplify reading in thread
+                client.setblocking(False) # Non-blocking for select-style handling if needed
                 
                 # Spawn Handler Thread
                 ct = threading.Thread(target=self._client_handler, args=(client, addr), daemon=True)
@@ -75,11 +78,16 @@ class ZmqBridge:
         
         try:
             while self.running:
-                data = sock.recv(4096)
+                try:
+                    data = sock.recv(4096)
+                except BlockingIOError:
+                    time.sleep(0.01)
+                    continue
+                    
                 if not data: break
                 
                 text = data.decode('utf-8', errors='ignore')
-                logger.info(f"RAW: {text.strip()}") # DEBUG: Reveal what arrives
+                # logger.debug(f"RAW RECEIVED: {text.strip()}") # SILENCED
                 buffer += text
                 
                 while '\n' in buffer:
@@ -93,7 +101,6 @@ class ZmqBridge:
                     # Process TRADES_JSON separately (no symbol field)
                     if fields and fields.get('type') == 'TRADES_JSON':
                         self.latest_trades = fields.get('trades', [])
-                        # Silenced: Too spammy
                         continue
                     
                     if fields and 'symbol' in fields:
@@ -125,7 +132,7 @@ class ZmqBridge:
             logger.info(f"Detailed Disconnect: {detected_symbol}")
 
     def _parse_line(self, line):
-        # TICK|SYMBOL|TIME|BID|ASK|VOL|EQUITY|POS
+        # ... (Same as before)
         try:
             if line.startswith("TICK"):
                 parts = line.split('|')
@@ -144,16 +151,22 @@ class ZmqBridge:
                     if len(parts) >= 9:
                         tick['profit'] = float(parts[8])
                     if len(parts) >= 11:
-                        tick['best_profit'] = float(parts[9])
+                        raw_best_profit = float(parts[9])
+                        if raw_best_profit < -990000:
+                            raw_best_profit = 0.0
+                        tick['best_profit'] = raw_best_profit
                         tick['best_ticket'] = int(parts[10])
+                    
+                    if len(parts) >= 14:
+                         tick['indicator_val'] = float(parts[12])
+                         
                     return tick
                     
             elif line.startswith("TRADES_JSON"):
-                # Format: TRADES_JSON|{json_string}
                 try:
                     parts = line.split('|', 1)
                     if len(parts) == 2:
-                        data = json.loads(parts[1]) # List of dicts
+                        data = json.loads(parts[1])
                         return {
                             'type': 'TRADES_JSON',
                             'trades': data
@@ -167,8 +180,6 @@ class ZmqBridge:
             return None
 
     def get_tick(self):
-        # This is simple/naive (last tick from *any* symbol)
-        # Main.py might need to filter.
         t = self.latest_tick
         if t:
             t['trades_json'] = self.latest_trades
@@ -189,35 +200,63 @@ class ZmqBridge:
         target_sock = None
         target_sym = None
         
-        # Extract symbol from params?
-        # Params is a list usually? Or dict?
-        # In main.py: bridge.send_command("ORDER", [side, symbol, volume...])
-        # So params[1] is symbol?
-        # Let's assume params is a list and check if any element matches a known symbol.
+        # Logic to extract potential symbol from params
+        candidate_symbols = []
+        if params:
+             # Heuristic: Symbols are usually 6 chars (USDJPY) or strings
+             # Priority: First Param is usually Symbol for visual commands
+             if len(params) > 0:
+                 candidate_symbols.append(str(params[0]))
+             
+             for p in params[1:]:
+                 s_p = str(p)
+                 candidate_symbols.append(s_p)
         
         with self.conn_lock:
-            # Broadcast to ALL for critical commands? No, duplicate orders.
-            # Try to match symbol
-            if params:
-                for p in params:
-                    if str(p) in self.clients:
-                        target_sock = self.clients[str(p)]
-                        target_sym = str(p)
-                        break
+            # 1. Try Exact Match
+            for cand in candidate_symbols:
+                if cand in self.clients:
+                    target_sock = self.clients[cand]
+                    target_sym = cand
+                    break
             
-            # Fallback: If only 1 client, use it.
+            # 2. Try Suffix/Prefix Fuzzy Match (e.g. "USDJPY" vs "USDJPYm")
+            if not target_sock:
+                for cand in candidate_symbols:
+                    for client_sym, sock in self.clients.items():
+                        if client_sym.startswith(cand) or cand.startswith(client_sym):
+                            target_sock = sock
+                            target_sym = client_sym
+                            break
+                    if target_sock: break
+
+            # 3. Fallback: If only 1 client, use it (Single Asset Mode)
             if not target_sock and len(self.clients) == 1:
-                target_sock = list(self.clients.values())[0]
-                target_sym = "SINGLE_FALLBACK"
+                target_sym = list(self.clients.keys())[0]
+                target_sock = self.clients[target_sym]
+            
+            # 4. Broadcast Mode (If action implies ALL)
+            if "CLOSE_ALL" in action or "PRUNE" in action or "GET_HISTORY" in action:
+                 if (not target_sock and len(self.clients) > 0) or ("ALL" in params):
+                      # logger.info(f"Broadcasting {action} to all clients.")
+                      for sym, sock in self.clients.items():
+                           try:
+                               sock.sendall(encoded)
+                           except: pass
+                      return
 
             if target_sock:
                 try:
                     target_sock.sendall(encoded)
-                    # logger.info(f"Sent {action} to {target_sym}")
+                    logger.info(f"BRIDGE TX -> {target_sym}: {action} | {params}")
                 except Exception as e:
                     logger.error(f"Send Error to {target_sym}: {e}")
             else:
-                 logger.warning(f"Could not route command '{action}' (Clients: {list(self.clients.keys())})")
+                 # Only log warning if we actually have clients but couldn't route
+                 if self.clients:
+                     # Filter spammy warnings for draw commands if they fail often
+                     if "DRAW" not in action:
+                         logger.warning(f"Could not route command '{action}' to params {params} (Clients: {list(self.clients.keys())})")
 
     def send_dashboard(self, state):
         pass

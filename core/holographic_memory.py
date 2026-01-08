@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import json
 import os
+from typing import List, Dict, Any
 from scipy.spatial.distance import cosine
 
 logger = logging.getLogger("HolographicMemory")
@@ -68,19 +69,17 @@ class HolographicMemory:
             return 0.0, 0.0 # Tabula Rasa
             
         distances = []
-        target = np.array(current_vector)
+        target = np.array(current_vector).astype(np.float32)
         
         # Calculate Cosine Distances
         # Opt: Use matrix math if vectors list is large (e.g. np.dot)
         # For now, simple loop is fine for < 10000 items.
         
         for i, vec in enumerate(self.vectors):
-            # Cosine distance is 1 - similarity. Low is good.
-            # dist = cosine(target, vec) # scipy cosine is generic
-            # Manually: 1 - (A.B / |A||B|)
-            dot = np.dot(target, vec)
+            vec_f = vec.astype(np.float32)
+            dot = np.dot(target, vec_f)
             norm_a = np.linalg.norm(target)
-            norm_b = np.linalg.norm(vec)
+            norm_b = np.linalg.norm(vec_f)
             if norm_a == 0 or norm_b == 0:
                 similarity = 0
             else:
@@ -104,3 +103,81 @@ class HolographicMemory:
         confidence = total_sim / k 
         
         return weighted_outcome, confidence
+
+    def construct_hologram(self, market_state: Dict[str, Any]) -> np.ndarray:
+        """
+        Transforms market state dict into a dense holographic vector.
+        Uses Random Projection (simulated) to encode high-dimensional features.
+        """
+        # Feature Extraction
+        price_norm = np.log(market_state.get('bid', 1.0) + 1)
+        vol_norm = np.log(market_state.get('volume', 1.0) + 1)
+        rsi = market_state.get('rsi', 50) / 100.0
+        entropy = market_state.get('metrics', {}).get('entropy', 0.5)
+        
+        # Base Vector (Deterministic)
+        vec = np.array([price_norm, vol_norm, rsi, entropy])
+        
+        # simulated "Holographic Projection" (Random Matrix Expansion)
+        # In real world, we'd use a fixed random matrix. Here we just expand functionally.
+        hologram = np.concatenate([
+            vec, 
+            np.sin(vec * np.pi), 
+            np.cos(vec * np.pi),
+            vec * vec,
+            np.tanh(vec)
+        ])
+        
+        # Normalize
+        norm = np.linalg.norm(hologram)
+        return hologram / (norm + 1e-9)
+
+    def retrieve_associative_memory(self, market_state: Dict[str, Any], k=5) -> Dict[str, Any]:
+        """
+        Pulls 'Historical Rhymes' from the Akasha.
+        Returns: { 'expected_outcome': float, 'confidence': float, 'similar_scenarios': int }
+        """
+        query_vec = self.construct_hologram(market_state)
+        outcome, conf = self.recall(query_vec, k)
+        
+        return {
+            "expected_outcome": outcome,
+            "confidence": conf,
+            "memory_depth": len(self.vectors),
+            "insight": "Historical Pattern Recognition" if conf > 0.7 else "Unmapped Territory"
+        }
+
+    def recall_associative(self, query_vector, k=10) -> List[Dict[str, Any]]:
+        """
+        Active Inference Recall: Retrieves full associative memory of past states.
+        Returns list of {vector, outcome, meta} for detailed generative modeling.
+        """
+        if not self.vectors: return []
+        
+        target = np.array(query_vector).astype(np.float32)
+        results = []
+        
+        for i, vec in enumerate(self.vectors):
+            vec_f = vec.astype(np.float32)
+            dot = np.dot(target, vec_f)
+            norm_a = np.linalg.norm(target)
+            norm_b = np.linalg.norm(vec_f)
+            similarity = 0 if (norm_a == 0 or norm_b == 0) else dot / (norm_a * norm_b)
+            
+            if similarity > 0.5: # Relevance threshold
+                results.append({
+                    'similarity': similarity,
+                    'outcome': self.outcomes[i],
+                    'meta': self.meta[i],
+                    'vector': self.vectors[i] 
+                })
+        
+        # Sort and return top K
+        results.sort(key=lambda x: x['similarity'], reverse=True)
+        return results[:k]
+
+    def retrieve_intuition(self, vector):
+        """
+        Alias for recall, used by some AGI components for semantic clarity.
+        """
+        return self.recall(vector)

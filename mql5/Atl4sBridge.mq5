@@ -12,7 +12,7 @@
 #include <Trade\Trade.mqh>
 
 // --- INPUTS ---
-input int    InpPort = 5557; // User defined port
+input int    InpPort = 5558; // User defined port
 input int    MagicNumber = 1337;
 input int    MaxSlippage = 5;
 input double MaxDailyLoss = 100.0;      // Maximum daily loss in account currency
@@ -932,6 +932,19 @@ void OnTick() {
 
 void OnTimer() {
     ReadCommands();
+    
+    // Send Heartbeat every 1s (approx every 20 calls at 50ms)
+    static int beat_counter = 0;
+    beat_counter++;
+    if(beat_counter >= 20) {
+        if(socket_handle != INVALID_HANDLE) {
+            string msg = StringFormat("HEARTBEAT|%s|%I64d\n", _Symbol, GetTickCount64());
+            uchar req[];
+            StringToCharArray(msg, req);
+            SocketSend(socket_handle, req, StringLen(msg));
+        }
+        beat_counter = 0;
+    }
 }
 
 //+------------------------------------------------------------------+
@@ -963,6 +976,7 @@ void ProcessCommand(string json) {
     if(ArraySize(parts) < 2) return;
     
     string action = parts[0];
+    Print("PYTHON CMD: ", action, " | Parts: ", ArraySize(parts));  // DEBUG
     
     // INTELLIGENT EXECUTION
     if(action == "OPEN_TRADE" && reflex.IsSafe() && !riskManager.IsEmergencyStop()) {
@@ -1136,18 +1150,23 @@ void ProcessCommand(string json) {
         Print("EMERGENCY STOP TRIGGERED");
         riskManager.EmergencyCloseAll();
     }
-    else if(action == "DRAW_RECT" && ArraySize(parts) >= 7) {
-        hud.DrawZone(parts[1], StringToDouble(parts[2]), StringToDouble(parts[3]), 
-                     (color)StringToInteger(parts[6]), (datetime)StringToInteger(parts[4]), 
-                     (datetime)StringToInteger(parts[5]));
+    else if(action == "DRAW_RECT" && ArraySize(parts) >= 8) {
+        // Format: DRAW_RECT|symbol|name|p1|p2|t1|t2|color
+        // parts[1]=symbol (for routing), parts[2]=name, parts[3]=p1, parts[4]=p2, parts[5]=t1, parts[6]=t2, parts[7]=color
+        Print("DRAW_RECT: Drawing ", parts[2], " from ", parts[3], " to ", parts[4]);
+        hud.DrawZone(parts[2], StringToDouble(parts[3]), StringToDouble(parts[4]), 
+                     (color)StringToInteger(parts[7]), (datetime)StringToInteger(parts[5]), 
+                     (datetime)StringToInteger(parts[6]));
     }
-    else if(action == "DRAW_LINE" && ArraySize(parts) >= 7) {
-        hud.DrawLine(parts[1], StringToDouble(parts[2]), StringToDouble(parts[3]), 
-                     (color)StringToInteger(parts[6]), (datetime)StringToInteger(parts[4]), 
-                     (datetime)StringToInteger(parts[5]));
+    else if(action == "DRAW_LINE" && ArraySize(parts) >= 8) {
+        // Format: DRAW_LINE|symbol|name|p1|p2|t1|t2|color
+        hud.DrawLine(parts[2], StringToDouble(parts[3]), StringToDouble(parts[4]), 
+                     (color)StringToInteger(parts[7]), (datetime)StringToInteger(parts[5]), 
+                     (datetime)StringToInteger(parts[6]));
     }
-    else if(action == "DRAW_TEXT" && ArraySize(parts) >= 6) {
-        hud.DrawText(parts[1], StringToDouble(parts[2]), parts[4], 
-                     (color)StringToInteger(parts[5]), (datetime)StringToInteger(parts[3]));
+    else if(action == "DRAW_TEXT" && ArraySize(parts) >= 7) {
+        // Format: DRAW_TEXT|symbol|name|price|time|text|color
+        hud.DrawText(parts[2], StringToDouble(parts[3]), parts[5], 
+                     (color)StringToInteger(parts[6]), (datetime)StringToInteger(parts[4]));
     }
 }

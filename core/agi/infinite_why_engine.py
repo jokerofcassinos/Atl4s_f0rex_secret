@@ -1039,15 +1039,32 @@ class InfiniteWhyEngine:
             support_ids.append((ev.event_id, sim))
 
         if total_weight == 0:
+            # HEURISTIC FALLBACK (For cold start)
+            # If we have no history, we infer outcome based on simple logic relative to the current decision score.
+            # E.g. If current score is +0.8 (Strong Buy), then decision="BUY" should have positive expected PnL.
+            base_score = query_event.decision_score
+            
+            # Simple heuristic mapping
+            heuristic_pnl = 0.0
+            if decision_alt == "BUY":
+                heuristic_pnl = base_score * 10.0 # Arbitrary scaling
+            elif decision_alt == "SELL":
+                heuristic_pnl = -base_score * 10.0
+                
+            # Apply multipliers
+            heuristic_pnl *= params.get('slot_multiplier', 1.0)
+            
             return (
                 {
-                    "expected_pnl": 0.0,
-                    "expected_max_favor": 0.0,
-                    "expected_max_adverse": 0.0,
-                    "confidence": 0.0,
+                    "expected_pnl": heuristic_pnl,
+                    "expected_max_favor": abs(heuristic_pnl) * 1.5,
+                    "expected_max_adverse": abs(heuristic_pnl) * 0.5,
+                    "confidence": 0.1, # Low confidence purely heuristic
+                    "is_heuristic": True
                 },
-                support_ids,
+                [],
             )
+
 
         expected_pnl = weighted_pnl / total_weight
 

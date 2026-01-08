@@ -12,12 +12,12 @@ class AGIProfiler:
     def __init__(self, data_loader=None):
         self.data_loader = data_loader
         
-    def analyze_market_conditions(self):
+    def analyze_market_conditions(self, symbol=None):
         """
         Runs a comprehensive 'Pre-Flight Check'.
         Returns a recommendation Dict based on Real Metrics (ATR, Entropy).
         """
-        logger.info("AGI PROFILER: Scanning Market Matrix...")
+        logger.info(f"AGI PROFILER: Scanning Market Matrix for {symbol}...")
         
         # Defaults
         volatility_score = 50.0
@@ -26,10 +26,8 @@ class AGIProfiler:
         
         if self.data_loader:
             try:
-                # Fetch fresh data for the default symbol (usually ETHUSD or XAUUSD)
-                # We need Daily for ATR and H1 for Entropy
-                # get_data returns a map: {'D1': df, 'H1': df, ...}
-                data_map = self.data_loader.get_data() 
+                # Fetch fresh data for the SPECIFIC symbol
+                data_map = self.data_loader.get_data(symbol) 
                 
                 # 1. Calculate ATR (Daily) - The "Heartbeat"
                 if 'D1' in data_map and data_map['D1'] is not None:
@@ -106,14 +104,17 @@ class AGIProfiler:
         # Log Returns
         returns = np.log(df['close'] / df['close'].shift(1)).dropna()
         
-        # Histogram
-        hist, _ = np.histogram(returns, bins=bins, density=True)
+        # Histogram (Counts, not density)
+        hist, _ = np.histogram(returns, bins=bins, density=False)
         
-        # Filter zeros
-        hist = hist[hist > 0]
+        # Calculate Probabilities
+        p_probs = hist / np.sum(hist)
+        
+        # Filter zeros to avoid log(0)
+        p_probs = p_probs[p_probs > 0]
         
         # Entropy = -Sum(p * log(p))
-        entropy = -np.sum(hist * np.log(hist))
+        entropy = -np.sum(p_probs * np.log(p_probs))
         
         # Normalize roughly to 0-1 range (for comparison)
         # Max entropy for uniform dist is log(bins)

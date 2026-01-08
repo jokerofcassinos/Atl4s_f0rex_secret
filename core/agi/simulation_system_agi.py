@@ -306,3 +306,65 @@ class SimulationSystemAGI:
             'clusters': len(self.clustering.clusters),
             'sensitivity_analyzed': len(self.sensitivity.sensitivity_results)
         }
+
+    def full_mental_simulation(self, current_state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        API Compatibility Wrapper for OmegaAGICore.
+        Runs a quick Monte Carlo simulation based on current state.
+        """
+        # 1. Create Scenarios
+        scenarios = []
+        
+        # Optimistic Scenario (Trend Continuation)
+        scenarios.append(self.create_scenario(
+            ScenarioType.BULLISH,
+            {'mean_return': 0.001, 'volatility': 0.02}
+        ))
+        
+        # Pessimistic Scenario (Reversal)
+        scenarios.append(self.create_scenario(
+            ScenarioType.BEARISH,
+            {'mean_return': -0.001, 'volatility': 0.03}
+        ))
+        
+        # Volatile Scenario (Noise)
+        scenarios.append(self.create_scenario(
+            ScenarioType.VOLATILE,
+            {'mean_return': 0.0, 'volatility': 0.05}
+        ))
+        
+        # 2. Run Simulation
+        results = self.simulator.run_parallel(scenarios)
+        
+        
+        # 3. Analyze Results
+        friction_cost = 0.00015 # Hardcoded estimation or import from FrictionModel
+        
+        bull_wins = sum(1 for r in results if (r.final_equity - self.simulator.initial_capital) > friction_cost)
+        total_runs = len(results)
+        prob_up = bull_wins / total_runs if total_runs > 0 else 0.5
+        
+        # Adjust expected moves by friction cost (Spread + Comm)
+        # Assuming profit target is hit, we lose spread.
+        expected_moves = [r.final_equity - self.simulator.initial_capital - friction_cost for r in results]
+        
+        optimistic = max(expected_moves)
+        pessimistic = min(expected_moves)
+        
+        recommendation = "WAIT"
+        # Increased threshold for Buy/Sell to account for friction validation
+        if prob_up > 0.75: recommendation = "BUY"
+        elif prob_up < 0.25: recommendation = "SELL"
+        
+        return {
+            'recommendation': recommendation,
+            'scenarios': {
+                'optimistic': optimistic,
+                'pessimistic': pessimistic,
+                'mean': float(np.mean(expected_moves))
+            },
+            'monte_carlo': {
+                'positive_probability': prob_up,
+                'iterations': total_runs
+            }
+        }

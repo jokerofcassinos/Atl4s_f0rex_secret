@@ -22,19 +22,15 @@ class GreatFilter:
 
         # Memória de decisões do filtro (AGI Risk Core)
         self.decision_memory = ModuleDecisionMemory("GreatFilter", max_memory=2000)
+        
+        # Phase 12: Friction & Profitability
+        from core.agi.execution.friction_model import FrictionEstimator
+        self.friction_estimator = FrictionEstimator()
 
     def validate_entry(self, signal: Dict[str, Any], market_state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Final Check before Opening.
-        Args:
-            signal: {'type': 'BUY', 'confidence': 85.0}
-            market_state: {'volatility': 50, 'is_crash': False, 'spread': float}
-
-        Returns:
-            dict com:
-                'allowed': bool
-                'decision_id': str
-                'reason': str
+        Now includes Phase 12 Profitability Gate.
         """
         reasons = []
         allowed = True
@@ -44,16 +40,42 @@ class GreatFilter:
             reasons.append("Blocking BUY during crash phase")
             allowed = False
 
-        # 2. Reject Low Confidence Scalps
+        # 2. Reject Low Confidence Scalps (lowered from 75 to 50 for HYDRA mode)
         confidence = float(signal.get("confidence", 0.0))
-        if confidence < 75.0:
+        if confidence < 50.0:
             reasons.append(f"Confidence {confidence:.1f} too low")
+            
+        # 3. Phase 12: Predictive Profitability Gate
+        # "Can we afford the trip?"
+        target_profit = market_state.get('metrics', {}).get('atr_value', 0.0005) * 1.5 # Estimating potential reward
+        friction_cost = self.friction_estimator.calculate_friction(market_state)
+        
+        # Expectancy Logic: Reward must cover Friction heavily
+        if not self.friction_estimator.is_profitable_in_session(market_state, target_profit):
+            reasons.append(f"UNPROFITABLE: Friction ({friction_cost:.5f}) eats Reward ({target_profit:.5f})")
             allowed = False
+            
+        return {
+            'allowed': allowed,
+            'decision_id': "GF-" + str(int(market_state.get('tick_time', 0))),
+            'reason': "; ".join(reasons)
+        }
 
-        # 3. Spread Check (If High Spread, Scalp is Ruined)
+        # 3. Spread Check (Block if spread is excessive)
+        # For Forex: spread is in price units (0.0003 = 3 pips for GBPUSD)
+        # For Gold: spread is in price units (0.50 = 50 cents)
         spread = market_state.get("spread", 0.0)
-        if spread > 50:  # 50 points = 5 pips (High for Scalp)
-            reasons.append(f"Spread {spread} too wide for scalp")
+        
+        # Use relative threshold: block if spread > 0.05% of price (covers both Forex and Gold)
+        # For GBPUSD ~1.34: 0.05% = 0.00067 (~6.7 pips) 
+        # For USDJPY ~156: 0.05% = 0.078 (~7.8 pips)
+        # For Gold ~2600: 0.05% = 1.30 ($1.30)
+        max_spread_ratio = 0.0005  # 0.05%
+        typical_price = market_state.get("typical_price", 1.0)  # Fallback
+        max_spread = typical_price * max_spread_ratio if typical_price > 10 else max_spread_ratio
+        
+        if spread > max_spread and spread > 0.0008:  # Also hard floor of 8 pips
+            reasons.append(f"Spread {spread:.5f} too wide (max: {max_spread:.5f})")
             allowed = False
 
         if not reasons:

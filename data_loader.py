@@ -121,10 +121,23 @@ class DataLoader:
              data_map['W1'] = self.resample_to_tf(data_map['D1'], 'W')
              
         # Phase 30: Apex Basket (Candidates)
-        # User Request: Focus on BTCXAU (Bitcoin vs Gold). 
-        # We also keep BTCUSD as reference.
+        # Dynamic Selection based on Asset Class
+        candidates = []
         
-        candidates = ["BTCXAU"]
+        # Check if Crypto
+        if any(c in target_symbol for c in ["BTC", "ETH", "SOL", "DOGE", "XRP"]):
+             candidates = ["BTCXAU", "ETHUSD"]
+        elif "XAU" in target_symbol or "GC=F" in target_symbol:
+             # Gold Mode -> Compare with Silver or Majors?
+             # User specifically asked NOT to see BTCXAU.
+             # We can add Silver or just relevant Forex majors.
+             candidates = [] # Disable Apex Routing for now in Gold mode unless requested
+        elif any(c in target_symbol for c in ["EUR", "GBP", "JPY", "AUD", "CAD", "CHF"]):
+             # Forex Mode -> Basket of Majors
+             candidates = ["EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "USDCAD", "USDCHF"]
+             # Remove self from candidates
+             candidates = [c for c in candidates if self._normalize_symbol(c) != target_symbol]
+        
         global_basket = {}
         
         # Helper to check if weekend (naive)
@@ -133,7 +146,7 @@ class DataLoader:
         
         for asset in candidates:
              # Skip Forex on weekends to avoid noise/stale data
-             if is_weekend and asset in ["XAUUSD", "EURUSD"]: continue
+             if is_weekend and asset in ["XAUUSD", "EURUSD", "USDJPY", "GBPUSD"]: continue
              
              # Start date logic is inside fetch_single
              c_file = os.path.join(config.CACHE_DIR, f"{asset}_Apex.parquet")
@@ -165,14 +178,23 @@ class DataLoader:
         return basket
 
     def _get_yf_ticker(self, symbol):
+        # Strip suffixes common in MT5 (e.g., 'm', '.pro', '_i')
+        clean_symbol = symbol.replace("m", "").replace(".pro", "").replace("_i", "")
+        
         ticker_map = {
             "XAUUSD": "GC=F",
             "BTCUSD": "BTC-USD",
-            "BTCXAU": "BTC-USD", # PROXY: BTCXAU correlates 99% with BTCUSD on typical brokers (unless real gold denom)
+            "BTCXAU": "BTC-USD", 
             "ETHUSD": "ETH-USD",
-            "EURUSD": "EURUSD=X"
+            "EURUSD": "EURUSD=X",
+            "GBPUSD": "GBPUSD=X",
+            "USDJPY": "USDJPY=X",
+            "AUDUSD": "AUDUSD=X",
+            "USDCAD": "USDCAD=X",
+            "USDCHF": "USDCHF=X",
+            "NZDUSD": "NZDUSD=X"
         }
-        return ticker_map.get(symbol, symbol)
+        return ticker_map.get(clean_symbol, f"{clean_symbol}=X") # Default to Forex format
 
 
 
@@ -185,6 +207,8 @@ class DataLoader:
         if interval == "5m": days = 55
         
         # 1. Load Cache
+        yf_ticker = self._get_yf_ticker(symbol)
+        # logger.info(f"DATA LOADER: Fetching {symbol} (YF: {yf_ticker}) -> {cache_file}")
         cached_df = self._load_cache(cache_file)
         
         start_date = None

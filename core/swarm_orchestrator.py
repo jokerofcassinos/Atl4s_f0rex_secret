@@ -102,20 +102,36 @@ from .mcts_planner import MCTSPlanner
 from .hyper_dimensional import HyperDimensionalEngine
 from .transformer_lite import TransformerLite
 from .genetics import EvolutionEngine
+from analysis.swarm.fractal_swarm import FractalMicroClimax # Phase 146
+
+from .agi.active_inference import GenerativeModel, FreeEnergyMinimizer
+from .agi.metacognition import RecursiveReflectionLoop
+from .agi.symbiosis.neural_resonance_bridge import NeuralResonanceBridge # Phase 150+
 
 logger = logging.getLogger("SwarmOrchestrator")
 
 from core.agi.omni_cortex import OmniCortex
 
 class SwarmOrchestrator:
-    def __init__(self, bus: ConsciousnessBus, evolution: EvolutionEngine, neuroplasticity: NeuroPlasticityEngine, attention: TransformerLite, grandmaster: MCTSPlanner):
+    def __init__(self, bus: ConsciousnessBus, evolution: EvolutionEngine, neuroplasticity: NeuroPlasticityEngine, attention: TransformerLite, grandmaster: MCTSPlanner = None, agi=None):
         self.bus = bus
         self.evolution = evolution
         self.neuroplasticity = neuroplasticity
         self.attention = attention
-        self.grandmaster = MCTSPlanner()
+        self.grandmaster = grandmaster if grandmaster else MCTSPlanner() # Use passed instance
+        self.agi = agi # Reference to OmegaAGICore (Brain)()
         self.omni_cortex = OmniCortex() # High-Level Reasoning Engine
         
+        # --- AGI PHASE 4: HOLOGRAPHIC ACTIVE INFERENCE ---
+        self.hd_engine = HyperDimensionalEngine()
+        self.holographic_memory = HolographicMemory()
+        self.generative_model = GenerativeModel()
+        self.free_energy_minimizer = FreeEnergyMinimizer()
+        
+        # --- AGI PHASE 5: METACOGNITION ---
+        self.metacognition = RecursiveReflectionLoop()
+        self.resonance_bridge = NeuralResonanceBridge() # Phase 150+
+
         self.active_agents = []
         self.alpha_threshold = 60.0 # Default
         self.short_term_memory = {'market_state': {}}
@@ -271,7 +287,7 @@ class SwarmOrchestrator:
         for agent in self.active_agents:
             if hasattr(agent, 'set_bridge'):
                 agent.set_bridge(bridge)
-        
+        '                                                                               '
         # Phase 117: Holographic Associative Memory
         self.holographic_memory = HolographicMemory()
         self.last_consensus_state = {}
@@ -353,6 +369,15 @@ class SwarmOrchestrator:
                         "reason": signal.meta_data.get("reason", ""),
                         "aggregated_signal": signal.signal_type,
                     }
+                    
+                    # --- CRITICAL FIX Check for List Corruption ---
+                    # Some agents might return a list as metadata by mistake
+                    if isinstance(signal.meta_data, list):
+                        logger.error(f"DATA CORRUPTION: Agent {agent.name} returned LIST as metadata. Fixing...")
+                        signal.meta_data = {'raw_data': signal.meta_data}
+                    elif not isinstance(signal.meta_data, dict):
+                         signal.meta_data = {'raw_val': str(signal.meta_data)}
+                         
                     # Merge generic state with per-signal meta_data for richer memory
                     market_state = {
                         **market_state_base,
@@ -379,16 +404,33 @@ class SwarmOrchestrator:
 
         self.last_consensus_state = swarm_snapshot
 
-        # Synthesize without await (Sync Method)
-        # Snapshot for Learning
-        self.last_vote_snapshot = {}
-        for t in thoughts:
-             self.last_vote_snapshot[t.source] = t.signal_type
-             
-        decision, score, meta = self.synthesize_thoughts(thoughts, swarm_snapshot)
+        # --- PHASE 2: AGI PERCEPTION & HYPER-COMPLEX ANALYSIS ---
+        agi_adj = {}
+        if self.agi:
+            # Pass full config and tick for deep analysis (Session/Liquidity)
+            agi_adj = self.agi.pre_tick(tick, config, data_map)
+            # Merge AGI adjustments into swarm logic (e.g., premonition)
+            thoughts.extend(self._process_agi_adjustments(agi_adj))
+        
+        # 2. Perceptual Processing (M1 Context)
+        df_m1 = data_map.get('1m')
+        if df_m1 is not None and not df_m1.empty:
+            # ... existing logic ...
+            pass
+
+        # 3. Decision Synthesis
+        # Pass agi_adj to synthesize_thoughts to enrich metadata
+        decision, score, meta = self.synthesize_thoughts(thoughts, swarm_snapshot, 
+                                                        mode=config.get('mode', 'SNIPER') if config else 'SNIPER',
+                                                        agi_context=agi_adj,
+                                                        config=config)
         return decision, score, meta
 
-    def synthesize_thoughts(self, thoughts: List[SwarmSignal] = None, current_state_vector: Dict = None) -> Tuple[str, float, Dict]:
+    def synthesize_thoughts(self, thoughts: List[SwarmSignal] = None, 
+                         current_state_vector: Dict = None, 
+                         mode: str = "SNIPER", 
+                         agi_context: Dict = None,
+                         config: Dict = None) -> Tuple[str, float, Dict]:
         if not thoughts:
             thoughts = self.bus.get_recent_thoughts()
         
@@ -462,7 +504,8 @@ class SwarmOrchestrator:
         for t in thoughts:
              if t.source == "Sovereign_Swarm" and t.signal_type == "META_INFO":
                  sov_weights = t.meta_data.get('weight_vector', {})
-                 logger.info(f"SOVEREIGN ACT: Regime={t.meta_data.get('regime')} | Weights Applied.")
+                 regime = t.meta_data.get('regime', 'UNKNOWN')
+                 logger.info(f"SOVEREIGN ACT: Regime={regime} | Weights Applied.")
         
         # C. Merge (Sovereign * Learned)
         # Allows Sovereign to Temporarily Override long-term learning if Regime changes drastically
@@ -470,7 +513,10 @@ class SwarmOrchestrator:
         for k in all_keys:
              w_learn = learned_weights.get(k, 1.0) # Default to base
              w_sov = sov_weights.get(k, 1.0)
+             w_sov = sov_weights.get(k, 1.0)
              weights[k] = w_learn * w_sov
+             
+        # Decide based on weighted votes
 
         if 'market_data' in self.short_term_memory:
              self.omni_cortex.perceive(self.short_term_memory['market_data'])
@@ -503,8 +549,9 @@ class SwarmOrchestrator:
 
         # 3. Transformer Attention Consensus (AGI Brain)
         if 'allowed_actions' not in locals(): allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_LONG", "EXIT_SHORT", "EXIT_ALL"]
+        if 'regime' not in locals(): regime = "UNKNOWN"
         
-        final_decision, final_score, meta_data = self._transformer_consensus(thoughts, weights, current_state_vector, allowed_actions)
+        final_decision, final_score, meta_data = self._transformer_consensus(thoughts, weights, current_state_vector, allowed_actions, mode=mode, regime=regime)
         
         # Inject Sovereign Signals into Metadata for Main Loop Multipliers
         sovereign_state = "NEUTRAL"
@@ -517,13 +564,81 @@ class SwarmOrchestrator:
                       sovereign_state = "STRONG"
         
         meta_data['sovereign_state'] = sovereign_state
+        
+        # --- PHASE 150+: HYPER-COMPLEX METADATA INJECTION ---
+        if agi_context:
+            for key, val in agi_context.items():
+                if key not in meta_data:
+                    meta_data[key] = val
+            meta_data.setdefault('factors', []).append("AGI_HYPER_COMPLEX_INTEGRATION")
 
         # Harvester Override (Priority)
         for t in thoughts:
              if t.signal_type == "EXIT_ALL": return ("EXIT_ALL", 99.0, t.meta_data)
              if t.signal_type == "VETO": return ("WAIT", 0.0, {})
 
+        # 4. Active Inference Arbitration (The Free Energy Principal)
+        # If the Swarm is split or uncertain, we check which decision minimizes Free Energy (Risk + Ambiguity)
+        active_inf_decision = self._resolve_active_inference(thoughts, final_decision)
+        if active_inf_decision:
+             final_decision, final_score, meta_new = active_inf_decision
+             meta_data.update(meta_new)
+             logger.info(f"ACTIVE INFERENCE: Override -> {final_decision} (Minimizes Free Energy)")
+
+        # 5. Metacognitive Reflection (Self-Correction)
+        # "Before I act, let me think about why I am acting."
+        reflection = self.metacognition.reflect(final_decision, final_score, meta_data, {'config': {'mode': mode}})
+        final_score = reflection['adjusted_confidence']
+        if reflection['notes']:
+             meta_data['reflection_notes'] = reflection['notes']
+             # If validation failed (score -> 0), switch to WAIT
+             if final_score < 50.0 and final_decision != "EXIT_ALL":
+                  final_decision = "WAIT"
+                  logger.info(f"METACOGNITION: Vetoed Decision. Reason: {reflection['notes']}")
+        
+        # 6. Neural Resonance Sync (Phase 150+)
+        # Synchronize decision with user intent model (Symbiosis)
+        if hasattr(self.agi, 'resonance_bridge'):
+            u_intent = config.get('user_intent', {'target': 'PROFIT', 'risk': 'MODERATE'}) if config else {'target': 'PROFIT', 'risk': 'MODERATE'}
+            resonance = self.agi.resonance_bridge.synchronize(u_intent, {'decision': final_decision, 'score': final_score})
+            meta_data['symbiosis_sync'] = resonance['symbiosis_confidence']
+            if resonance['fusion_stream'] == "SYMBIOTIC_CONSENSUS":
+                logger.info(f"NEURAL RESONANCE: Absolute Symbiosis achieved ({resonance['symbiosis_confidence']:.2%})")
+
         return (final_decision, final_score, meta_data)
+
+    def _resolve_active_inference(self, thoughts: List[SwarmSignal], current_consensus: str) -> Tuple[str, float, Dict]:
+        """
+        Calculates Expected Free Energy based on Swarm Hypotheses.
+        """
+        # If consensus is strong (>80%), skip expensive calculation
+        # if final_score > 80: return None
+        
+        # We evaluate 3 Policies: BUY, SELL, HOLD (WAIT)
+        policies = ["BUY", "SELL", "HOLD"]
+        
+        # Context: Aggregated Swarm Sentiment
+        result = self.free_energy_minimizer.select_best_policy(policies, {})
+        
+        best_policy = result['selected_policy']
+        best_G = result['best_G']
+        
+        # Map HOLD -> WAIT
+        if best_policy == "HOLD": best_policy = "WAIT"
+        
+        # If Active Inference strongly disagrees with Consensus, we prefer Active Inference
+        # (Generative Model is 'smarter' than simple voting)
+        
+        # For now, we only use it to BREAK TIES or Veto weak signals
+        if current_consensus == "WAIT" and best_policy != "WAIT":
+             return (best_policy, 65.0, {'active_inference_G': best_G})
+             
+        if current_consensus != "WAIT" and best_policy == "WAIT":
+             # Active Inference suggests Holding is safer (lower Free Energy)
+             return ("WAIT", 0.0, {'active_inference_veto': True, 'G': best_G})
+             
+        return None
+
 
     def calculate_dynamic_slots(self, volatility: float, trend_strength: float, mode: str = "SNIPER") -> int:
         """
@@ -593,18 +708,45 @@ class SwarmOrchestrator:
         final_score = 0
         
         # CIVIL WAR CHECK (Both sides strong)
+        # CIVIL WAR CHECK (Both sides strong)
         if score_buy > 2000 and score_sell > 2000:
+             # Calculate Ratio
              ratio = score_buy / score_sell if score_sell > 0 else 1.0
-             if 0.9 < ratio < 1.1: # Relaxed from 0.8-1.2 to 0.9-1.1 to allow more trades
+             
+             # "Looser" Restriction: Only block if ratio is VERY tight (0.95 - 1.05)
+             # User requested "less vetting".
+             if 0.95 < ratio < 1.05: 
                  logger.warning(f"CIVIL WAR DETECTED: Buyers({score_buy:.0f}) vs Sellers({score_sell:.0f}). Gridlock.")
-                 return "WAIT", 0.0, {}
                  
+                 # AGI INTERVENTION (Tie-Breaker)
+                 # We summon the GrandMaster to decide the fate of the Civil War.
+                 if hasattr(self.grandmaster, 'perceive_and_decide'):
+                      # Create minimal context
+                      gm_ctx = {'close': float(self.last_price)}
+                      verdict = self.grandmaster.perceive_and_decide(gm_ctx)
+                      
+                      if verdict == "BUY":
+                          logger.info("GRANDMASTER INTERVENTION: Overrode Civil War -> BUY")
+                          return "BUY", 75.0, {"reason": "GrandMaster Tie-Break"}
+                      elif verdict == "SELL":
+                          logger.info("GRANDMASTER INTERVENTION: Overrode Civil War -> SELL")
+                          return "SELL", 75.0, {"reason": "GrandMaster Tie-Break"}
+                      else:
+                          return "WAIT", 0.0, {}
+                 else:
+                      return "WAIT", 0.0, {}
+                      
+             # If ratio is slighly skewed (e.g. 1.2), allow the dominant side but penalize confidence
+             # This prevents blocking valid but contested moves.
+             pass
+
         if score_buy > score_sell and score_buy > 500: # Heuristic thresh
             final_decision = "BUY"
             final_score = 80
         elif score_sell > score_buy and score_sell > 500:
             final_decision = "SELL"
             final_score = 80
+
             
         if final_decision not in allowed_actions:
              final_decision = "WAIT"
@@ -631,13 +773,18 @@ class SwarmOrchestrator:
         #     return (top_signal.signal_type, top_signal.confidence, top_signal.meta_data)
         # return None
 
-    def _transformer_consensus(self, thoughts, weights, current_state_vector, allowed_actions):
+    def _transformer_consensus(self, thoughts, weights, current_state_vector, allowed_actions, mode="SNIPER", regime="UNKNOWN"):
         """
         Phase 117: Transformer Attention Consensus (AGI Brain).
-        Replaces simple voting with Self-Attention.
+        IMPROVED: Confidence from dominant faction strength, not net cancellation.
         """
         d_model = 64
         vectors = []
+        
+        # Track raw faction strengths (before cancellation)
+        buy_strength = 0.0
+        sell_strength = 0.0
+        total_weight = 0.0
         
         # Vector 0: Holographic Memory Context (The "RAG" Token)
         rag_vec = np.zeros(d_model)
@@ -652,8 +799,13 @@ class SwarmOrchestrator:
              if t.signal_type == "META_INFO": continue
              w = weights.get(t.source, 1.0)
              val = 0
-             if t.signal_type == "BUY": val = 1
-             elif t.signal_type == "SELL": val = -1
+             if t.signal_type == "BUY": 
+                 val = 1
+                 buy_strength += t.confidence * w
+             elif t.signal_type == "SELL": 
+                 val = -1
+                 sell_strength += t.confidence * w
+             total_weight += w
              
              vec = np.zeros(d_model)
              vec[0] = val * t.confidence / 100.0 * w
@@ -671,20 +823,84 @@ class SwarmOrchestrator:
         
         decision_score = swarm_vec[0]
         final_decision = "WAIT"
-        # Fixed: Use actual signal strength, not inflated 5x multiplier
-        # Scale from [-1, 1] decision score to [0, 100] confidence
-        final_conf = min(100.0, max(0.0, abs(decision_score) * 100.0))
         
-        if decision_score > 0.05: final_decision = "BUY"
-        elif decision_score < -0.05: final_decision = "SELL"
+        # === NEW: Calculate confidence from DOMINANT FACTION, not net score ===
+        # This prevents BUY/SELL cancellation from killing confidence
         
-        # Boost confidence for strong consensus (but not artificially inflate)
-        if final_conf > 50:
-            final_conf = min(100.0, final_conf * 1.2)  # Max 20% boost instead of 5x 
+        dominant_strength = max(buy_strength, sell_strength)
+        total_strength = buy_strength + sell_strength
         
-        logger.info(f"AGI ATTENTION: Decision={final_decision} (Score={decision_score:.3f}) | Memory Bias={vectors[0][0]:.3f}")
+        # Consensus ratio: How unified is the swarm?
+        if total_strength > 0:
+            consensus_ratio = dominant_strength / total_strength  # 0.5 = split, 1.0 = unanimous
+        else:
+            consensus_ratio = 0.0
+        
+        # Base confidence: Average confidence of dominant faction votes
+        active_votes = len([t for t in thoughts if t.signal_type in ["BUY", "SELL"]])
+        if active_votes > 0:
+            base_conf = dominant_strength / (active_votes * 1.5)  # Normalized to ~50-70 range
+        else:
+            base_conf = 0.0
+        
+        # Consensus boost: Unanimous swarm = 1.2x, Split swarm = 0.9x
+        consensus_boost = 0.9 + (consensus_ratio - 0.5) * 0.6  # Range 0.6 to 1.2
+        
+        # Mode multipliers (reduced for realism)
+        mode_mult = 1.0
+        if mode == "WOLF_PACK": mode_mult = 1.2
+        elif mode == "HYDRA": mode_mult = 1.3  # Moderate boost, not 2x
+        elif mode == "SNIPER": mode_mult = 0.9  # Conservative
+        
+        # Calculate and CAP at 85% (100% is unrealistic)
+        final_conf = min(85.0, base_conf * consensus_boost * mode_mult)
+        
+        # Determine direction from decision_score
+        if decision_score > 0.02: 
+            final_decision = "BUY"
+        elif decision_score < -0.02: 
+            final_decision = "SELL"
+        
+        logger.info(f"AGI ATTENTION: Decision={final_decision} (Score={decision_score:.3f}) | Memory Bias={rag_vec[0]:.3f}")
+        
+        # --- DIALECTIC SYNTHESIS (Hegelian Logic) ---
+        # Instead of averaging +1 and -1 to 0, we check the DOMINANT CLUSTER.
+        # If Regime is TRENDING, we ignore the Counter-Trend dissenters (Civil War Resolution).
+        
+        if regime == "TRENDING" and final_decision == "WAIT":
+             # Check if Trend Swarms are voting BUY
+             trend_vote = 0.0
+             for t in thoughts:
+                 if "Trending" in t.source or "Apex" in t.source or "Technical" in t.source:
+                      if t.signal_type == "BUY": trend_vote += t.confidence
+                      elif t.signal_type == "SELL": trend_vote -= t.confidence
+             
+             if trend_vote > 200: # Strong Trend Vote masked by Oscillators
+                 logger.info("DIALECTIC SYNTHESIS: Regime is TRENDING. Ignoring Counter-Trend Dissenters.")
+                 final_decision = "BUY"
+                 final_conf = 85.0 # High Confidence Override
+                 
+             elif trend_vote < -200:
+                 logger.info("DIALECTIC SYNTHESIS: Regime is TRENDING. Ignoring Counter-Trend Dissenters.")
+                 final_decision = "SELL"
+                 final_conf = 85.0
 
+        # Wolf Pack Boost (Winner Takes All)
+        if mode == "WOLF_PACK" and final_decision != "WAIT":
+             # If we have a winner, boost it to overcome hesitation
+             final_conf = max(final_conf, 75.0)
+        
+        # HYDRA Boost (Aggressive Multi-Vector)
+        if mode == "HYDRA" and final_decision != "WAIT":
+             final_conf = max(final_conf, 65.0)  # Minimum 65% for HYDRA
+ 
+        
+        # Boost confidence for strong consensus (capped at 85% - 100% is unrealistic)
+        if final_conf > 50:
+            final_conf = min(85.0, final_conf * 1.1)  # 10% boost, max 85% 
+        
         if final_decision not in allowed_actions: final_decision = "WAIT"
 
         return final_decision, final_conf, {'attention_weights': attn_weights.tolist()}
+
 
