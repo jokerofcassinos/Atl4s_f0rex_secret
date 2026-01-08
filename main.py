@@ -90,7 +90,7 @@ class OmegaSystem:
         # --- AGI PHASE 5.2: SYMBIOSIS ---
         self.user_model = UserIntentModeler()
         self.explainer = ExplanabilityGenerator()
-        
+        self.last_forecast = "NEUTRAL"
         
         # Inject into Cortex
         self.cortex = SwarmOrchestrator(
@@ -109,6 +109,8 @@ class OmegaSystem:
 
         self.symbol = "ETHUSD" # Default for Sunday Crypto
         self.last_trade_times = {} # Cooldown tracking
+        self.last_data_fetch_time = 0 # Throttling for data loader
+        self.cached_data_map = None # Cache for throttled data
         self.burst_tracker = {} # Burst Execution Manager
         
         # User Configuration (Defaults)
@@ -431,25 +433,69 @@ class OmegaSystem:
                     tick_count += 1
                     self.symbol = tick.get('symbol', 'XAUUSD')
                     
-                    if self.flow_manager and self.flow_manager.active_symbols:
-                        # Ensure data_map exists before we try to modify it
-                        # Fetch primary data first (moved from below)
-                        data_map = self.data_loader.get_data(self.symbol)
-                        
-                        basket_data = self.data_loader.get_basket_data(self.flow_manager.active_symbols)
-                        if data_map:
-                             data_map['basket_data'] = basket_data
-                        else:
-                             data_map = {'basket_data': basket_data} # Fallback
-                    else:
-                        data_map = self.data_loader.get_data(self.symbol)
+                    now_msc = tick.get('time_msc', 0)
+                    
+                    # --- CRITICAL: VTP & EXECUTION FIRST (Zero Latency) ---
+                    # Use the raw tick data immediately before any heavy analysis
+                    
+                    # 1. Update Active Trades Snapshot
+                    trades_snapshot = tick.get('trades_json', [])
+                    if trades_snapshot:
+                        self.learning.update_active_trades(trades_snapshot)
 
-                    # Ensure data_map is correctly populated with 'M5' and 'M1' keys
-                    # Assuming data_loader.get_data returns a dict that might contain these
-                    # Or that df_m5 and df_m1 are derived from data_map later.
-                    # For explicit population, we'd need to fetch/derive them here.
-                    # As per instruction, we'll ensure the keys are present if data_loader provides them.
-                    # This block is placed here to ensure data_map is ready before pre_tick.
+                        # 2. Individual VTP/VSL Guards
+                        self.executor.check_individual_guards(
+                             trades_snapshot, 
+                             self.config['virtual_tp'], 
+                             self.config['virtual_sl'],
+                             market_bias=self.last_forecast
+                         )
+                         
+                        # 3. Dynamic Stops (Event Horizon)
+                        await self.executor.manage_dynamic_stops(tick)
+                        
+                        # 4. Predictive Exits
+                        await self.executor.monitor_positions(tick)
+                        
+                        # 5. Global Catastrophe Guard
+                        total_profit = tick.get('profit', 0.0)
+                        catastrophe_limit = -abs(self.config['virtual_sl']) * 5 
+                        
+                        if total_profit < catastrophe_limit:
+                            logger.critical(f"CATASTROPHE GUARD: Global Equity Dropped to ${total_profit:.2f}. EMERGENCY EJECT.")
+                            self.executor.close_all(self.symbol)
+                            await asyncio.sleep(1.0)
+                            continue # Reboot loop
+
+                    # --- DATA LOADING (Throttled) ---
+                    # Only fetch OHLCV data every 60s or if missing
+                    # This prevents the 2-second sleep/network block on every tick
+                    
+                    data_map = self.cached_data_map
+
+                    if (now_msc - self.last_data_fetch_time > 60000) or (data_map is None):
+                        logger.info(f"DATA LOADER: Refreshing OHLCV data (Last: {(now_msc - self.last_data_fetch_time)/1000:.1f}s ago)")
+                        if self.flow_manager and self.flow_manager.active_symbols:
+                            # Ensure data_map exists before we try to modify it
+                            # Fetch primary data first (moved from below)
+                            data_map = self.data_loader.get_data(self.symbol)
+                            
+                            basket_data = self.data_loader.get_basket_data(self.flow_manager.active_symbols)
+                            if data_map:
+                                 data_map['basket_data'] = basket_data
+                            else:
+                                 data_map = {'basket_data': basket_data} # Fallback
+                        else:
+                            data_map = self.data_loader.get_data(self.symbol)
+                            
+                        self.last_data_fetch_time = now_msc
+                        self.cached_data_map = data_map # Update cache
+                        
+                        # Use valid data if fetch failed? (DataLoader usually returns cached or None)
+                        if data_map is None: 
+                             data_map = {} # Prevent crash
+
+                    # Extract frames from possibly cached data_map
                     df_m5 = data_map.get('M5')
                     if df_m5 is None:
                         df_m5 = data_map.get('5m')
@@ -479,72 +525,14 @@ class OmegaSystem:
                     if 'last' not in tick:
                         tick['last'] = (tick['bid'] + tick['ask']) / 2
 
-                    # --- 0. INDIVIDUAL GUARDIAN (Latency Bypass) ---
-                    # Phase 122: Per-Order Management (No more "Stop All")
-                    
-                    trades_snapshot = tick.get('trades_json', [])
-                    if trades_snapshot:
-                        # --- PHASE 6: HISTORY RECONCILIATION ---
-                        self.learning.update_active_trades(trades_snapshot)
-
-                        # self.config['virtual_tp'] and ['virtual_sl'] are per-trade targets now
-                        self.executor.check_individual_guards(
-                             trades_snapshot, 
-                             self.config['virtual_tp'], 
-                             self.config['virtual_sl']
-                         )
-                         
-                        # Keep Global Catastrophe Guard (Optional, but good for safety)
-                        # Only triggered if Total Profit is absurdly negative (e.g. 5x SL)
-                        total_profit = tick.get('profit', 0.0)
-                        catastrophe_limit = -abs(self.config['virtual_sl']) * 5 
-                        
-                        if total_profit < catastrophe_limit:
-                            logger.critical(f"CATASTROPHE GUARD: Global Equity Dropped to ${total_profit:.2f}. EMERGENCY EJECT.")
-                            self.executor.close_all(self.symbol)
-                            await asyncio.sleep(1.0)
-                            continue # Reboot loop
-
-                    # 2. Fetch/Update Context (Dataframes)
-                    # Already fetched at start of tick.
-                    pass 
-                        
-                    # Phase 116: Event Horizon (Parabolic Exits)
-                    # 1. Fetch Open Trades if we have positions but no details
-                    # Or refresh every 5s to keep stops valid
-                    current_positions_count = tick.get('positions', 0)
-                    now_msc = tick.get('time_msc', 0)
-                    last_trade_fetch = self.last_trade_times.get('fetch', 0)
-                    
-                    if current_positions_count > 0:
-                        if now_msc - last_trade_fetch > 2000: # Every 2s
-                             self.bridge.send_command("GET_OPEN_TRADES", [self.symbol])
-                             self.last_trade_times['fetch'] = now_msc
-
-                    # --- PHASE 3: AGI PROFILER UPGRADE ---
-                    # Re-scan market every 5 minutes (300,000 ms)
-                    if now_msc - self.last_profile_time > 300000:
-                         logger.info("AGI PROFILER: Scheduled Re-Scan...")
-                         # We need to ensure DataLoader has fresh data first.
-                         # self.data_loader.get_data(self.symbol) # Heavy? Maybe relying on cache is safer.
-                         rec = self.profiler.analyze_market_conditions(self.symbol)
-                         if 'metrics' in rec:
-                              self.agi_metrics = rec['metrics']
-                              logger.info(f"AGI METRICS UPDATED: ATR={self.agi_metrics.get('atr',0):.2f}")
-                         self.last_profile_time = now_msc
-
-                    # 2. Run Dynamic Stop Manager
-                    # This relies on ZmqBridge merging TRADES_JSON into the tick
-                    # 2. Run Dynamic Stop Manager (Trailing Stops)
-                    # This relies on ZmqBridge merging TRADES_JSON into the tick
-                    await self.executor.manage_dynamic_stops(tick)
-                    
                     # 3. Running Virtual Guards (VTP/VSL)
-                    await self.executor.monitor_positions(tick)
+                    # MOVED TO TOP OF LOOP FOR SPEED
+                    pass
+
 
                     # 3. Cortex Thinking
                     # Returns (decision, confidence, metadata)
-                    decision, confidence, metadata = await self.cortex.process_tick(tick, data_map, self.config)
+                    decision, confidence, metadata = await self.cortex.process_tick(tick, data_map, self.config, agi_context=agi_adjustments)
 
                     # --- PHASE 8: SINGULARITY NEOGENESIS (Override) ---
                     swarm_dir = 0
@@ -566,6 +554,9 @@ class OmegaSystem:
                              logger.warning(f"SINGULARITY OVERRIDE: {decision} -> {final_verdict} (Conf: {final_conf:.1f}%)")
                              decision = final_verdict
                              confidence = final_conf
+                    
+                    # --- NORMAL OPERATION ---
+                    self.last_forecast = decision
                     
                     # Phase 30: Apex Routing
                     if decision == "ROUTING":
@@ -619,9 +610,9 @@ class OmegaSystem:
                             else: max_burst = 1
                         elif self.config['mode'] == "HYBRID":
                             # Balanced approach: 2-3 orders based on confidence
-                            if confidence >= 90.0: max_burst = 3
-                            elif confidence >= 80.0: max_burst = 2
-                            else: max_burst = 1
+                            if confidence >= 90.0: max_burst = 5 # Aggressive
+                            elif confidence >= 80.0: max_burst = 3 # Increased from 2
+                            else: max_burst = 2 # Min 2 heads
                         elif self.config['mode'] == "AGI_MAPPER":
                             # AGI Full Control - GrandMaster Decision
                             # Ensure we have a valid timestamp to avoid runtime errors
@@ -672,7 +663,7 @@ class OmegaSystem:
                             mode=self.config['mode']
                         )
                         
-                        # logger.info(f"AGI SLOTS: {max_slots} (Vol: {volatility_idx:.1f}, Conf: {confidence:.1f})")
+                        logger.info(f"AGI SLOTS: {max_slots} (Vol: {volatility_idx:.1f}, Conf: {confidence:.1f})")
 
                         tracker = self.burst_tracker.get(self.symbol, {'timestamp': 0, 'count': 0})
                         

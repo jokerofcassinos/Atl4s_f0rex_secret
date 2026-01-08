@@ -57,6 +57,21 @@ class GameSwarm(SubconsciousUnit):
         # Which player has the highest "Force" (Incentive * Volume)?
         # For this prototype, we treat Incentives as Force.
         
+        # --- FIX: TREND FILTER FOR REVERSION ---
+        # If Trend is Strong, Reversion is dangerous (catching a falling knife).
+        # We penalize Reversion Score by the Trend Score.
+        
+        # Determine Trend Direction vs Reversion Direction
+        trend_dir = "BUY" if slope > 0 else "SELL"
+        revert_dir = "SELL" if rsi > 50 else "BUY"
+        
+        if trend_dir != revert_dir:
+             # Conflict!
+             # If Trend Incentive is high (> 0.5), dampen Reversion
+             if tf_incentive > 0.5:
+                  mr_incentive *= (1.0 - tf_incentive) # Dampener
+                  # Example: TF=0.8, MR=1.0 -> MR becomes 0.2. Trend wins.
+        
         scores = {
             'TREND': tf_incentive,
             'REVERT': mr_incentive,

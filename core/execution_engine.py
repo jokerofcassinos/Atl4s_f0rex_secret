@@ -1,6 +1,7 @@
 
 import logging
 import asyncio
+import time
 from typing import Dict, Any, Optional
 
 from risk.dynamic_leverage import DynamicLeverage
@@ -23,11 +24,17 @@ class ExecutionEngine:
         self.event_horizon = EventHorizonRisk()  # Phase 116
         self.config = {"spread_limit": 0.0005}
         self.last_stop_update = {}  # {ticket: timestamp}
-        self.closed_tickets = set()  # Track already-closed tickets to prevent duplicate close commands
+        self.close_attempts = {}    # {ticket: timestamp_msc} - Retry mechanism
+        self.trade_start_times = {} # {ticket: local_timestamp_sec} - For accurate age tracking
+        self.closed_tickets_cache = set() # Phase 98: Anti-Ghosting Cache
 
 
     def set_config(self, config: Dict):
         self.config = config
+
+    def _get_current_time_msc(self):
+        return int(time.time_ns() / 1_000_000)
+        
         
     async def monitor_positions(self, tick: Dict):
         """
@@ -182,11 +189,15 @@ class ExecutionEngine:
         # Create params for bridge command
         # Format: symbol, cmd_type, volume, sl, tp, confidence
         # EA expects: parts[1]=symbol, parts[2]=cmd, parts[3]=vol, parts[4]=sl, parts[5]=tp, parts[6]=conf
-        params = [symbol, cmd_type, lots, f"{vsl:.5f}", f"{vtp:.5f}", confidence]
+        
+        # FIXED: Disable MQL5/Broker SL (Send 0.0) to prevent premature Price Closures.
+        # We rely 100% on Python's Dollar Guard (check_individual_guards) which is now Volume-Scaled.
+        # We KEEP VTP to allow Predictive Exits (The Magnet) to function.
+        params = [symbol, cmd_type, lots, "0.00000", f"{vtp:.5f}", confidence]
 
         if self.bridge:
             logger.info(f"TRANSMITTING ORDER: {command} {symbol} @ {price:.5f} | Lots: {lots} | Conf: {confidence:.1f}%")
-            logger.info(f"DYNAMIC GEOMETRY: VSL={vsl:.5f}, VTP={vtp:.5f}")
+            logger.info(f"DYNAMIC GEOMETRY (INTERNAL): VSL={vsl:.5f} (DISABLED in MQL5), VTP={vtp:.5f}")
             self.bridge.send_command("OPEN_TRADE", params)
             logger.info(f"ORDER SENT TO MT5: {params}")
         else:
@@ -406,7 +417,21 @@ class ExecutionEngine:
         # User Feedback: "Impossible to reach". So we make it easier.
         
         if progress > 0.80:
-             logger.info(f"VIRTUAL TP: {symbol} at 80% progress. Securing ${profit:.2f}.")
+             # FIX: Ensure we are actually in profit!
+             # The distance logic 'abs(current - open)' triggers on LOSSES too if price moves away.
+             if profit <= 0:
+                 return False
+            
+             # Mode-based Threshold
+             # SNIPER: 95% (Secure it)
+             # HYDRA/WOLF: 98% (Let it run)
+             mode = self.config.get('mode', 'SNIPER')
+             threshold = 0.98 if mode in ["HYDRA", "WOLF_PACK"] else 0.95
+             
+             if progress < threshold:
+                 return False
+                 
+             logger.info(f"VIRTUAL TP: {symbol} at {progress:.1%} progress (>{threshold:.1%}). Securing ${profit:.2f}.")
              self.close_trade(ticket, symbol)
              return True
              
@@ -420,6 +445,8 @@ class ExecutionEngine:
         if self.bridge:
             # FIX: Must include symbol for ZmqBridge routing
             self.bridge.send_command("CLOSE_TRADE", [str(ticket), symbol])
+            self.closed_tickets_cache.add(ticket) # Mark as dead to ExecutionEngine
+
     def close_all(self, symbol: str):
         """Emergency Exit / Strategic Close"""
         logger.warning(f"EXECUTION: CLOSE ALL POSITIONS for {symbol}")
@@ -443,7 +470,7 @@ class ExecutionEngine:
         if self.bridge:
             self.bridge.send_command("HARVEST_WINNERS", [symbol])
 
-    def check_individual_guards(self, trades: list, v_tp: float, v_sl: float):
+    def check_individual_guards(self, trades: list, v_tp: float, v_sl: float, market_bias: str = "NEUTRAL"):
         """
         Phase 122: Granular Guard.
         Checks each trade individually against Virtual TP and Virtual SL.
@@ -454,10 +481,24 @@ class ExecutionEngine:
             if not isinstance(trade, dict): continue
             
             ticket = trade.get('ticket')
+            trade_type = trade.get('type') # 0=Buy, 1=Sell
             
-            # Skip already-closed tickets to prevent duplicate close commands
-            if ticket in self.closed_tickets:
+            # Retry Mechanism (Phase 135 Fix):
+            # Instead of ignoring forever, we respect a 5-second cooldown.
+            current_time = self._get_current_time_msc()
+            # Anti-Ghosting Check
+            if ticket in self.closed_tickets_cache:
                 continue
+
+            # Instead of ignoring forever, we respect a 5-second cooldown via self.close_attempts
+            # But the detailed logs usually come from close_trade() which we now gate.
+            
+            if ticket in self.close_attempts:
+                last_attempt = self.close_attempts[ticket]
+                if (current_time - last_attempt) < 5000: # 5 seconds
+                    continue
+
+
                 
             try:
                 profit = float(trade.get('profit', 0.0))
@@ -466,25 +507,88 @@ class ExecutionEngine:
                 
             symbol = trade.get('symbol')
             
-            limit = -abs(v_sl)
+            # SCALING FIX: Adjust Dollar Limits by Volume
+            # Standard Config ($10) is based on 0.01 lots.
+            # If we trade 1.0 lots, $10 is 1 pip (Instant Death).
+            # We must scale limit by (volume / 0.01).
+            min_scaling = 1.0
+            try:
+                # DEBUG: Check if volume exists
+                vol_raw = trade.get('volume')
+                if vol_raw is None:
+                     # logger.warning(f"VSL WARNING: Ticket {ticket} has NO VOLUME key. Trade keys: {list(trade.keys())}")
+                     vol = 1.0 # Default to 1.0 (Safe Mode - $1000 limit)
+                else:
+                     vol = float(vol_raw)
+                
+                if vol <= 0: vol = 0.01
+                scaling_factor = vol / 0.01
+            except Exception as e:
+                logger.error(f"VSL SCALING ERROR: {e}")
+                scaling_factor = 100.0 # Default to 1.0 lot equivalent
+                
+            # Logarithmic Damping? No, linear is fair for Pips.
+            # limit = -abs(v_sl) * scaling_factor
             
-            # Debug: Show profit vs thresholds (only for positive profits)
+            real_v_tp = v_tp * scaling_factor
+            real_v_sl = -abs(v_sl) * scaling_factor
+            
+            # Debug: Show profit vs thresholds (only for positive logic or close calls)
+            if profit < -5.0:
+                 pass
+                 # logger.debug(f"VSL MONITOR: Ticket {ticket} | Vol {vol:.2f} | Scale {scaling_factor:.1f}x | Profit ${profit:.2f} vs Limit ${real_v_sl:.2f}")
+
             if profit > 0:
-                logger.info(f"VTP CHECK: Ticket {ticket} | Profit ${profit:.2f} | VTP ${v_tp:.2f} | Trigger: {profit >= v_tp}")
+                logger.debug(f"VTP CHECK: Ticket {ticket} | Profit ${profit:.2f} | VTP ${real_v_tp:.2f} | Trigger: {profit >= real_v_tp}")
             
-            if profit >= v_tp:
-                logger.info(f"INDIVIDUAL GUARD: Harvesting Ticket {ticket} ({symbol}) | Profit ${profit:.2f} >= ${v_tp:.2f}")
+            if profit >= real_v_tp:
+                logger.info(f"INDIVIDUAL GUARD: Harvesting Ticket {ticket} ({symbol}) | Profit ${profit:.2f} >= ${real_v_tp:.2f}")
                 self.close_trade(ticket, symbol)
-                self.closed_tickets.add(ticket)  # Mark as closed
+                self.close_attempts[ticket] = current_time # Mark attempt
+                self.closed_tickets_cache.add(ticket)
                 continue # One action per trade
 
             # 2. Individual Stop Loss (The Shield)
             # v_sl is usually positive in config (e.g. $40), so we check against -40
-            limit = -abs(v_sl) 
+            limit = real_v_sl 
+            # 2. Individual Stop Loss (The Shield) - with BREATHING ROOM
+            # Tracker Cleanup & Init
+            # We track local start time to avoid Timezone issues with Broker Server Time
+            if ticket not in self.trade_start_times:
+                 self.trade_start_times[ticket] = current_time / 1000.0
+            
+            local_start_time = self.trade_start_times[ticket]
+            age_seconds = (current_time / 1000.0) - local_start_time
+            
+            # BREATHING ROOM: First 5 Minutes (300s)
+            # We relax the VSL to allow trade to develop (survive spread/initial drawdown)
+            if age_seconds < 300: 
+                limit = limit * 3.0 # e.g. -$10 becomes -$30
+
+            # 3. PREDICTIVE HOLD (The Oracle)
             if profit <= limit:
-                logger.info(f"INDIVIDUAL GUARD: Pruning Ticket {ticket} ({symbol}) | Profit ${profit:.2f} <= ${limit:.2f}")
+                # Calculate Panic Limit (Hard Floor)
+                panic_limit = limit * 1.5 # e.g. -10 -> -15 (or -30 -> -45 if breathing)
+                
+                prediction_saved_us = False
+                
+                if profit > panic_limit:
+                    # We are in the "Grey Zone" (Between Stop and Panic)
+                    # Use Forecast to decide.
+                    if trade_type == 0: # BUY
+                        if market_bias in ["BUY", "BULLISH", "STRONG"]:
+                            prediction_saved_us = True
+                    elif trade_type == 1: # SELL
+                        if market_bias in ["SELL", "BEARISH", "STRONG"]:
+                            prediction_saved_us = True
+
+                if prediction_saved_us:
+                     # logger.info(f"PREDICTIVE HOLD: Ticket {ticket} survived VSL check via Forecast ({market_bias})")
+                     continue # HOLD THE LINE
+
+                logger.info(f"INDIVIDUAL GUARD: Pruning Ticket {ticket} ({symbol}) | Profit ${profit:.2f} <= ${limit:.2f} (Age: {age_seconds:.0f}s)")
                 self.close_trade(ticket, symbol)
-                self.closed_tickets.add(ticket)  # Mark as closed
+                self.close_attempts[ticket] = current_time  # Mark attempt
                 continue
 
     def close_longs(self, symbol: str):

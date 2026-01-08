@@ -25,6 +25,19 @@ class HybridScalperSwarm(SubconsciousUnit):
         df_m1 = context.get('df_m1')
         df_m5 = context.get('df_m5')
         tick_data = context.get('tick')
+        
+        # H1 Trend Context
+        data_map = context.get('data_map', {})
+        df_h1 = data_map.get('H1')
+        trend_bias = 0.0
+        
+        if df_h1 is not None and len(df_h1) > 20:
+             closes = df_h1['close']
+             ema_20 = closes.ewm(span=20, adjust=False).mean().iloc[-1]
+             if closes.iloc[-1] > ema_20:
+                 trend_bias = 0.25 # Bias towards BUY
+             else:
+                 trend_bias = -0.25 # Bias towards SELL
 
         if df_m1 is None or len(df_m1) < 20: return None
 
@@ -76,13 +89,13 @@ class HybridScalperSwarm(SubconsciousUnit):
 
         # --- UNIFIED VECTOR S ---
         # Weights: v (Momentum) 40%, P (Pressure) 30%, A (Reversion) 30%
-        # If market is trending (v matches P), we ignore A.
-        # If market is extended (A is huge), we ignore v.
+        # PLUS Trend Bias
         
         w_v, w_p, w_a = 0.4, 0.3, 0.3
         
-        # Unified Vector
-        S = (w_v * v) + (w_p * P) + (w_a * A)
+        # Unified Vector + Trend Bias
+        # If trend is Up, it adds 0.25 to the score, making BUYs easier and SELLs harder.
+        S = (w_v * v) + (w_p * P) + (w_a * A) + trend_bias
         
         # Signal Generation
         signal = "WAIT"
@@ -91,14 +104,13 @@ class HybridScalperSwarm(SubconsciousUnit):
         if S > self.threshold: signal = "BUY"
         elif S < -self.threshold: signal = "SELL"
         
-        reason = f"Hybrid Field: v={v:.2f} P={P:.2f} A={A:.2f} | S={S:.2f}"
+        reason = f"Hybrid Field: v={v:.2f} P={P:.2f} A={A:.2f} Trend={trend_bias:.2f} | S={S:.2f}"
         
         if signal != "WAIT":
-            # logger.info(f"Hybrid Signal: {signal} | {reason}") # Too noisy?
-            pass
+             pass
 
         return SwarmSignal(
-            source="HybridScalper",
+            source=self.name,
             signal_type=signal,
             confidence=confidence,
             timestamp=0,

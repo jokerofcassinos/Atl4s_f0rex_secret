@@ -20,8 +20,8 @@ class EventHorizonRisk:
     def __init__(self, base_risk_pips: float = 20.0):
         self.base_risk_pips = base_risk_pips
         # k factor: Sensitivity to acceleration. 
-        # Higher = tighter stops on pumps.
-        self.k_factor = 5.0 
+        # Reduced from 5.0 to 2.0 to give more breathing room (User Feedback)
+        self.k_factor = 2.0 
         
         # State tracking per symbol
         # {symbol: {'last_price': float, 'velocity': float, 'acceleration': float}}
@@ -62,16 +62,15 @@ class EventHorizonRisk:
         
         # 1. Spread Check (User Feedback Fix)
         # We need to cover the spread before trailing.
-        # But we shouldn't wait for "Triple".
-        # Let's say we start trailing at 1.5x Spread.
+        # Increased to 5.0x Spread to prevent "choking" the trade early.
         profit = 0.0
         if side == "BUY":
             profit = current_price - entry_price
         else:
             profit = entry_price - current_price
             
-        if profit <= (spread * 1.5):
-            return None # Not profitable enough to trail yet
+        if profit <= (spread * 5.0):
+            return None # Not profitable enough to trail yet correctly.
             
         # 2. Event Horizon Equation
         # We normalize accel to some meaningful scale (e.g. pips^2)
@@ -83,15 +82,15 @@ class EventHorizonRisk:
         # Base Distance (e.g. 500 points / $5)
         # We need a dynamic base based on volatility, but for now fixed.
         # Let's use the spread as a unit!
-        base_dist = spread * 10.0 # Start loose (10x spread)
+        base_dist = spread * 20.0 # Start loose (20x spread, up from 15x)
         if base_dist < self.base_risk_pips: 
-             base_dist = self.base_risk_pips * 0.01 # Pips to Points? No, raw price.
+             base_dist = self.base_risk_pips * 0.01 
         
         # Formula
-        dynamic_dist = base_dist / (1.0 + (self.k_factor * accel))
+        dynamic_dist = base_dist / (1.0 + (self.k_factor * 0.5 * accel))
         
-        # Minimum breathing room (Spread * 1.5)
-        min_dist = spread * 1.5
+        # Minimum breathing room (Spread * 2.0)
+        min_dist = spread * 2.0
         if dynamic_dist < min_dist:
             dynamic_dist = min_dist
             

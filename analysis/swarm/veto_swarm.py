@@ -132,9 +132,9 @@ class VetoSwarm(SubconsciousUnit):
             # Ask the Meta-Critic: "Am I being paranoid?"
             reflection = self.meta_critic.reflect(
                 decision="VETO",
-                confidence=100.0,
-                meta_data={'reason': reason},
-                context=context
+                context=100.0,
+                metadata={'reason': reason},
+                extra_context=context
             )
             
             # If Meta-Critic significantly drops valid confidence, we suppress the veto

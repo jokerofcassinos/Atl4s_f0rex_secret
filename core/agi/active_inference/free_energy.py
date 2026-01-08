@@ -43,18 +43,46 @@ class FreeEnergyMinimizer:
         """
         Evaluates policies and returns the one with Min Expected Free Energy (G).
         """
+        # Real Active Inference Calculation
+        # G = Risk (Divergence from Goal) + Ambiguity (Uncertainty)
+        
+        target_decision = context.get('consensus_decision', 'WAIT')
+        confidence = context.get('consensus_confidence', 0.0) / 100.0
+        entropy = context.get('entropy', 0.5)
+        
         scores = {}
         for p in policies:
-            # G = Risk + Ambiguity
-            # Placeholder: assign random "Energy" based on policy type
-            # In real Active Inference, this uses the Generative Model to predict future states
+            g_value = 1.0 # Base Energy
             
-            # Bias: 'HOLD' is usually lower energy (safer) unless signal is strong
-            base_energy = 0.5
-            if p == "HOLD": base_energy = 0.2
+            # Map Policy to Decision
+            p_action = "WAIT" if p == "HOLD" else p
             
-            # Simulated calculation
-            g_value = base_energy + np.random.uniform(0, 0.5)
+            # 1. Risk (Alignment with Swarm Intelligence)
+            # If we act against the Collective Wisdom, Risk is High.
+            if p_action == target_decision:
+                # Aligned: Energy reduces as Confidence increases
+                # If Conf=0.9, Cost=0.1
+                g_value -= confidence 
+            else:
+                # Opposed: Energy increases with Confidence
+                # If Conf=0.9, Cost=1.9
+                g_value += confidence
+                
+            # 2. Ambiguity (Entropy Context)
+            # In High Entropy (Chaos), Action is expensive. Holding is cheap.
+            if p == "HOLD":
+                # High Entropy favors HOLD -> Reduces G
+                g_value -= (entropy * 0.8)
+            else:
+                # High Entropy penalizes Action -> Increases G
+                g_value += (entropy * 0.5)
+                
+            # 3. Volatility Cost (Spread/Slippage Risk)
+            # Volatility makes Action costlier
+            vol = context.get('volatility', 0.0)
+            if p != "HOLD":
+                g_value += (vol * 100.0) # Penalize action in high vol
+                
             scores[p] = g_value
             
         best_policy = min(scores, key=scores.get)

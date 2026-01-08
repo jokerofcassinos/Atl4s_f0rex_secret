@@ -28,10 +28,17 @@ class DynamicGeometryEngine:
         if atr <= 0: atr = 0.0005
         
         # 1. Structural Stop (VSL)
-        # Place SL behind noise (2.0 * ATR is standard "Safe Zone")
+        # Place SL behind noise (3.0 * ATR is standard "Safe Zone")
         # In a real fractal system, we would look for the last low/high. 
         # Here we simulate finding the 'Liquidity Void' via ATR extension.
-        stop_distance = atr * 2.0
+        stop_distance = atr * 3.0
+        
+        # SAFETY: Minimum Distance Enforcement
+        # Prevent tight stops (< 5 pips) that get killed by spread.
+        # 0.0015 = 0.15% (Approx 15 pips on major pairs)
+        min_dist = current_price * 0.0015
+        if stop_distance < min_dist:
+             stop_distance = min_dist
         
         # 2. Dynamic Target (VTP)
         # Adapt reward based on session volatility.
