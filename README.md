@@ -46,10 +46,10 @@ Static Stop Losses are dead.
 -   **Elastic Targets (VTP)**: Take Profit levels expand and contract based on the session's estimated "Energy" (Volatility).
 
 ### 5. 🌍 Global Market Scanner (Eye of Sauron)
-The bot is not tethered to one symbol.
--   **On Startup**: It scans the entire accessible multiverse (Forex Majors + Crypto).
--   **Opportunity Score**: It calculates a composite score of *Trend Clarity + Volatility + Liquidity*.
--   **Target Lock**: It autonomously selects the best hunting ground for the session.
+The bot is not tethered to one symbol. It now features **Interactive Operational Profiles**:
+-   **AUTO Mode**: Scans the entire multiverse (Forex + Crypto) for the mathematically highest expected value.
+-   **FOREX/GOLD Mode**: Focuses on deep liquidity pools (EUR, GBP, JPY, XAU) during London/NY sessions.
+-   **CRYPTO Mode**: Activates high-volatility parameters for weekend warfare (BTC, ETH).
 
 ---
 
