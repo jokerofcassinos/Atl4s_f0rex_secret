@@ -595,8 +595,8 @@ class OmegaSystem:
                         now = datetime.datetime.now()
                         seconds_into_block = (now.minute % 5) * 60 + now.second
                         
-                        if seconds_into_block > 90 and self.config['mode'] != "SCALPER": 
-                            # Scalpers might ignore this, but Hybrid/Sniper should respect it.
+                        if seconds_into_block > 90 and self.config['mode'] not in ["SCALPER", "HYDRA"]: 
+                            # Scalpers and Hydra might ignore this, but Hybrid/Sniper should respect it.
                             logger.info(f"CANDLE SYNC: Waiting for M5 Open ({seconds_into_block}s > 90s). Trigger blocked.")
                             continue
                             
@@ -626,6 +626,12 @@ class OmegaSystem:
                             # Balanced approach: 2-3 orders based on confidence
                             if confidence >= 90.0: max_burst = 5 # Aggressive
                             elif confidence >= 80.0: max_burst = 3 # Increased from 2
+                            else: max_burst = 2 # Min 2 heads
+                        elif self.config['mode'] == "HYDRA":
+                            # HYDRA Mode: Aggressive burst based on Metacognition Score
+                            if confidence >= 54.0: max_burst = 10 # God Mode
+                            elif confidence >= 50.0: max_burst = 6
+                            elif confidence >= 47.0: max_burst = 3
                             else: max_burst = 2 # Min 2 heads
                         elif self.config['mode'] == "AGI_MAPPER":
                             # AGI Full Control - GrandMaster Decision

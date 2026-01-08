@@ -491,7 +491,7 @@ class SwarmOrchestrator:
         # 2. Holographic Recall
         if current_state_vector:
              intuition = self.holographic_memory.retrieve_intuition(current_state_vector)
-             if intuition < -0.3:
+             if intuition < -30.0:  # Relaxed from -0.3 (was too sensitive)
                   logger.warning(f"DEJA VU: Holographic Danger (Score: {intuition:.2f}). Aborting.")
                   return ("WAIT", 0.0, {})
         

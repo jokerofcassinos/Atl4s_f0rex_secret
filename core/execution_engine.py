@@ -468,7 +468,7 @@ class ExecutionEngine:
         # Min Profit: $5.00 (Just cover spread/commissions)
         
         if progress > 0.85:
-             if profit <= 5.0: # Min profit just to be safe
+             if profit <= 2.0: # Min profit reduced from $5 to $2
                  return False
             
              logger.info(f"VTP: {symbol} at {progress:.1%} progress. Bagging ${profit:.2f}.")
