@@ -13,28 +13,35 @@ class GlobalMarketScanner:
     def __init__(self, bridge):
         self.bridge = bridge
         self.universe = [
-            "EURUSD", "GBPUSD", "XAUUSD", "BTCUSD", "ETHUSD", "USDJPY", "AUDUSD"
+            "EURUSD", "GBPUSD", "USDJPY", "USDCAD", "USDCHF", "BTCUSD", "ETHUSD"
         ]
         
-    def scan_universe(self) -> str:
+    def scan_universe(self, mode="AUTO") -> str:
         """
         Iterates through the universe and calculates Opportunity Score.
+        Mode: 'AUTO' (All), 'FOREX' (Fiat+Gold), 'CRYPTO' (BTC/ETH).
         Returns the best symbol.
         """
-        if not self.bridge: return "XAUUSD" # Fallback
+        if not self.bridge: return "EURUSD" # Fallback
         
         scores = {}
-        logger.info("INITIATING GLOBAL SCAN SEQUENCE...")
+        logger.info(f"INITIATING GLOBAL SCAN SEQUENCE (MODE: {mode})...")
         
-        # MOCK SCAN (Since we can't synchronously request 7 ticks in one loop easily without async complexity in this snippet)
-        # In production this would be an async gathering loop.
-        # For prototype, we 'probe' randomly or assume last knowns.
+        # Filter Universe
+        target_universe = []
+        for sym in self.universe:
+            is_crypto = sym in ["BTCUSD", "ETHUSD"]
+            if mode == "FOREX" and is_crypto: continue
+            if mode == "CRYPTO" and not is_crypto: continue
+            target_universe.append(sym)
+            
+        if not target_universe:
+            logger.warning("Universe empty after filtering! Reverting to EURUSD.")
+            return "EURUSD"
         
         # Simulating AGI Perception
-        for symbol in self.universe:
+        for symbol in target_universe:
             # Score = Volatility (0-10) + Trend Clarity (0-10)
-            # We mock this for now to demonstrate the ARCHITECTURE.
-            # Real impl would call self.bridge.get_tick(symbol) and run BigBeluga light.
             
             volatility = random.uniform(2, 9)
             clarity = random.uniform(1, 10)

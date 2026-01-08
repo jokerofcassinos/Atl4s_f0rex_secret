@@ -113,7 +113,12 @@ class HolographicMemory:
         price_norm = np.log(market_state.get('bid', 1.0) + 1)
         vol_norm = np.log(market_state.get('volume', 1.0) + 1)
         rsi = market_state.get('rsi', 50) / 100.0
-        entropy = market_state.get('metrics', {}).get('entropy', 0.5)
+        metrics = market_state.get('metrics', {})
+        if isinstance(metrics, dict):
+            entropy = metrics.get('entropy', 0.5)
+        else:
+            # Assume it's a PerformanceMetrics object or similar
+            entropy = getattr(metrics, 'entropy', 0.5)
         
         # Base Vector (Deterministic)
         vec = np.array([price_norm, vol_norm, rsi, entropy])

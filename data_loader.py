@@ -55,6 +55,9 @@ class DataLoader:
             "EURUSD": "EURUSD=X"
         }
         
+        if "-" in s:
+            return s
+            
         if s in mapping:
             return mapping[s]
             
@@ -69,6 +72,10 @@ class DataLoader:
         if len(s) == 6 and s.endswith("USD"):
              # Could be "ADAUSD" -> "ADA-USD"
              # But checks against known forex?
+             # If not in mapping (which has major forex), assume crypto?
+             # Forex map is extensive but not exhaustive.
+             # Safe fallback: if not in forex map, try adding -?
+             # For now, rely on mapping.
              pass 
              
         return s 

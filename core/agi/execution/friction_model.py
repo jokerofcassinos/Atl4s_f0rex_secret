@@ -27,7 +27,11 @@ class FrictionEstimator:
         
         # 2. Slippage Model
         # High volatility = High slippage risk
-        volatility = market_state.get('metrics', {}).get('volatility', 0.0)
+        metrics = market_state.get('metrics')
+        if hasattr(metrics, 'get'):
+             volatility = metrics.get('volatility', 0.0)
+        else:
+             volatility = getattr(metrics, 'volatility', 0.0)
         est_slippage = current_spread * 0.5 if volatility > 0.002 else 0.0
         
         total_friction = current_spread + est_slippage

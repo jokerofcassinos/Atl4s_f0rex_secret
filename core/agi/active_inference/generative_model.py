@@ -49,7 +49,11 @@ class GenerativeModel:
         mu_new = mu_old + k * (Surprise)
         """
         # Extract observed states (simplified)
-        obs_vol = observation.get('metrics', {}).get('volatility', 0.001)
+        metrics = observation.get('metrics')
+        if hasattr(metrics, 'get'):
+             obs_vol = metrics.get('volatility', 0.001)
+        else:
+             obs_vol = getattr(metrics, 'volatility', 0.001)
         
         # Bayesian Update (Kalman-like heuristic)
         learning_rate = 0.1 * surprise # Learn faster when surprised

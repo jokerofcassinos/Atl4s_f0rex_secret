@@ -39,10 +39,34 @@ class FreeEnergyMinimizer:
         self.surprise_history.append(surprise)
         return float(surprise)
         
+    def select_best_policy(self, policies: list, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Evaluates policies and returns the one with Min Expected Free Energy (G).
+        """
+        scores = {}
+        for p in policies:
+            # G = Risk + Ambiguity
+            # Placeholder: assign random "Energy" based on policy type
+            # In real Active Inference, this uses the Generative Model to predict future states
+            
+            # Bias: 'HOLD' is usually lower energy (safer) unless signal is strong
+            base_energy = 0.5
+            if p == "HOLD": base_energy = 0.2
+            
+            # Simulated calculation
+            g_value = base_energy + np.random.uniform(0, 0.5)
+            scores[p] = g_value
+            
+        best_policy = min(scores, key=scores.get)
+        return {
+            "selected_policy": best_policy,
+            "best_G": scores[best_policy],
+            "all_scores": scores
+        }
+
     def minimize(self, action_space: list) -> str:
         """
-        Selects the action that minimizes EXPECTED Free Energy (G).
-        For now, this is a placeholder for 'Active Inference' planning.
-        In full implementation, this would simulate future paths for each action.
+        Legacy wrapper.
         """
-        return "OBSERVE" # Default to observation to reduce uncertainty
+        res = self.select_best_policy(action_space, {})
+        return res['selected_policy']

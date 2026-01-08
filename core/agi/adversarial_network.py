@@ -66,6 +66,8 @@ class AdversarialCritic:
         
         # Example: Low volume breakout?
         metrics = context.get('metrics', {})
+        # Safety for Object
+        get_metric = lambda key, default: metrics.get(key, default) if hasattr(metrics, 'get') else getattr(metrics, key, default)
         volume = metrics.get('volume_score', 1.0) # 1.0 is normal
         
         if volume < 0.8: # Low volume

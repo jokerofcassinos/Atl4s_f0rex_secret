@@ -96,7 +96,14 @@ class FluxHeatmap:
     def _calculate_velocity(self, tick: Dict[str, Any]) -> float:
         # v = dP / dt
         price = tick['bid']
-        time_now = tick['time_msc']
+        # Handle 'time_msc' missing in some tick updates (ZMQ vs MQL format diff)
+        if 'time_msc' in tick:
+            time_now = tick['time_msc']
+        elif 'time' in tick:
+            time_now = tick['time'] * 1000 # Convert epoch seconds to ms
+        else:
+            import time
+            time_now = time.time() * 1000
         
         # Store basic history for velocity if needed, but for now just use simple diff
         # assuming update is called sequentially on ticks

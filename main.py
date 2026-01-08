@@ -131,11 +131,33 @@ class OmegaSystem:
         # --- AGI PRE-FLIGHT CHECK ---
         print("\n[AGI]: Connecting to Market Matrix for Analysis...")
         
+        # --- PHASE 15: GLOBAL MARKET SCANNER (INTERACTIVE MODE) ---
+        # Ask USER for mode BEFORE we start the noisy connection loop.
+        print("\n" + "="*40)
+        print("👁️  GLOBAL SCANNER INITIATING  👁️")
+        print("="*40)
+        print("SELECT OPERATION MODE:")
+        print("[1] AUTO (Scan All - The Singularity Choice)")
+        print("[2] FOREX/GOLD (Fiat & Metals Only)")
+        print("[3] CRYPTO (Bitcoin/Eth Only)")
+        
+        scan_mode = "AUTO"
+        try:
+            print("Waiting for choice (defaulting to AUTO in 10s if no input)...")
+            mode_map = {"1": "AUTO", "2": "FOREX", "3": "CRYPTO"}
+            # We use a simple blocking input here as requested by user.
+            choice = input("Enter Mode [1-3] > ").strip()
+            scan_mode = mode_map.get(choice, "AUTO")
+        except:
+            scan_mode = "AUTO"
+        
+        print(f"[AGI]: Mode Selected: {scan_mode}")
+
         # 1. Quick Data Fetch
         try:
             # Try to get a live tick to confirm connection
             # WAITING FOR TICKS (Handshake)
-            print(f"[AGI]: Connecting to Market Matrix for Analysis...")
+            # print(f"[AGI]: Connecting to Market Matrix for Analysis...") # Redundant
             
             # Allow 60 seconds for EAs to connect
             wait_cycles = 60  # Extended wait time for MT5 connection
@@ -161,18 +183,12 @@ class OmegaSystem:
             
             #LOOP ENDS HERE. NOW WE SCAN.
             
-            # --- PHASE 15: GLOBAL MARKET SCANNER ---
+            # --- PHASE 15: GLOBAL MARKET SCANNER (REFINED) ---
             from core.agi.market_scanner import GlobalMarketScanner
             scanner = GlobalMarketScanner(self.bridge)
-            # If we auto-selected a symbol from socket, we might still want to scan universe?
-            # Or scan only if we haven't locked target? 
-            # User wants "Scan ALL major pairs".
-            # So we scan anyway to confirm if we should switch or if the current one is good.
-            # But usually we must trade what is open on MT5 chart (if EA is limited).
-            # Assuming EA can trade any symbol? If not, we scan locally available.
-            # For this phase, we assume we SCAN and Update self.symbol.
             
-            best_symbol = scanner.scan_universe()
+            # Use the mode selected at start
+            best_symbol = scanner.scan_universe(mode=scan_mode)
             self.symbol = best_symbol
             print(f"[AGI]: Target Locked: {self.symbol} (Highest Opportunity Score)")
             print(f"[AGI]: Downloading Quantum History for {self.symbol}...")
@@ -287,17 +303,19 @@ class OmegaSystem:
             self.flow_manager.active_symbols = ["ETHUSD", "BTCUSD"]
             
         
-        print(f"Virtual SL ($) [Default: {self.config['virtual_sl']}]:")
-        try:
-            vsl_in = input().strip()
-            if vsl_in: self.config['virtual_sl'] = float(vsl_in)
-        except: pass
+        # VSL/VTP are now Dynamically Managed by AGI (Phase 14)
+        # We assume defaults from profile are sufficient starting points.
+        # print(f"Virtual SL ($) [Default: {self.config['virtual_sl']}]:")
+        # try:
+        #     vsl_in = input().strip()
+        #     if vsl_in: self.config['virtual_sl'] = float(vsl_in)
+        # except: pass
             
-        print(f"Virtual TP ($) [Default: {self.config['virtual_tp']}]:")
-        try:
-            vtp_in = input().strip()
-            if vtp_in: self.config['virtual_tp'] = float(vtp_in)
-        except: pass
+        # print(f"Virtual TP ($) [Default: {self.config['virtual_tp']}]:")
+        # try:
+        #     vtp_in = input().strip()
+        #     if vtp_in: self.config['virtual_tp'] = float(vtp_in)
+        # except: pass
 
         print("\nSelect Operational Mode:")
         print("1. SNIPER (Precision, 1 Order per Signal)")

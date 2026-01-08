@@ -18,7 +18,12 @@ class DynamicGeometryEngine:
         Calculates distinct VSL (Stop Loss) and VTP (Take Profit) levels.
         Returns: (vsl_price, vtp_price)
         """
-        atr = market_state.get('metrics', {}).get('atr_value', 0.0005)
+        if isinstance(market_state, dict) and 'metrics' in market_state and hasattr(market_state['metrics'], 'get'):
+             atr = market_state.get('metrics', {}).get('atr_value', 0.0005)
+        else:
+             # Handle Object
+             metrics_obj = market_state.get('metrics') if isinstance(market_state, dict) else getattr(market_state, 'metrics', None)
+             atr = getattr(metrics_obj, 'atr_value', 0.0005) if metrics_obj else 0.0005
         # Fallback if ATR is 0
         if atr <= 0: atr = 0.0005
         
@@ -31,7 +36,13 @@ class DynamicGeometryEngine:
         # 2. Dynamic Target (VTP)
         # Adapt reward based on session volatility.
         # If volatile, expand target. If quiet, contract.
-        vol_score = market_state.get('metrics', {}).get('volatility', 0.001) / 0.001
+        if isinstance(market_state, dict) and 'metrics' in market_state and hasattr(market_state['metrics'], 'get'):
+             vol_val = market_state['metrics'].get('volatility', 0.001)
+        else:
+             metrics_obj = market_state.get('metrics') if isinstance(market_state, dict) else getattr(market_state, 'metrics', None)
+             vol_val = getattr(metrics_obj, 'volatility', 0.001) if metrics_obj else 0.001
+             
+        vol_score = vol_val / 0.001
         reward_ratio = max(1.5, min(4.0, vol_score * 0.5 + 1.5))
         
         target_distance = stop_distance * reward_ratio
