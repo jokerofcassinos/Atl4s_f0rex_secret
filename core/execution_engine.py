@@ -159,7 +159,9 @@ class ExecutionEngine:
         account_info: Optional[Dict] = None,
         spread_tolerance: Optional[float] = None,
         multiplier: float = 1.0,
-        atr_value: Optional[float] = None # Phase 3: AGI ATR Override
+        atr_value: Optional[float] = None, # Phase 3: AGI ATR Override
+        hydra_multiplier: float = 1.0, # Phase 11: Hydra Burst Scaling
+        volatility: float = 50.0 # Phase 11: Swarm Volatility
     ):
         """
         Converts a Cortex Command into a Physical Order.
@@ -184,8 +186,8 @@ class ExecutionEngine:
 
         # 2. Dynamic Lots Calculation
         equity = account_info.get('equity', 1000.0) if account_info else 1000.0
-        # Placeholder volatility (should come from market_state)
-        volatility = 50.0 
+        # Volatility passed from Swarm/Hydra (or default 50.0)
+        # volatility = 50.0 (Removed hardcoding) 
         
         lots = self.leverage_manager.calculate_lots(
             equity=equity,
@@ -194,7 +196,7 @@ class ExecutionEngine:
         )
         
         # Apply Logic Multiplier (Sovereign/Singularity)
-        lots = round(lots * multiplier, 2)
+        lots = round(lots * multiplier * hydra_multiplier, 2)
         
         # 3. Dynamic Geometry (Phase 14)
         # Replacing 0.0/0.0 with intelligent stops
@@ -256,29 +258,27 @@ class ExecutionEngine:
         # 1. Determine Hydra Heads (Number of Orders)
         # Base: 1 order.
         # Conviction Bonus: +1 per 10% above 70% confidence.
-        # Adjusted for Metacognition Scores (Deflated Scale)
-        # Score 47 is "Moderate/Good". Score 80 is "Perfect".
+        # User Specific Mapping (Aggressive Mode)
         heads = 1
-        if confidence > 45: heads += 1 # Total 2 (User's case: 47)
-        if confidence > 55: heads += 1 # Total 3
-        if confidence > 75: heads += 1 # Total 4
+        if confidence >= 54:
+            heads = 10
+        elif confidence >= 50:
+            heads = 6
+        elif confidence >= 47:
+            heads = 3
         
         # AGI Depth Bonus (The "Ontological Nuance" Factor)
-        if infinite_depth >= 50: heads += 1 # Total 5 (God Mode)
+        # Add bonus ONLY if we aren't already maxed out
+        if infinite_depth >= 50 and heads < 10: 
+             heads += 1 
         
-        # Entropy Damper (If chaos is too high, reduce heads)
-        if entropy > 0.8:
+        # Entropy Damper (If chaos is too high, reduce slightly)
+        if entropy > 0.8 and heads > 1:
             heads = max(1, heads - 1)
             # logger.info(f"HYDRA: High Entropy ({entropy:.2f}) pruned heads to {heads}")
             
-        # Hard Cap (User Feedback: "5 is exaggeration", mostly 3)
-        # Standard Limit: 3 Heads.
-        # GOD MODE Limit: 5 Heads (Only if >75% Conf OR Deep Thought)
-        limit = 3
-        if confidence > 75 or infinite_depth >= 50:
-            limit = 5
-            
-        heads = min(heads, limit)
+        # Hard Cap (Safety)
+        heads = min(heads, 10)
         
         logger.info(f"HYDRA: Spawning {heads} Heads (Conf={confidence}%, Depth={infinite_depth})")
         
@@ -297,14 +297,27 @@ class ExecutionEngine:
             # User said "mutiplica o numero de ordens". Implies scaling UP total volume.
             # We use standard sizing per order. Aggressive!
             
+            # Determine Scaling Factor to prevent Margin Blowout
+            # 10 Heads * 1.0 Lots = 10x Risk (Too much).
+            # We want "Aggressive" but "Possible".
+            # 10 Heads -> 0.3x each (Total 3.0x Risk)
+            # 6 Heads -> 0.4x each (Total 2.4x Risk)
+            # 3 Heads -> 0.6x each (Total 1.8x Risk)
+            
+            scaling_factor = 1.0
+            if heads >= 8: scaling_factor = 0.3
+            elif heads >= 5: scaling_factor = 0.4
+            elif heads >= 2: scaling_factor = 0.6
+            
             await self.execute_signal(
                 command=command,
                 symbol=symbol,
                 bid=bid,
                 ask=ask,
-                confidence=confidence, # Pass original confidence
+                confidence=confidence,
                 account_info=account_info,
-                multiplier=1.0 # Each head strikes with full force
+                volatility=volatility,
+                hydra_multiplier=scaling_factor # Pass scaling
             )
             
             # Micro-sleep to prevent sequence errors in MT5

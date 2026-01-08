@@ -131,15 +131,15 @@ class MetaExecutionLoop:
         recent = list(self.history)[-100:]
         
         # Filter for actual Trade Attempts (ignore idle ticks)
-        # Assuming 'outcome' or 'profit' or explicit 'success' key is meaningful only for trades
-        active_attempts = [h for h in recent if 'success' in h['result']]
+        # Key: We look for 'trade_action' in the result dict
+        active_attempts = [h for h in recent if h['result'].get('trade_action', False)]
         
         if not active_attempts:
              return
              
         success_rate = sum(1 for h in active_attempts if h['result'].get('success', False)) / len(active_attempts)
         
-        if len(active_attempts) >= 3: # Only judge if we have a sample
+        if len(active_attempts) >= 5: # Only judge if we have a sample
             if success_rate < 0.3:
                 logger.warning(f"MetaLoop: Low active success rate ({success_rate:.0%}), need optimization")
             elif success_rate > 0.7:

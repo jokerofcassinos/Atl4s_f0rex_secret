@@ -457,9 +457,12 @@ class OmegaSystem:
                         # 4. Predictive Exits
                         await self.executor.monitor_positions(tick)
                         
-                        # 5. Global Catastrophe Guard
+                        # 5. Global Catastrophe Guard (Equity-Based)
+                        # FIX: Previous limit was too tight for Hydra Mode (10 heads = ~$100 spread).
+                        # New Logic: Limit is -50% of current equity. This is a real catastrophe.
                         total_profit = tick.get('profit', 0.0)
-                        catastrophe_limit = -abs(self.config['virtual_sl']) * 5 
+                        current_equity = tick.get('equity', 1000.0)
+                        catastrophe_limit = -abs(current_equity) * 0.50  # 50% Drawdown = Real Problem
                         
                         if total_profit < catastrophe_limit:
                             logger.critical(f"CATASTROPHE GUARD: Global Equity Dropped to ${total_profit:.2f}. EMERGENCY EJECT.")
