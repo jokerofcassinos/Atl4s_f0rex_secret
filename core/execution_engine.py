@@ -95,18 +95,48 @@ class ExecutionEngine:
             )
             
             if new_stop_level:
+                # SAFETY: Enforce 5 Minute Breathing Room for Physical SL too
+                # Unless we are protecting significant profit (> $20)
+                if ticket not in self.trade_start_times:
+                    self.trade_start_times[ticket] = self._get_current_time_msc() / 1000.0
+                
+                age_seconds = (self._get_current_time_msc() / 1000.0) - self.trade_start_times[ticket]
+                
+                current_profit = trade.get('profit', 0.0)
+                
+                if age_seconds < 300 and current_profit < 20.0:
+                     # logger.debug(f"EVENT HORIZON: Holding Fire on Ticket {ticket} (Age {age_seconds:.0f}s < 300s)")
+                     new_stop_level = 0.0 # Cancel update
+                
                 # Ratchet Logic: Only move closer to price
                 update_needed = False
                 
-                if side == "BUY":
-                    # For BUY, SL must move UP (Higher than current SL)
-                    if new_stop_level > current_sl and new_stop_level < trade_price:
-                        update_needed = True
-                else:
-                    # For SELL, SL must move DOWN (Lower than current SL)
-                    # (Remember SL is above price for Sell)
-                    if (current_sl == 0 or new_stop_level < current_sl) and new_stop_level > trade_price:
-                        update_needed = True
+            if new_stop_level:
+                # SAFETY: Enforce 5 Minute Breathing Room for Physical SL too
+                # Unless we are protecting significant profit (> $20)
+                if ticket not in self.trade_start_times:
+                    self.trade_start_times[ticket] = self._get_current_time_msc() / 1000.0
+                
+                age_seconds = (self._get_current_time_msc() / 1000.0) - self.trade_start_times[ticket]
+                
+                current_profit = trade.get('profit', 0.0)
+                
+                if age_seconds < 300 and current_profit < 20.0:
+                     new_stop_level = 0.0 # Cancel update
+                
+                # Ratchet Logic: Only move closer to price
+                update_needed = False
+                
+                if new_stop_level > 0:
+                    if side == "BUY":
+                        # For BUY, SL must move UP (Higher than current SL)
+                        if new_stop_level > current_sl and new_stop_level < trade_price:
+                            update_needed = True
+                    else:
+                        # For SELL, SL must move DOWN (Lower than current SL)
+                        # (Remember SL is above price for Sell)
+                        if (current_sl == 0 or new_stop_level < current_sl) and new_stop_level > trade_price:
+                            update_needed = True
                 
                 # Check for Min Distance (Don't spam updates for 0.01 change)
                 if update_needed:
@@ -226,25 +256,29 @@ class ExecutionEngine:
         # 1. Determine Hydra Heads (Number of Orders)
         # Base: 1 order.
         # Conviction Bonus: +1 per 10% above 70% confidence.
-        # Depth Bonus: +1 per 1000 InfiniteWhy branches (simulated via depth arg).
-        
+        # Adjusted for Metacognition Scores (Deflated Scale)
+        # Score 47 is "Moderate/Good". Score 80 is "Perfect".
         heads = 1
-        if confidence > 70: heads += 1
-        if confidence > 80: heads += 1
-        if confidence > 90: heads += 1
-        if confidence > 95: heads += 1 # Max 5 from confidence
+        if confidence > 45: heads += 1 # Total 2 (User's case: 47)
+        if confidence > 55: heads += 1 # Total 3
+        if confidence > 75: heads += 1 # Total 4
         
         # AGI Depth Bonus (The "Ontological Nuance" Factor)
-        if infinite_depth >= 10: heads += 1
-        if infinite_depth >= 50: heads += 1 # Rare deep thought
+        if infinite_depth >= 50: heads += 1 # Total 5 (God Mode)
         
         # Entropy Damper (If chaos is too high, reduce heads)
         if entropy > 0.8:
-            heads = max(1, heads - 2)
-            logger.info(f"HYDRA: High Entropy ({entropy:.2f}) pruned heads to {heads}")
+            heads = max(1, heads - 1)
+            # logger.info(f"HYDRA: High Entropy ({entropy:.2f}) pruned heads to {heads}")
             
-        # Hard Cap
-        heads = min(heads, 8)
+        # Hard Cap (User Feedback: "5 is exaggeration", mostly 3)
+        # Standard Limit: 3 Heads.
+        # GOD MODE Limit: 5 Heads (Only if >75% Conf OR Deep Thought)
+        limit = 3
+        if confidence > 75 or infinite_depth >= 50:
+            limit = 5
+            
+        heads = min(heads, limit)
         
         logger.info(f"HYDRA: Spawning {heads} Heads (Conf={confidence}%, Depth={infinite_depth})")
         
@@ -410,28 +444,21 @@ class ExecutionEngine:
         
         if total_dist == 0: return
 
+        # Anti-Ghosting
+        if ticket in self.closed_tickets_cache: return
+
         progress = current_dist / total_dist
         
         # 2. Virtual Hit Logic
-        # If we are 80% of the way there, and profit is decent, CLOSE.
-        # User Feedback: "Impossible to reach". So we make it easier.
+        # User Feedback: "Leave it as it was" -> Relaxed.
+        # Threshold: 85% (SNIPER) / 90% (HYDRA)
+        # Min Profit: $5.00 (Just cover spread/commissions)
         
-        if progress > 0.80:
-             # FIX: Ensure we are actually in profit!
-             # The distance logic 'abs(current - open)' triggers on LOSSES too if price moves away.
-             if profit <= 0:
+        if progress > 0.85:
+             if profit <= 5.0: # Min profit just to be safe
                  return False
             
-             # Mode-based Threshold
-             # SNIPER: 95% (Secure it)
-             # HYDRA/WOLF: 98% (Let it run)
-             mode = self.config.get('mode', 'SNIPER')
-             threshold = 0.98 if mode in ["HYDRA", "WOLF_PACK"] else 0.95
-             
-             if progress < threshold:
-                 return False
-                 
-             logger.info(f"VIRTUAL TP: {symbol} at {progress:.1%} progress (>{threshold:.1%}). Securing ${profit:.2f}.")
+             logger.info(f"VTP: {symbol} at {progress:.1%} progress. Bagging ${profit:.2f}.")
              self.close_trade(ticket, symbol)
              return True
              
@@ -532,6 +559,15 @@ class ExecutionEngine:
             
             real_v_tp = v_tp * scaling_factor
             real_v_sl = -abs(v_sl) * scaling_factor
+            
+            # CRITICAL FIX: Enforce Minimum Drawdown Space per Lot
+            # User reported closing at -$10 on 1.3 lots (< 1 pip).
+            # We strictly enforce that VSL cannot be tighter than -$100 per 1.0 lot.
+            # 1.3 lots -> -$130 minimum space.
+            min_drawdown = -100.0 * vol
+            if real_v_sl > min_drawdown:
+                 real_v_sl = min_drawdown
+                 # logger.debug(f"VSL ADJUST: Enforcing Min Drawdown ${min_drawdown:.2f} (Was ${real_v_sl:.2f})")
             
             # Debug: Show profit vs thresholds (only for positive logic or close calls)
             if profit < -5.0:

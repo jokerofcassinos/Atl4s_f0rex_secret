@@ -131,7 +131,8 @@ class ApexSwarm(SubconsciousUnit):
         current_is_trash = (current_score < 1.0)
         
         if significant_gap:
-             logger.debug(f"APEX SCORES: {scores} | Current: {current_symbol} ({current_score:.2f}) | King: {king_symbol} ({king_score:.2f})")
+             # logger.debug(f"APEX SCORES: {scores} | Current: {current_symbol} ({current_score:.2f}) | King: {king_symbol} ({king_score:.2f})")
+             pass
         
         if (significant_gap or current_is_trash) and king_symbol != current_symbol:
             reason = f"Routing to {king_symbol} (Score {king_score:.2f} vs {current_score:.2f})"

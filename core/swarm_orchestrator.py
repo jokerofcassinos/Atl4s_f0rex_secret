@@ -507,7 +507,7 @@ class SwarmOrchestrator:
              if t.source == "Sovereign_Swarm" and t.signal_type == "META_INFO":
                  sov_weights = t.meta_data.get('weight_vector', {})
                  regime = t.meta_data.get('regime', 'UNKNOWN')
-                 logger.info(f"SOVEREIGN ACT: Regime={regime} | Weights Applied.")
+                 # logger.debug(f"SOVEREIGN ACT: Regime={regime} | Weights Applied.")
         
         # C. Merge (Sovereign * Learned)
         # Allows Sovereign to Temporarily Override long-term learning if Regime changes drastically
@@ -621,12 +621,12 @@ class SwarmOrchestrator:
         if reflection['notes']:
             meta_data['reflection_notes'] = reflection['notes']
             # If validation failed (score -> 0), switch to WAIT
-            # Relaxed Threshold: 35.0 (was 50.0) to allow "Moderate" reasoning (0.7 quality * 0.6 conf = 42)
-            if final_score < 35.0 and final_decision != "EXIT_ALL":
+            # Relaxed Threshold: 47.0 (was 35.0) per User Request (Raising the Bar)
+            if final_score < 47.0 and final_decision != "EXIT_ALL":
                 final_decision = "WAIT"
-                logger.info(f"METACOGNITION: Vetoed Decision. Score {final_score:.1f} < 35.0. Reason: {reflection['notes']}")
+                logger.info(f"METACOGNITION: Vetoed Decision. Score {final_score:.1f} < 47.0. Reason: {reflection['notes']}")
             else:
-                logger.info(f"METACOGNITION: Passed. Score {final_score:.1f} (Threshold 35.0)")
+                logger.info(f"METACOGNITION: Passed. Score {final_score:.1f} (Threshold 47.0)")
         
         # 6. Neural Resonance Sync (Phase 150+)
         # Synchronize decision with user intent model (Symbiosis)
@@ -985,7 +985,7 @@ class SwarmOrchestrator:
         elif decision_score < -0.02: 
             final_decision = "SELL"
         
-        logger.info(f"AGI ATTENTION: Decision={final_decision} (Score={decision_score:.3f}) | Memory Bias={rag_vec[0]:.3f}")
+        # logger.debug(f"AGI ATTENTION: Decision={final_decision} (Score={decision_score:.3f}) | Memory Bias={rag_vec[0]:.3f}")
         
         # --- DIALECTIC SYNTHESIS (Hegelian Logic) ---
         # Instead of averaging +1 and -1 to 0, we check the DOMINANT CLUSTER.
@@ -1000,12 +1000,12 @@ class SwarmOrchestrator:
                       elif t.signal_type == "SELL": trend_vote -= t.confidence
              
              if trend_vote > 200: # Strong Trend Vote masked by Oscillators
-                 logger.info("DIALECTIC SYNTHESIS: Regime is TRENDING. Ignoring Counter-Trend Dissenters.")
+                 # logger.debug("DIALECTIC SYNTHESIS: Regime is TRENDING. Ignoring Counter-Trend Dissenters.")
                  final_decision = "BUY"
                  final_conf = 85.0 # High Confidence Override
                  
              elif trend_vote < -200:
-                 logger.info("DIALECTIC SYNTHESIS: Regime is TRENDING. Ignoring Counter-Trend Dissenters.")
+                 # logger.debug("DIALECTIC SYNTHESIS: Regime is TRENDING. Ignoring Counter-Trend Dissenters.")
                  final_decision = "SELL"
                  final_conf = 85.0
 

@@ -190,6 +190,10 @@ class ZmqBridge:
         Sends command to MQL5.
         Tries to route to the correct symbol if 'symbol' is in params.
         """
+        # USER REQUEST: REMOVE VISUALS
+        if "DRAW" in action:
+            return
+
         msg = f"{action}"
         if params:
             msg += "|" + "|".join(map(str, params))

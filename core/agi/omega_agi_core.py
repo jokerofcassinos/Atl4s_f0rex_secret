@@ -82,9 +82,9 @@ class MetaExecutionLoop:
                 'description': 'High latency detected, reducing analysis depth'
             },
             {
-                'condition': lambda ctx: ctx.metrics.win_rate < 0.4 and ctx.metrics.trades_executed > 10,
+                'condition': lambda ctx: ctx.metrics.win_rate < 0.25 and ctx.metrics.trades_executed > 20,
                 'action': 'switch_to_conservative',
-                'description': 'Low win rate, switching to conservative mode'
+                'description': 'Critical Low win rate, switching to conservative mode'
             },
             {
                 'condition': lambda ctx: ctx.metrics.errors > 5,
@@ -107,7 +107,7 @@ class MetaExecutionLoop:
         for rule in self.optimization_rules:
             if rule['condition'](context):
                 adjustments[rule['action']] = True
-                logger.info(f"MetaLoop Adjustment: {rule['description']}")
+                # logger.debug(f"MetaLoop Adjustment: {rule['description']}")
         
         return adjustments
     
@@ -130,12 +130,20 @@ class MetaExecutionLoop:
         
         recent = list(self.history)[-100:]
         
-        success_rate = sum(1 for h in recent if h['result'].get('success', False)) / len(recent)
+        # Filter for actual Trade Attempts (ignore idle ticks)
+        # Assuming 'outcome' or 'profit' or explicit 'success' key is meaningful only for trades
+        active_attempts = [h for h in recent if 'success' in h['result']]
         
-        if success_rate < 0.3:
-            logger.warning(f"MetaLoop: Low success rate ({success_rate:.0%}), need optimization")
-        elif success_rate > 0.7:
-            logger.info(f"MetaLoop: High success rate ({success_rate:.0%}), current strategy working")
+        if not active_attempts:
+             return
+             
+        success_rate = sum(1 for h in active_attempts if h['result'].get('success', False)) / len(active_attempts)
+        
+        if len(active_attempts) >= 3: # Only judge if we have a sample
+            if success_rate < 0.3:
+                logger.warning(f"MetaLoop: Low active success rate ({success_rate:.0%}), need optimization")
+            elif success_rate > 0.7:
+                logger.info(f"MetaLoop: High active success rate ({success_rate:.0%}), current strategy working")
     
     def get_uptime(self) -> float:
         """Get uptime in seconds."""
@@ -711,9 +719,9 @@ class OmegaAGICore:
         # --- PHASE 6: EMPIRICAL HISTORY CHECK ---
         if self.learning:
             stats = self.learning.analyze_patterns()
-            if stats['win_rate'] < 0.4 and stats['total_trades'] > 5:
+            if stats['win_rate'] < 0.25 and stats['total_trades'] > 20:
                  adjustments['risk_mode'] = 'CONSERVATIVE'
-                 logger.warning(f"AGI HISTORY WARNING: Low Win Rate ({stats['win_rate']:.2f}). Enforcing CONSERVATIVE mode.")
+                 logger.warning(f"AGI HISTORY WARNING: Critical Low Win Rate ({stats['win_rate']:.2f}). Enforcing CONSERVATIVE mode.")
 
         # --- AGI DREAMER: MENTAL SIMULATION ---
         # "Imagine the next 10 minutes..."
@@ -767,7 +775,7 @@ class OmegaAGICore:
             nuance = self.ontology_nuance.process_nuance(tick, adjustments)
             adjustments['ontological_nuance'] = nuance
             
-            logger.info(f"OmegaAGICore: Hyper-Complex Analysis Complete. Context Keys: {list(adjustments.keys())}")
+            # logger.info(f"OmegaAGICore: Hyper-Complex Analysis Complete. Context Keys: {list(adjustments.keys())}")
 
             if self.meta_loop.iteration % 100 == 0:
                 raw_data = np.array(tick.get('delta_stream', [0.0] * 10))

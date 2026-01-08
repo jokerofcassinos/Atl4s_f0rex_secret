@@ -520,7 +520,7 @@ class OmegaSystem:
                          if 'switch_mode' in agi_adjustments:
                              # self.config['mode'] = agi_adjustments['switch_mode'] # Optional auto-switch
                              pass 
-                         logger.info(f"AGI CORE: Adjustments Generated: {agi_adjustments}")
+                         # logger.info(f"AGI CORE: Adjustments Generated: {agi_adjustments}")
                     
                     if 'last' not in tick:
                         tick['last'] = (tick['bid'] + tick['ask']) / 2
@@ -584,6 +584,17 @@ class OmegaSystem:
                         elapsed = warm_time.time() - self._start_trade_time
                         if elapsed < warm_up_secs:
                             logger.info(f"WARM-UP: Skipping trade ({elapsed:.0f}s/{warm_up_secs}s)")
+                            continue
+                            
+                        # --- CANDLE START SYNCHRONIZATION (User Request) ---
+                        # Prevent entering trades mid-candle (e.g. Minute 3 or 4 of 5m block)
+                        # Only allow entry in the first 90 seconds of the 5-minute candle.
+                        now = datetime.datetime.now()
+                        seconds_into_block = (now.minute % 5) * 60 + now.second
+                        
+                        if seconds_into_block > 90 and self.config['mode'] != "SCALPER": 
+                            # Scalpers might ignore this, but Hybrid/Sniper should respect it.
+                            logger.info(f"CANDLE SYNC: Waiting for M5 Open ({seconds_into_block}s > 90s). Trigger blocked.")
                             continue
                             
                         cmd = 0 if decision == "BUY" else 1
@@ -689,7 +700,7 @@ class OmegaSystem:
                              else:
                                  spread_tol = None  # Default (SNIPER)
                              
-                             if self.config['mode'] == "HYDRA":
+                             if self.config['mode'] in ["HYDRA", "HYBRID"]:
                                  # Invoke Hydra Protocol
                                  await self.executor.execute_hydra_burst(
                                      command=decision,

@@ -1,0 +1,136 @@
+# Tasks
+
+- [ ] Fix 'list' object has no attribute 'get' error in OmegaProtocol <!-- id: 0 -->
+    - [x] Create Session Intelligence layer (Modules 1-5)
+- [x] Create Liquidity Cognition layer (Modules 6-10)
+- [x] Create AGI Metacognition layer (Modules 11-15)
+- [x] Create Symbiotic Fusion layer (Modules 16-20)
+- [x] Create Execution Intelligence layer (Modules 21-25)
+- [x] Create Hyper-Complex Session/Liquidity Fusion (25 Sub-systems)
+- [x] Implement Self-Supervised- [x] **Final Integration Check**: Run `main.py` and ensure the bot initializes without legacy errors.
+    - [x] Verify "OmegaAGI Core v5.0 (Symbiotic) Initialized" log.
+    - [x] Verify `SwarmOrchestrator` is passing rich metadata to `RecursiveReflection`. (Logic verified & Missing Method Implemented)
+    - [x] Ensure `ZmqBridge` is non-blocking and mock ticks trigger AGI analysis.
+    - [x] **Tune Metacognition Sensitivity** (Raised Threshold to 47.0, Tuned Hydra Burst to boost Heads on Quality)
+# Phase 7: Deepening AGI & Math Logic
+- [/] **Phase 5: Final Polish & Stability**
+    - [x] **Fix Premature Trade Closure** (Fixed Event Horizon & Predictive Exit logic)
+    - [x] Investigate VTP Delays
+    - [x] Analyze `main.py` loop latency (Found blocking data load)
+    - [x] Move Execution Logic to Critical Path (Top of Loop)
+    - [x] Throttle `data_loader` to 60s intervals
+    - [x] Monitor VTP performance after optimization (Bot running at full speed, logs confirm latency removed) and Crash Loop**
+        - [x] Resolve `TypeError` in `veto_swarm.py` (caused bot restart)
+        - [x] Implement VTP Retry Mechanism (replaced permanent suppression with 5s cooldown)
+    - [ ] **Fix Counter-Trend Logic** (Investigate why GameSwarm/ActiveInference bought against trend)
+    - [ ] **Verify "More Breathing Room"** (Ensure trades have space to develop)
+    - [x] **Final Code Cleanup** (Remove debug logs, legacy comments)
+    - [x] Disable MT5 Visuals ("DRAW_" commands)
+    - [x] Silence Terminal Spam (Apex, Swarm, MetaLoop)
+    - [x] Relax Conservative Mode Logic
+    - [x] Fix VTP (Reverted strictness, relaxed to $5/85%)
+    - [x] Hardening VSL (Enforced Min Drawdown $100 per lot)
+    - [x] **AGI Log Silence & Hybrid Burst Fix**
+    - [x] **Candle Sync (5m Start Lock)**
+    - [x] **AGI Stoppage Fix (MetaLoop Low Success Bug)**
+- [x] **Advanced Math Kernels**
+    - [x] Implement `KalmanFilter` & `HurstExponent` in `math_kernels.py`
+    - [x] Realize `ActionWave` logic (remove placeholders)
+- [x] **Microstructure Deepening**
+    - [x] Implement `DensityMatrix` (numpy histogram) in `FluxHeatmap`
+    - [x] Implement Shannon Entropy in `FluxHeatmap`
+    - [x] Implement `SweepDetection` logic in `LiquidityBlackHole`
+- [x] **Deep AGI Core**
+    - [x] Create `neuro_plasticity_v2.py` (Heuristic Rewriter)
+    - [x] Integrate Neuroplasticity into `OmegaAGICore`
+# Phase 8: Pan-Cognitive Awakening
+- [x] **Sensory Integration**
+    - [x] Bind `FluxHeatmap` & `LiquidityBlackHole` to `OmegaAGICore.pre_tick`
+    - [x] Bind BigBeluga signals to `OmegaAGICore` decision matrix
+- [x] **Deep Logic Awakening**
+    - [x] Upgrade `InfiniteRecursiveReflection` with multi-path recursion
+    - [x] Upgrade `HighFidelityResonance` with intent persistence
+    - [x] Real-time verification of "Singularity" logic in logs
+# Phase 9: Hyper-Complex AGI Synthesis
+- [x] **Multidimensional Causal Inference**
+    - [x] Implement `CausalGraph` (Directed Acyclic Graph)
+    - [x] Implement `GrangerCausality` logic
+- [x] **Self-Supervised Learning (SSL)**
+    - [x] Create/Update `SelfSupervisedLearningEngine`
+    - [x] Implement `ContrastiveLoss` for pattern distinction
+- [x] **Ontological & Abstract Nuance**
+    - [x] Implement `SemanticGraph` with concept nodes (Fear, Greed, etc.)
+    - [x] Implement `NuanceTraversal` logic
+# Phase 10: Symbiotic Evolution & Autonomy
+- [x] **Symbiotic Resonance Loop**
+    - [x] Create/Update `HighFidelityResonance` to negotiate with Market State
+    - [x] Implement `UserGene` injection (embedding user style into GA)
+- [x] **Autonomous Evolutionary Heuristics**
+    - [x] Create `EvolutionaryHeuristics` engine
+    - [x] Implement `GenomeSpawn` and `Hotswap` logic
+# Phase 11: Holographic Quantum Synthesis
+- [x] **Holographic Memory Engine**
+    - [x] Create/Update `core/holographic_memory.py` with vector encoding
+    - [x] Implement `PatternRecall` (Associative Memory)
+- [x] **Quantum Probability Collapser**
+    - [x] Update `core/agi/quantum.py` with superposition/collapse logic
+    - [x] Bind Quantum Collapse to Swarm Conflict Resolution
+# Phase 12: Predictive Profitability Modeling
+- [x] **Friction Estimator**
+    - [x] Create `core/agi/execution/friction_model.py`
+    - [x] Implement `is_profitable_in_session`
+- [x] **Profitability Gate**
+    - [x] Upgrade `GreatFilter` with `Expectancy` calculation
+    - [x] Enforce `Expectancy > 0` block
+# Phase 13: Active Inference & Generative Dreaming
+- [x] **Generative World Model**
+    - [x] Create `core/agi/active_inference/generative_model.py`
+    - [x] Implement `dream_next_tick`
+- [x] **Free Energy Principle**
+    - [x] Create `core/agi/active_inference/free_energy.py`
+    - [x] Implement `minimize_surprise`
+# Phase 14: Dynamic Risk Geometry
+- [x] **Dynamic Geometry Engine**
+    - [x] Create `core/agi/risk/dynamic_geometry.py`
+    - [x] Implement `calculate_vsl` and `calculate_vtp`
+- [x] **Integration**
+    - [x] Update `ExecutionEngine` to use dynamic geometry
+# Phase 15: Global Market Scanner
+- [x] **Global Scanner**
+    - [x] Create `core/agi/market_scanner.py`
+    - [x] Implement `scan_universe`
+- [x] **Startup Integration**
+    - [x] Wire `smart_startup` to use `GlobalScanner` results
+# Phase 16: Documentation & Deployment
+- [x] **README 5.0 (Singularity Edition)**
+    - [x] Rewrite `README.md` with full AGI documentation
+    - [x] Document new systems (Holographic, Active Inference, etc.)
+- [x] **GitHub Deployment**
+    - [x] Create `github_upload.ps1`
+    - [x] Execute upload to branch `agi-beta-v1.0`
+- [/] **Architectural Design**
+    - [x] Define structure for 50+ Heatmap/Liquidity/Spread/Session systems
+    - [ ] Map 25 BigBeluga concepts to Python class structures
+- [/] **Architectural Design**
+    - [x] Define structure for 50+ Heatmap/Liquidity/Spread/Session systems
+    - [x] Map 25 BigBeluga concepts to Python class structures
+- [x] **System Group A: Heatmap & Liquidity (30 Systems)**
+    - [x] Implement `FluxHeatmap` (10 sub-systems: Density, Velocity, Correlation...)
+    - [x] Implement `LiquidityBlackHole` (10 sub-systems: Vacuum, Sweep, Depth...)
+    - [x] Implement `VolumeResonance` (10 sub-systems: Harmonic, Decay, Amplification...)
+- [x] **System Group B: Spread & Session (20 Systems)**
+    - [x] Implement `ElasticSpreadDynamics` (10 sub-systems)
+    - [x] Implement `ChronoSessionOverlap` (10 sub-systems)
+- [x] **System Group C: BigBeluga Integration (25 Concepts)**
+    - [x] Implement specialized math kernels (ActionWave, Lorentzian, Gaussian)
+    - [x] Implement `MarketEchoScreener` & `RegimeFilter` components
+    - [x] Implement `FractalTrend` & `SwingTraces` components
+    - [x] Implement `VolumeDelta` & `LiquiditySpectrum` components
+- [x] **System Group D: Deep AGI Core**
+    - [x] Upgrade `RecursiveReflection` to Level 10 (Infinite Depth)
+    - [x] Implement `HighFidelityResonance` (Empathic Bridge)
+    - [x] Add `CausalInferenceEngine` (Multidimensional logic)
+    - [x] Activate `RealTimeNeuroPlasticity` (Self-rewriting heuristics)
+- [x] Resolve legacy file collisions
+- [x] Verify stable bot initialization
+    - [x] Verify fix <!-- id: 4 -->

@@ -257,7 +257,7 @@ class RecursiveReflection:
         if avg_quality > 0.6:  # Relaxed from 0.7
             observation = "Reasoning appears sound based on multiple factors"
             quality = avg_quality
-        elif avg_quality > 0.3:  # Relaxed from 0.4
+        elif avg_quality > 0.47:  # Raised to 0.47 per User Request (Standard: 47%)
             observation = "Moderate reasoning quality - acceptable for active modes"
             quality = max(0.75, avg_quality) # Boost to 0.75 (Passing Grade)
         else:
