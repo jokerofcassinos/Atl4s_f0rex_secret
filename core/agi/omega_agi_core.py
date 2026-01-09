@@ -546,60 +546,7 @@ class OmegaAGICore:
         self.quantum = QuantumProbabilityCollapser()
         self.fuzzy = FuzzyLogicEngine()
 
-    def pre_tick(self, tick: Dict, config: Dict, market_data_map: Dict = None) -> Dict[str, Any]:
-        """
-        Phase 7: AGI Pre-Analysis (The Deep Thought).
-        Generates context for the Swarm.
-        """
-        context = {
-            'tick': tick,
-            'config': config,
-            'market_data': market_data_map
-        }
-        
-        adjustments = self.meta_loop.pre_iteration(context)
 
-        # --- PHASE 8: SENSORY INTEGRATION ---
-        
-        # 0. CHRONOS TIME FRACTAL (NY Session + Quarterly IPDA)
-        chronos_context = {}
-        if market_data_map:
-             sym = config.get('symbol', 'XAUUSD')
-             # Session
-             chronos_data = self.chronos.analyze_session_fractal(tick, market_data_map, symbol=sym)
-             # Quarterly (IPDA)
-             quarterly_data = self.quarterly.analyze_cycle(tick)
-             
-             # Merge
-             chronos_context = {**chronos_data, **quarterly_data}
-             adjustments['chronos_narrative'] = chronos_context
-             
-        # 0.1 GLOBAL CORRELATION & RISK SENTIMENT
-        if market_data_map and 'global_basket' in market_data_map:
-             sym = config.get('symbol', 'XAUUSD')
-             corr_data = self.correlation.analyze_correlations(sym, market_data_map['global_basket'])
-             adjustments['global_risk'] = corr_data
-             
-        # 1. Microstructure Analysis (Tape Reading)
-        current_tick_vol = tick.get('volume', 0)
-        
-        # 2. Causal Inference (Multidimensional)
-        # We need event data (stubbed for now, or from news scraper)
-        sentiment_score = 0.5 # Default
-        high_impact_prob = 0.0
-        
-        causal_events = {'sentiment_score': sentiment_score, 'impact': high_impact_prob}
-        # Pass Chronos Context to Causal Engine
-        if hasattr(self, 'causal_inference'):
-             causa = self.causal_inference.infer_cause(tick, causal_events, chronos_context=chronos_context)
-             
-             ontological_narrative = causa.get('ontological_layer', 'STANDARD')
-             if ontological_narrative != "STANDARD_MECHANICS":
-                  logger.info(f"AGI DEEP THOUGHT: [{ontological_narrative}] -> {causa['confidence']:.2f}")
-
-             adjustments['causal_root'] = causa['root_cause']
-             adjustments['causal_chain'] = causa['causal_chain']
-             adjustments['ontological_nuance'] = ontological_narrative
         # ... (rest of method)
         
         # Core Memory & Vector Engines (Required for Generative Model)
@@ -670,6 +617,51 @@ class OmegaAGICore:
         adjustments = self.meta_loop.pre_iteration(context)
 
         # --- PHASE 8: SENSORY INTEGRATION (The Optic Nerve) ---
+        
+        # 0. CHRONOS TIME FRACTAL (NY Session + Quarterly IPDA)
+        chronos_context = {}
+        if market_data_map:
+             sym = config.get('symbol', 'XAUUSD')
+             # Session
+             chronos_data = self.chronos.analyze_session_fractal(tick, market_data_map, symbol=sym)
+             # Quarterly (IPDA)
+             quarterly_data = self.quarterly.analyze_cycle(tick)
+             
+             # Merge
+             chronos_context = {**chronos_data, **quarterly_data}
+             adjustments['chronos_narrative'] = chronos_context
+             
+        # 0.1 GLOBAL CORRELATION & RISK SENTIMENT
+        if market_data_map and 'global_basket' in market_data_map:
+             sym = config.get('symbol', 'XAUUSD')
+             adjustments['symbol'] = sym # Save for later
+             corr_data = self.correlation.analyze_correlations(sym, market_data_map['global_basket'])
+             adjustments['global_risk'] = corr_data
+
+        # 0.2 CAUSAL INFERENCE (Why?)
+        sentiment_score = 0.5; high_impact_prob = 0.0
+        causal_events = {'sentiment_score': sentiment_score, 'impact': high_impact_prob}
+        if hasattr(self, 'causal_inference'):
+             causa = self.causal_inference.infer_cause(tick, causal_events, chronos_context=chronos_context)
+             ontological_narrative = causa.get('ontological_layer', 'STANDARD')
+             if ontological_narrative != "STANDARD_MECHANICS":
+                  logger.info(f"AGI DEEP THOUGHT: [{ontological_narrative}] -> {causa['confidence']:.2f}")
+
+             adjustments['causal_root'] = causa['root_cause']
+             adjustments['causal_chain'] = causa['causal_chain']
+             adjustments['ontological_nuance'] = ontological_narrative
+        sentiment_score = 0.5; high_impact_prob = 0.0
+        causal_events = {'sentiment_score': sentiment_score, 'impact': high_impact_prob}
+        if hasattr(self, 'causal_inference'):
+             causa = self.causal_inference.infer_cause(tick, causal_events, chronos_context=chronos_context)
+             ontological_narrative = causa.get('ontological_layer', 'STANDARD')
+             if ontological_narrative != "STANDARD_MECHANICS":
+                  logger.info(f"AGI DEEP THOUGHT: [{ontological_narrative}] -> {causa['confidence']:.2f}")
+
+             adjustments['causal_root'] = causa['root_cause']
+             adjustments['causal_chain'] = causa['causal_chain']
+             adjustments['ontological_nuance'] = ontological_narrative
+
         # 1. Microstructure Analysis
         heatmap_metrics = self.flux_heatmap.update(tick)
         liquidity_metrics = self.liquidity_blackhole.analyze(tick, heatmap_metrics)
@@ -908,32 +900,22 @@ class OmegaAGICore:
         
         # 1. Counter-Trend Check (Ontological Paradox)
         trend_score = trend_info.get('composite_score', 0.0)
-        trend_bias = trend_info.get('fractal_bias', 'NEUTRAL')
         
         # Determine if we have a strong macro trend conflict
         macro_conflict = False
         signal_val = 1 if internal_signal.signal_type == "BUY" else -1 if internal_signal.signal_type == "SELL" else 0
         
-        # If Trend is Strong (e.g. > 0.4 meaning multiple TFs align) AND Signal opposes it
-        if abs(trend_score) > 0.4:
+        # Stricter Threshold: 0.3 (was 0.4)
+        if abs(trend_score) > 0.3:
             if (trend_score > 0 and signal_val < 0) or (trend_score < 0 and signal_val > 0):
                 macro_conflict = True
 
         if "Counter-Trend Violation" in str(reflection_result.blind_spots_detected) or macro_conflict:
-             original_dir = internal_signal.signal_type
-             
-             # Case A: Weak/Medium Signal -> INVERT (Smart Correction)
-             # We are now more aggressive: If Macro prohibits it, we flip it unless it's a God-Mode Reversal
-             if internal_signal.confidence < 0.85:
-                 new_dir = "SELL" if original_dir == "BUY" else "BUY"
-                 logger.warning(f"NEOGENESIS: AUTO-CORRECTED {original_dir} -> {new_dir} (Aligning with Macro Trend {trend_score:.2f})")
-                 new_conf = max(0.70, internal_signal.confidence) 
-                 final_signal = internal_signal._replace(signal_type=new_dir, confidence=new_conf)
-                 
-             # Case B: Strong Signal -> VETO
-             else:
-                 logger.warning(f"NEOGENESIS: Vetoed Strong {original_dir} - Ontological Conflict (Score: {trend_score:.2f}). Risky Reversal.")
-                 final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
+             # STRICT SAFETY: VETO ONLY. Do not invert.
+             # Fighting the trend caused the USDCHF blowup. 
+             # If we disagree with the trend, we WAIT.
+             logger.warning(f"NEOGENESIS: Vetoed Counter-Trend {internal_signal.signal_type} - Trend Score: {trend_score:.2f}. Safety First.")
+             final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
         
         # 2. Low Quality Veto
         elif reflection_result.reasoning_quality < 0.5:
@@ -945,12 +927,20 @@ class OmegaAGICore:
              risk_data = agi_context['global_risk']
              sentiment = risk_data.get('global_risk_sentiment', 'NEUTRAL')
              
-             # Logic: If RISK_OFF, Veto BUYS on Risk Assets (Crypto, AUD, NZD)
+             sym = agi_context.get('symbol', 'XAUUSD') # Fix: Get from Context
+
+             # A. Risk Asset Check
              if sentiment == "RISK_OFF" and final_signal.signal_type == "BUY":
-                  sym = config.get('symbol', 'XAUUSD')
                   if any(s in sym for s in ['AUD', 'NZD', 'BTC', 'ETH', 'SPX', 'NAS']):
                        logger.warning(f"NEOGENESIS: Vetoed BUY on {sym} - Risk-Off Sentiment Prevails.")
                        final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
+                       
+             # B. DXY / USD Strength Check (The USDCHF Fix)
+             # If Sentiment is RISK_OFF (DXY strong), Veto SELLS on USD pairs (USDCHF, USDJPY, USDCAD)
+             if sentiment == "RISK_OFF" and final_signal.signal_type == "SELL":
+                 if "USD" in sym[:3]: # Starts with USD (USDCHF, USDJPY)
+                      logger.warning(f"NEOGENESIS: Vetoed SELL on {sym} - DXY is Strong (Risk-Off).")
+                      final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
 
         # 4. Boost Confidence
         elif reflection_result.reasoning_quality > 0.8:
