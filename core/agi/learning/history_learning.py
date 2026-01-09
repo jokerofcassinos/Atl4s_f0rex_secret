@@ -22,7 +22,11 @@ class HistoryLearningEngine:
     def __init__(self, memory: HolographicMemory):
         self.memory = memory
         self.is_dreaming = False
+        self.is_dreaming = False
         self.experiences_learned = 0
+        self.wins = 0
+        self.losses = 0
+        self.total_pnl = 0.0
         
     def dream_cycle(self, data: pd.DataFrame, batch_size: int = 1000):
         """
@@ -122,3 +126,26 @@ class HistoryLearningEngine:
         if trade_feedback.get('trade_executed'):
              logger.info(f"HISTORY LEARNING: Observed Trade Result: {trade_feedback}")
              self.experiences_learned += 1
+             
+             pnl = float(trade_feedback.get('profit', 0.0))
+             self.total_pnl += pnl
+             if pnl > 0: self.wins += 1
+             elif pnl < 0: self.losses += 1
+
+    def analyze_patterns(self) -> Dict[str, Any]:
+        """
+        Analyzes learned patterns to determine overall system health/performance.
+        Used by OmegaAGICore to switch modes (e.g. Critical Low Win Rate).
+        """
+        total_trades = self.wins + self.losses
+        win_rate = 0.5 # Default neutral
+        
+        if total_trades > 0:
+            win_rate = self.wins / total_trades
+            
+        return {
+            'win_rate': win_rate,
+            'total_trades': total_trades,
+            'total_pnl': self.total_pnl,
+            'experiences': self.experiences_learned
+        }

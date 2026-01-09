@@ -483,6 +483,14 @@ from core.agi.big_beluga.liquidity_spectrum import LiquiditySpectrum
 
 from core.agi.pan_cognitive.infinite_reflection import InfiniteRecursiveReflection
 from core.agi.pan_cognitive.empathic_bridge import HighFidelityResonance
+from core.agi.big_beluga.correlation import CorrelationSynapse
+from core.agi.big_beluga.range_scanner import RangeScanner # Phase 17: Range Master
+from core.agi.physics.time_distortion import TimeDistortionEngine # Phase 19: Market Physics
+from core.agi.big_beluga.power_of_3 import PowerOf3Analyzer # Phase 19: AMD
+from core.agi.big_beluga.power_of_3 import PowerOf3Analyzer # Phase 19: AMD
+from core.agi.pan_cognitive.composite_operator import CompositeOperator # Phase 20: The Institute
+from core.agi.big_beluga.snr_matrix import SNRMatrix # Phase 21: SNR
+from core.agi.big_beluga.msnr_alchemist import MSNRAlchemist # Phase 22: MSNR
 from core.agi.pan_cognitive.causal_inference import CausalInferenceEngine
 from core.agi.pan_cognitive.neuro_plasticity_v2 import NeuroPlasticityV2
 
@@ -588,11 +596,16 @@ class OmegaAGICore:
         self.ontology_nuance = OntologicalNuanceProcessor()
         self.resonance_bridge = NeuralResonanceBridge()
         
-        from core.agi.big_beluga.correlation import CorrelationSynapse
+        self.quarterly_cycle = QuarterlyCycle()
         self.correlation = CorrelationSynapse()
-        
+        self.range_scanner = RangeScanner() # Phase 17
+        self.time_engine = TimeDistortionEngine() # Phase 19
+        self.power_of_3 = PowerOf3Analyzer() # Phase 19
+        self.composite_operator = CompositeOperator() # Phase 20
+        self.snr_matrix = SNRMatrix() # Phase 21
+        self.msnr_alchemist = MSNRAlchemist() # Phase 22
         self.recent_decisions: deque = deque(maxlen=100)
-        self.learning = None # History Engine (Phase 6)
+        self.causal_engine = CausalInferenceEngine() # (Phase 6)
         
         logger.info("OmegaAGI Core v5.0 (Symbiotic) Initialized.")
         
@@ -631,7 +644,52 @@ class OmegaAGICore:
              chronos_context = {**chronos_data, **quarterly_data}
              adjustments['chronos_narrative'] = chronos_context
              
-        # 0.1 GLOBAL CORRELATION & RISK SENTIMENT
+        # 3. Time Fractal Analysis (Chronos)
+        chronos_context = self.chronos.analyze_session_fractal(tick, market_data_map, config.get('symbol', 'XAUUSD'))
+        adjustments['chronos_narrative'] = chronos_context
+
+        # 4. Range Analysis (The Impossible - Phase 17)
+        range_data = {}
+        if market_data_map and 'M5' in market_data_map:
+             range_data = self.range_scanner.analyze(market_data_map['M5'])
+             adjustments['range_analysis'] = range_data
+             
+             if range_data['status'] == 'RANGING':
+                  logger.info(f"RANGE SCANNER: Market is RANGING (Str: {range_data['strength']:.2f}). Bias: {range_data['proximity']}")
+                  # Add Ping Pong Bias to adjustments
+                  if range_data['proximity'] == 'RANGE_LOW':
+                       adjustments['bias_override'] = 'BUY'
+                  elif range_data['proximity'] == 'RANGE_HIGH':
+                       adjustments['bias_override'] = 'SELL'
+                       
+        # 5. Physics & Institute Analysis (Phase 19/20)
+        time_data = self.time_engine.process_tick(tick)
+        adjustments['time_physics'] = time_data
+        
+        amd_data = {}
+        if market_data_map and 'M5' in market_data_map:
+             amd_data = self.power_of_3.analyze(market_data_map['M5'])
+             adjustments['amd_structure'] = amd_data
+             
+        operator_profile = self.composite_operator.profile_market_behavior(tick, market_data_map, range_data)
+        adjustments['operator_profile'] = operator_profile
+        
+        
+        if time_data['time_state'] in ['WARP_EVENT', 'HFT_ACTIVITY']:
+             logger.warning(f"PHYSICS: TIME WARP DETECTED! Velocity: {time_data['velocity']:.1f} TPS. Factor: {time_data['warp_factor']:.1f}x")
+             
+        # 6. SNR Matrix & MSNR Alchemist (Phase 21/22)
+        if market_data_map and 'M5' in market_data_map:
+             raw_levels = self.snr_matrix.scan_structure(market_data_map['M5'])
+             golden_zones = self.msnr_alchemist.transmute(raw_levels, tick.get('bid', 0))
+             
+             confluence = self.msnr_alchemist.detect_confluence(golden_zones, tick.get('bid', 0))
+             adjustments['structure_confluence'] = confluence
+             
+             if confluence['in_zone']:
+                  logger.info(f"MSNR ALCHEMIST: Price inside GOLDEN ZONE (Score: {confluence['nearest_zone_score']:.1f}). Prepare for Impact.")
+        
+        # 7. Global Correlation
         if market_data_map and 'global_basket' in market_data_map:
              sym = config.get('symbol', 'XAUUSD')
              adjustments['symbol'] = sym # Save for later
@@ -924,24 +982,47 @@ class OmegaAGICore:
         
         # 3. GLOBAL CORRELATION VETO (The Web)
         elif agi_context and 'global_risk' in agi_context:
-             risk_data = agi_context['global_risk']
-             sentiment = risk_data.get('global_risk_sentiment', 'NEUTRAL')
-             
-             sym = agi_context.get('symbol', 'XAUUSD') # Fix: Get from Context
+            risk_data = agi_context['global_risk']
+            sentiment = risk_data.get('global_risk_sentiment', 'NEUTRAL')
+            
+            sym = agi_context.get('symbol', 'XAUUSD')
+            
+            # --- PHASE 17: RANGE EXCEPTION ---
+            # If we are in "Ping Pong Mode" (Ranging), we ignore Trend Vetoes
+            # But we still respect GLOBAL RISK if it's extreme.
+            range_info = agi_context.get('range_analysis', {})
+            is_ranging = range_info.get('status') == 'RANGING'
+            range_bias = agi_context.get('bias_override')
+            
+            if is_ranging and range_bias:
+                 # Logic: We are Ranging. We WANT to trade Reversals.
+                 # If Swarm says SELL and Range says SELL (Top of Range) -> APPROVE (Ping Pong)
+                 # We bypass typical "Counter-Trend" blocks here because Range Trading IS Counter-Trend locally.
+                 
+                 if final_signal.signal_type == "BUY" and range_bias == "BUY":
+                      logger.info("SINGULARITY: Approving PING-PONG BUY (Range Low Support).")
+                      final_signal = final_signal._replace(signal_type="BUY", confidence=0.85)
+                      return self._format_output(final_signal, is_dict)
+                      
+                 if final_signal.signal_type == "SELL" and range_bias == "SELL":
+                      logger.info("SINGULARITY: Approving PING-PONG SELL (Range High Resistance).")
+                      final_signal = final_signal._replace(signal_type="SELL", confidence=0.85)
+                      return self._format_output(final_signal, is_dict)
 
-             # A. Risk Asset Check
-             if sentiment == "RISK_OFF" and final_signal.signal_type == "BUY":
-                  if any(s in sym for s in ['AUD', 'NZD', 'BTC', 'ETH', 'SPX', 'NAS']):
-                       logger.warning(f"NEOGENESIS: Vetoed BUY on {sym} - Risk-Off Sentiment Prevails.")
-                       final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
-                       
-             # B. DXY / USD Strength Check (The USDCHF Fix)
-             # If Sentiment is RISK_OFF (DXY strong), Veto SELLS on USD pairs (USDCHF, USDJPY, USDCAD)
-             if sentiment == "RISK_OFF" and final_signal.signal_type == "SELL":
-                 if "USD" in sym[:3]: # Starts with USD (USDCHF, USDJPY)
-                      logger.warning(f"NEOGENESIS: Vetoed SELL on {sym} - DXY is Strong (Risk-Off).")
-                      final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
+            # Standard Logic (Trend Followers)
+            if final_signal.signal_type == "BUY":
+                if sentiment == "RISK_OFF" and sym in ["AUDUSD", "NZDUSD", "BTCUSD", "ETHUSD", "SPX500"]:
+                     logger.warning(f"NEOGENESIS: Vetoed BUY on {sym} - Sentiment is {sentiment} (Risk-Off). Protection Active.")
+                     final_signal = final_signal._replace(signal_type="WAIT", confidence=0.0)
 
+            elif final_signal.signal_type == "SELL":
+                # PROTECTION: Don't SELL USD Pairs if DXY is Strong (Risk Off usually means DXY UP)
+                # If Sentiment is RISK_OFF -> DXY is Rising -> USDXXX goes UP.
+                # So Selling USDCHF/USDJPY is suicide.
+                if sentiment == "RISK_OFF" and sym in ["USDCHF", "USDJPY", "USDCAD"]:
+                     logger.warning(f"NEOGENESIS: Vetoed SELL on {sym} - DXY is Strong (Risk-Off). Protection Active.")
+                     final_signal = final_signal._replace(signal_type="WAIT", confidence=0.0)
+                     
         # 4. Boost Confidence
         elif reflection_result.reasoning_quality > 0.8:
              final_signal = final_signal._replace(confidence=min(1.0, final_signal.confidence * 1.1))

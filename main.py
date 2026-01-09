@@ -101,17 +101,20 @@ class OmegaSystem:
             grandmaster=self.grandmaster
         )
         
-        # --- PHASE 6: LEARNING ---
-        # The Engine needs access to the same memory as the GrandMaster/Cortex
-        self.learning = HistoryLearningEngine(self.grandmaster.memory)
+        self.executor = ExecutionEngine(bridge=self.bridge)
         
-        self.executor = ExecutionEngine(self.bridge)
-
+        # --- PHASE 6: HISTORY ENGINE ---
+        self.history_engine = HistoryLearningEngine(self.data_loader)
+        self.agi.connect_learning_engine(self.history_engine)
+        
+        # --- PERSISTENCE ---
+        self.cached_data_map = None
+        self.last_data_fetch_time = 0
+        self.burst_tracker = {} # {symbol: {count: 0, last_ts: 0}}
+        self.latest_agi_context = {} # AGI Brain State Persistence
+        
         self.symbol = "ETHUSD" # Default for Sunday Crypto
         self.last_trade_times = {} # Cooldown tracking
-        self.last_data_fetch_time = 0 # Throttling for data loader
-        self.cached_data_map = None # Cache for throttled data
-        self.burst_tracker = {} # Burst Execution Manager
         
         # User Configuration (Defaults)
         # These are overwritten by Profile Selection
@@ -441,7 +444,7 @@ class OmegaSystem:
                     # 1. Update Active Trades Snapshot
                     trades_snapshot = tick.get('trades_json', [])
                     if trades_snapshot:
-                        self.learning.update_active_trades(trades_snapshot)
+                        self.history_engine.update_active_trades(trades_snapshot)
 
                         # 2. Individual VTP/VSL Guards
                         self.executor.check_individual_guards(
@@ -454,8 +457,9 @@ class OmegaSystem:
                         # 3. Dynamic Stops (Event Horizon)
                         await self.executor.manage_dynamic_stops(tick)
                         
-                        # 4. Predictive Exits
-                        await self.executor.monitor_positions(tick)
+                        # 4. Predictive Exits (The Magnet + The Broom)
+                        # Pass AGI Context for Trend-Aware decay
+                        await self.executor.monitor_positions(tick, agi_context=self.latest_agi_context)
                         
                         # 5. Global Catastrophe Guard (Equity-Based)
                         # FIX: Previous limit was too tight for Hydra Mode (10 heads = ~$100 spread).
@@ -519,6 +523,7 @@ class OmegaSystem:
                     # Phase 7: Now receives full data_map for Temporal/Abstract reasoning
                     agi_adjustments = self.agi.pre_tick(tick, self.config, data_map)
                     if agi_adjustments:
+                         self.latest_agi_context = agi_adjustments # CACHE FOR NEXT LOOP
                          # Apply self-healing or optimization adjustments
                          if 'switch_mode' in agi_adjustments:
                              # self.config['mode'] = agi_adjustments['switch_mode'] # Optional auto-switch

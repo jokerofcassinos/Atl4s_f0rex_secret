@@ -36,9 +36,9 @@ class ExecutionEngine:
         return int(time.time_ns() / 1_000_000)
         
         
-    async def monitor_positions(self, tick: Dict):
+    async def monitor_positions(self, tick: Dict, agi_context: Dict = None):
         """
-        Orchestrates all position monitoring checks (VTP, VSL, Predictive).
+        Orchestrates all position monitoring checks (VTP, VSL, Predictive, Stalemate).
         """
         if not self.bridge: return
         
@@ -55,7 +55,13 @@ class ExecutionEngine:
         # 3. Check Predictive Exits (The Magnet)
         for trade in trades:
              if not isinstance(trade, dict): continue
-             self.check_predictive_exit(trade, tick)
+             
+             # A. Predictive Exit (VTP)
+             closed = self.check_predictive_exit(trade, tick)
+             if closed: continue
+             
+             # B. Stalemate Check (The Broom)
+             self.check_stalemate(trade, tick, agi_context)
         
         
     async def manage_dynamic_stops(self, tick: Dict):
@@ -630,6 +636,76 @@ class ExecutionEngine:
                 self.close_trade(ticket, symbol)
                 self.close_attempts[ticket] = current_time  # Mark attempt
                 continue
+
+    def check_stalemate(self, trade: Dict, current_tick: Dict, agi_context: Dict = None):
+        """
+        Lateral Market Decay (The Broom).
+        Clears out old, stagnant positions via AGI-Aware Decay.
+        """
+        ticket = trade.get('ticket')
+        if ticket in self.closed_tickets_cache: return
+        
+        # Calculate Age
+        current_time_sec = self._get_current_time_msc() / 1000.0
+        
+        # Ensure start time is tracked
+        if ticket not in self.trade_start_times:
+            self.trade_start_times[ticket] = current_time_sec
+            return
+
+        local_start_time = self.trade_start_times[ticket]
+        age_seconds = current_time_sec - local_start_time
+        profit = float(trade.get('profit', 0.0))
+        symbol = trade.get('symbol')
+        trade_type = trade.get('type') # 0=Buy, 1=Sell
+        
+        # --- AGI CONTEXT AWARENESS ---
+        base_threshold = 2700 # 45 minutes
+        volatility_score = 50.0
+        trend_bias = "NEUTRAL"
+        
+        if agi_context:
+            # 1. Volatility Scaling
+            # If Volatility is Low (<30), market is dead. Exit faster.
+            # If Volatility is High (>70), give more room (noise).
+            volatility_score = agi_context.get('volatility_score', 50.0)
+            
+            if volatility_score < 30:
+                base_threshold = 1800 # 30 minutes (Dead Market)
+            elif volatility_score > 70:
+                base_threshold = 3600 # 60 minutes (High Noise)
+                
+            # 2. Trend Alignment Bonus
+            # If I am Long and Trend is Bullish -> Be Patient (+30m)
+            chronos = agi_context.get('chronos_narrative', {})
+            trend_bias = chronos.get('trend_bias', 'NEUTRAL')
+            
+            aligned = False
+            if trade_type == 0 and trend_bias in ["BULLISH", "STRONG_BULL"]: aligned = True
+            if trade_type == 1 and trend_bias in ["BEARISH", "STRONG_BEAR"]: aligned = True
+            
+            if aligned:
+                base_threshold += 1800 # +30m Patience
+                # logger.debug(f"STALEMATE: Ticket {ticket} aligned with {trend_bias}. Extended patience to {base_threshold/60:.0f}m")
+
+        # Logic 1: Stagnation (Smart Threshold)
+        if age_seconds > base_threshold: 
+             if profit >= 0.50:
+                  logger.info(f"STALEMATE: Ticket {ticket} ({symbol}) old ({age_seconds/60:.1f}m > {base_threshold/60:.0f}m) & green (${profit:.2f}). Bias: {trend_bias}. Closing.")
+                  self.close_trade(ticket, symbol)
+                  return True
+                  
+        # Logic 2: Ancient Decay (Hard Cleanup - 120m cap or 90m default)
+        # If aligned, we might wait up to 120m. Unaligned 90m.
+        final_cap = 7200 if (agi_context and trend_bias != "NEUTRAL") else 5400
+        
+        if age_seconds > final_cap: 
+             if profit >= 0.10: # Just get out green
+                  logger.info(f"DECAY: Ticket {ticket} is ancient ({age_seconds/60:.1f}m). Closing at ${profit:.2f}.")
+                  self.close_trade(ticket, symbol)
+                  return True
+                  
+        return False
 
     def close_longs(self, symbol: str):
         logger.warning(f"EXECUTION: Closing LONGS for {symbol}")
