@@ -723,12 +723,15 @@ class SwarmOrchestrator:
         base_slots = 5
         
         # 1. Mode Multiplier
+        # 1. Mode Multiplier
         if mode == "WOLF_PACK":
-            base_slots = 10
+            base_slots = 15 # Boosted from 10
         elif mode == "HYBRID":
-            base_slots = 10
+            base_slots = 20 # Boosted from 10
+        elif mode == "HYDRA":
+            base_slots = 25 # Aggressive Base
         elif mode == "AGI_MAPPER":
-            base_slots = 12
+            base_slots = 40 # Heavy scaling for $8k+ accounts
             
         # 2. Entropy / Volatility Damper
         # Volatility 0-100
@@ -736,9 +739,9 @@ class SwarmOrchestrator:
         # If Vol < 20 (Calm) -> Neutral
         entropy_factor = 1.0
         if volatility > 60:
-            entropy_factor = 0.75 # Less punishment (was 0.5)
+            entropy_factor = 0.8 # Less punishment (was 0.5)
         elif volatility > 40:
-            entropy_factor = 0.9 # Mild reduction (was 0.8)
+            entropy_factor = 0.95 # Mild reduction (was 0.8)
             
         # 3. Trend Spear
         # Trend 0-100
@@ -747,12 +750,12 @@ class SwarmOrchestrator:
         if trend_strength > 70:
             trend_factor = 1.5
         elif trend_strength > 90:
-            trend_factor = 2.0
+            trend_factor = 2.5 # Aggressive Scaling
             
         final_slots = int(base_slots * entropy_factor * trend_factor)
         
-        # Hard Limits
-        final_slots = max(1, min(final_slots, 25))
+        # Hard Limits (Raised for $8k account)
+        final_slots = max(1, min(final_slots, 60))
         
         # logger.debug(f"AGI SLOTS: Base {base_slots} * Ent {entropy_factor} * Trend {trend_factor} = {final_slots}")
         

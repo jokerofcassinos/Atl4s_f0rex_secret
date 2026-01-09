@@ -108,10 +108,7 @@
 - [x] **GitHub Deployment**
     - [x] Create `github_upload.ps1`
     - [x] Execute upload to branch `agi-beta-v1.0`
-- [/] **Architectural Design**
-    - [x] Define structure for 50+ Heatmap/Liquidity/Spread/Session systems
-    - [ ] Map 25 BigBeluga concepts to Python class structures
-- [/] **Architectural Design**
+- [] **Architectural Design**
     - [x] Define structure for 50+ Heatmap/Liquidity/Spread/Session systems
     - [x] Map 25 BigBeluga concepts to Python class structures
 - [x] **System Group A: Heatmap & Liquidity (30 Systems)**
@@ -134,3 +131,12 @@
 - [x] Resolve legacy file collisions
 - [x] Verify stable bot initialization
     - [x] Verify fix <!-- id: 4 -->
+
+# Phase 17: Stability & Debugging (Jan 2026)
+- [x] **Fix Hydra Execution Logic**
+    - [x] Add HYDRA mode to `max_burst` logic (2-10 heads based on Confidence 47-54+)
+    - [x] Bypass `CANDLE SYNC` guard for aggressive HYDRA mode
+- [x] **Debug Trade Vetoes**
+    - [x] Relax `DEJA VU` threshold from -0.3 to -30.0 (Scale adjustment)
+- [x] **Tune Take Profits**
+    - [x] **Immediate VTP Close**: Change logic to close immediately at $2.00 profit (Removed 85% progress check)

@@ -545,7 +545,7 @@ class OmegaSystem:
                     swarm_signal = {'direction': swarm_dir, 'confidence': confidence / 100.0}
                     
                     # Ask the Singularity Swarm (AlphaSynergy)
-                    singularity_packet = self.agi.synthesize_singularity_decision(swarm_signal)
+                    singularity_packet = self.agi.synthesize_singularity_decision(swarm_signal, market_data_map=data_map, agi_context=agi_adjustments)
                     final_verdict = singularity_packet.get('verdict', 'WAIT')
                     final_conf = singularity_packet.get('confidence', 0.0) * 100.0
                     

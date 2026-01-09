@@ -15,8 +15,8 @@
 input int    InpPort = 5558; // User defined port
 input int    MagicNumber = 1337;
 input int    MaxSlippage = 5;
-input double MaxDailyLoss = 100.0;      // Maximum daily loss in account currency
-input double MaxRiskPerTrade = 2.0;     // Maximum risk per trade (%)
+input double MaxDailyLoss = 5000.0;      // Maximum daily loss in account currency (Scaled for $8k)
+input double MaxRiskPerTrade = 5.0;     // Maximum risk per trade (%) (Scaled for Aggressive)
 input bool   EnableLocalML = true;       // Enable on-device ML
 input bool   EnableAdaptiveExecution = true; // Enable adaptive execution
 
@@ -408,7 +408,7 @@ public:
         }
         
         // Check max positions
-        if(PositionsTotal() >= 10) {
+        if(PositionsTotal() >= 100) {
             Print("RISK: Maximum positions reached");
             return false;
         }

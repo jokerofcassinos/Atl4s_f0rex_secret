@@ -462,21 +462,12 @@ class ExecutionEngine:
 
         progress = current_dist / total_dist
         
-        # 2. Virtual Hit Logic
-        # User Feedback: "Leave it as it was" -> Relaxed.
-        # Threshold: 85% (SNIPER) / 90% (HYDRA)
-        # Min Profit: $5.00 (Just cover spread/commissions)
-        
-        if progress > 0.85:
-             if profit <= 2.0: # Min profit reduced from $5 to $2
-                 return False
-            
-             logger.info(f"VTP: {symbol} at {progress:.1%} progress. Bagging ${profit:.2f}.")
+        # 2. Virtual Hit Logic - SIMPLIFIED
+        # Close immediately when profit >= $2.00 (User Request)
+        if profit >= 2.0:
+             logger.info(f"VTP: {symbol} reached ${profit:.2f}. Closing immediately.")
              self.close_trade(ticket, symbol)
              return True
-             
-        # 3. Time Decay / Stalling (Simple check)
-        # If profit is > $5.00 and we are stalling (would require history, skipping for now)
         
         return False
 

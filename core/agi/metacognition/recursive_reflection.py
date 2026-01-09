@@ -421,6 +421,31 @@ class RecursiveReflection:
         
         if decision.get('confidence', 0) > 0.95:
             blind_spots.append("Potentially overconfident")
+            
+        # 4. Trend Alignment (Ontological Check)
+        # Check if trend info is in context
+        trend_info = context.get('trend_info', {})
+        if trend_info:
+            bias = trend_info.get('fractal_bias', 'NEUTRAL')
+            strength = trend_info.get('trend_strength', 0.0)
+            decision_dir = decision.get('direction', 'UNKNOWN')
+            
+            # If Strong Trend defined
+            if strength > 0.6 and bias in ['BULLISH', 'BEARISH']:
+                # If Decision contradicts Trend
+                if (bias == 'BULLISH' and decision_dir == 'SELL') or \
+                   (bias == 'BEARISH' and decision_dir == 'BUY'):
+                       
+                       # Check for Reversal Logic (God Mode exception)
+                       reversal_intent = False
+                       if 'reversal' in str(decision.get('factors', [])).lower():
+                           reversal_intent = True
+                           
+                       # If not explicitly a reversal play, it's a violation
+                       if not reversal_intent:
+                           blind_spots.append(f"Counter-Trend Violation (Trend: {bias})")
+        else:
+            blind_spots.append("Trend Context Missing")
         
         return blind_spots
     

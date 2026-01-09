@@ -537,11 +537,70 @@ class OmegaAGICore:
             enable_meta_reasoning=True
         )
         self.simulation = SimulationSystemAGI()
+        from core.agi.temporal import FractalTimeScaleIntegrator, ChronosPattern, QuarterlyCycle
         self.temporal = FractalTimeScaleIntegrator()
+        self.chronos = ChronosPattern(utc_offset_hours=2) 
+        self.quarterly = QuarterlyCycle(utc_offset_hours=2)
         self.abstraction = AbstractPatternSynthesizer()
         self.synergy = AlphaSynergySwarm()
         self.quantum = QuantumProbabilityCollapser()
         self.fuzzy = FuzzyLogicEngine()
+
+    def pre_tick(self, tick: Dict, config: Dict, market_data_map: Dict = None) -> Dict[str, Any]:
+        """
+        Phase 7: AGI Pre-Analysis (The Deep Thought).
+        Generates context for the Swarm.
+        """
+        context = {
+            'tick': tick,
+            'config': config,
+            'market_data': market_data_map
+        }
+        
+        adjustments = self.meta_loop.pre_iteration(context)
+
+        # --- PHASE 8: SENSORY INTEGRATION ---
+        
+        # 0. CHRONOS TIME FRACTAL (NY Session + Quarterly IPDA)
+        chronos_context = {}
+        if market_data_map:
+             sym = config.get('symbol', 'XAUUSD')
+             # Session
+             chronos_data = self.chronos.analyze_session_fractal(tick, market_data_map, symbol=sym)
+             # Quarterly (IPDA)
+             quarterly_data = self.quarterly.analyze_cycle(tick)
+             
+             # Merge
+             chronos_context = {**chronos_data, **quarterly_data}
+             adjustments['chronos_narrative'] = chronos_context
+             
+        # 0.1 GLOBAL CORRELATION & RISK SENTIMENT
+        if market_data_map and 'global_basket' in market_data_map:
+             sym = config.get('symbol', 'XAUUSD')
+             corr_data = self.correlation.analyze_correlations(sym, market_data_map['global_basket'])
+             adjustments['global_risk'] = corr_data
+             
+        # 1. Microstructure Analysis (Tape Reading)
+        current_tick_vol = tick.get('volume', 0)
+        
+        # 2. Causal Inference (Multidimensional)
+        # We need event data (stubbed for now, or from news scraper)
+        sentiment_score = 0.5 # Default
+        high_impact_prob = 0.0
+        
+        causal_events = {'sentiment_score': sentiment_score, 'impact': high_impact_prob}
+        # Pass Chronos Context to Causal Engine
+        if hasattr(self, 'causal_inference'):
+             causa = self.causal_inference.infer_cause(tick, causal_events, chronos_context=chronos_context)
+             
+             ontological_narrative = causa.get('ontological_layer', 'STANDARD')
+             if ontological_narrative != "STANDARD_MECHANICS":
+                  logger.info(f"AGI DEEP THOUGHT: [{ontological_narrative}] -> {causa['confidence']:.2f}")
+
+             adjustments['causal_root'] = causa['root_cause']
+             adjustments['causal_chain'] = causa['causal_chain']
+             adjustments['ontological_nuance'] = ontological_narrative
+        # ... (rest of method)
         
         # Core Memory & Vector Engines (Required for Generative Model)
         self.holographic_memory = HolographicMemory()
@@ -581,6 +640,9 @@ class OmegaAGICore:
         self.ssl_engine = SelfSupervisedLearningEngine()
         self.ontology_nuance = OntologicalNuanceProcessor()
         self.resonance_bridge = NeuralResonanceBridge()
+        
+        from core.agi.big_beluga.correlation import CorrelationSynapse
+        self.correlation = CorrelationSynapse()
         
         self.recent_decisions: deque = deque(maxlen=100)
         self.learning = None # History Engine (Phase 6)
@@ -786,18 +848,127 @@ class OmegaAGICore:
         
         return adjustments
 
-    def synthesize_singularity_decision(self, swarm_signal: Dict) -> Dict[str, Any]:
-        """
-        Phase 8: Project NEOGENESIS.
-        Collapses all AGI wave functions into a single decision.
-        """
-        if not self.synergy: return swarm_signal
+    def synthesize_singularity_decision(self, swarm_signal: Any, market_data_map: Dict[str, Any] = None, agi_context: Dict[str, Any] = None) -> Any:
+        # --- ADAPTER LAYER (Handle Main.py Dict Input) ---
+        is_dict = isinstance(swarm_signal, dict)
+        if is_dict:
+            from collections import namedtuple
+            # Define flexible namedtuple that supports _replace
+            GenericSignal = namedtuple('GenericSignal', ['signal_type', 'confidence', 'meta_data'])
+            
+            # Map input dict to object
+            raw_dir = swarm_signal.get('direction', 0)
+            s_type = "BUY" if raw_dir == 1 else "SELL" if raw_dir == -1 else "WAIT"
+            
+            internal_signal = GenericSignal(
+                signal_type=s_type, 
+                confidence=swarm_signal.get('confidence', 0.0),
+                meta_data={}
+            )
+        else:
+            internal_signal = swarm_signal
+
+        # --- CORE LOGIC (Uses internal_signal) ---
+        if not self.synergy: return self._format_output(internal_signal, is_dict)
         
         inputs = {
-            'swarm_consensus': swarm_signal,
+            'swarm_consensus': internal_signal,
         }
         
-        # 1. Causal Input (Infinite Why)
+        # 2. Fractal Trend (Ontological Truth)
+        trend_info = {}
+        if self.fractal_trend and market_data_map:
+             trend_info = self.fractal_trend.analyze({'bid': 0}, market_data_map)
+             
+        # 3. Metacognitive Reflection (The Mirror)
+        # We reflect on the SWARM'S decision
+        
+        # Merge Pre-Tick Context (Session, Liquidity) with Inputs
+        reflection_context = {
+                'swarm_votes': inputs.get('swarm_votes', {}),
+                'market_state': inputs.get('market_state', {}),
+                'trend_info': trend_info,
+                'spread_ok': True 
+        }
+        
+        if agi_context:
+            reflection_context.update(agi_context) # Inject Session, Liquidity, Nuance
+        
+        reflection_result = self.metacognition.reflect(
+            decision={
+                'direction': internal_signal.signal_type,
+                'confidence': internal_signal.confidence,
+                'factors': internal_signal.meta_data.get('factors', [])
+            },
+            context=reflection_context
+        )
+        
+        # --- PHASE 9: SINGULARITY VETO & INVERSION ---
+        final_signal = internal_signal
+        
+        # 1. Counter-Trend Check (Ontological Paradox)
+        trend_score = trend_info.get('composite_score', 0.0)
+        trend_bias = trend_info.get('fractal_bias', 'NEUTRAL')
+        
+        # Determine if we have a strong macro trend conflict
+        macro_conflict = False
+        signal_val = 1 if internal_signal.signal_type == "BUY" else -1 if internal_signal.signal_type == "SELL" else 0
+        
+        # If Trend is Strong (e.g. > 0.4 meaning multiple TFs align) AND Signal opposes it
+        if abs(trend_score) > 0.4:
+            if (trend_score > 0 and signal_val < 0) or (trend_score < 0 and signal_val > 0):
+                macro_conflict = True
+
+        if "Counter-Trend Violation" in str(reflection_result.blind_spots_detected) or macro_conflict:
+             original_dir = internal_signal.signal_type
+             
+             # Case A: Weak/Medium Signal -> INVERT (Smart Correction)
+             # We are now more aggressive: If Macro prohibits it, we flip it unless it's a God-Mode Reversal
+             if internal_signal.confidence < 0.85:
+                 new_dir = "SELL" if original_dir == "BUY" else "BUY"
+                 logger.warning(f"NEOGENESIS: AUTO-CORRECTED {original_dir} -> {new_dir} (Aligning with Macro Trend {trend_score:.2f})")
+                 new_conf = max(0.70, internal_signal.confidence) 
+                 final_signal = internal_signal._replace(signal_type=new_dir, confidence=new_conf)
+                 
+             # Case B: Strong Signal -> VETO
+             else:
+                 logger.warning(f"NEOGENESIS: Vetoed Strong {original_dir} - Ontological Conflict (Score: {trend_score:.2f}). Risky Reversal.")
+                 final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
+        
+        # 2. Low Quality Veto
+        elif reflection_result.reasoning_quality < 0.5:
+             logger.warning(f"NEOGENESIS: Vetoed {internal_signal.signal_type} - Poor Reasoning Quality")
+             final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
+        
+        # 3. GLOBAL CORRELATION VETO (The Web)
+        elif agi_context and 'global_risk' in agi_context:
+             risk_data = agi_context['global_risk']
+             sentiment = risk_data.get('global_risk_sentiment', 'NEUTRAL')
+             
+             # Logic: If RISK_OFF, Veto BUYS on Risk Assets (Crypto, AUD, NZD)
+             if sentiment == "RISK_OFF" and final_signal.signal_type == "BUY":
+                  sym = config.get('symbol', 'XAUUSD')
+                  if any(s in sym for s in ['AUD', 'NZD', 'BTC', 'ETH', 'SPX', 'NAS']):
+                       logger.warning(f"NEOGENESIS: Vetoed BUY on {sym} - Risk-Off Sentiment Prevails.")
+                       final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
+
+        # 4. Boost Confidence
+        elif reflection_result.reasoning_quality > 0.8:
+             final_signal = final_signal._replace(confidence=min(1.0, final_signal.confidence * 1.1))
+
+        if reflection_result.total_depth > 0:
+             logger.info(f"AGI REFLECTION: {reflection_result.synthesis} (Quality: {reflection_result.reasoning_quality:.2f})")
+
+        return self._format_output(final_signal, is_dict)
+
+    def _format_output(self, signal_obj: Any, return_dict: bool) -> Any:
+        if return_dict:
+            return {
+                'verdict': signal_obj.signal_type,
+                'confidence': signal_obj.confidence,
+                'score': 0.0
+            }
+        return signal_obj
         # Assuming we can get a quick sentiment from Causal (simplification)
         
         # 2. Temporal Input
