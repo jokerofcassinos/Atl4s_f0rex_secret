@@ -1,6 +1,6 @@
 
 # GitHub Upload Script for Atl4s-Forex Singularity
-# Branch: agi-beta-v1.0
+# Branch: agi-beta-v0.5
 
 Write-Host "INITIATING OMEGA UPLOAD SEQUENCE..." -ForegroundColor Cyan
 
@@ -11,7 +11,7 @@ if (-not (Test-Path ".git")) {
 }
 
 # 2. Checkout Branch
-$branch = "agi-beta-v1.0"
+$branch = "agi-alpha-v0.5"
 Write-Host "Checking out branch: $branch"
 git checkout -b $branch 2>$null
 if ($LASTEXITCODE -ne 0) {
@@ -25,7 +25,7 @@ git add .
 
 # 4. Commit
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
-$msg = "Phase 16: Singularity Core v5.0 (Active Inference + Global Scanner) - $timestamp"
+$msg = "Auto agi update - $timestamp"
 Write-Host "Committing: $msg"
 git commit -m "$msg"
 
