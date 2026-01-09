@@ -13,6 +13,7 @@ import time
 import datetime
 import numpy as np
 from typing import Dict, Any, List, Optional, Callable, Tuple
+from core.agi.big_beluga.correlation import CorrelationSynapse
 from dataclasses import dataclass, field
 from collections import deque
 from enum import Enum
@@ -505,6 +506,7 @@ class OmegaAGICore:
         self.scheduler = AdaptiveScheduler()
         self.state_machine = AdvancedStateMachine()
         self.monitor = PerformanceMonitor()
+        self.correlation_synapse = CorrelationSynapse()
         
         # --- AGI Expansion: Phase 6 & 7 (Singularity & Deep Logic) ---
         # Microstructure Systems (Group A & B)
@@ -898,7 +900,7 @@ class OmegaAGICore:
         
         return adjustments
 
-    def synthesize_singularity_decision(self, swarm_signal: Any, market_data_map: Dict[str, Any] = None, agi_context: Dict[str, Any] = None) -> Any:
+    def synthesize_singularity_decision(self, swarm_signal: Any, market_data_map: Dict[str, Any] = None, agi_context: Dict[str, Any] = None, open_positions: List[Dict] = None) -> Any:
         # --- ADAPTER LAYER (Handle Main.py Dict Input) ---
         is_dict = isinstance(swarm_signal, dict)
         if is_dict:
@@ -969,18 +971,85 @@ class OmegaAGICore:
                 macro_conflict = True
 
         if "Counter-Trend Violation" in str(reflection_result.blind_spots_detected) or macro_conflict:
-             # STRICT SAFETY: VETO ONLY. Do not invert.
-             # Fighting the trend caused the USDCHF blowup. 
-             # If we disagree with the trend, we WAIT.
-             logger.warning(f"NEOGENESIS: Vetoed Counter-Trend {internal_signal.signal_type} - Trend Score: {trend_score:.2f}. Safety First.")
-             final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
+             # --- NEOGENESIS V2: ELASTIC SNAP LOGIC ---
+             # Instead of Vetoing, we check if the Counter-Trend is a valid "Rubber Band" Reversion.
+             
+             allow_scalp = False
+             inversion_candidate = False
+             reason = "Safety"
+             
+             # 1. Check Cycle (Reversion Zones allow Scalps)
+             current_minute = int((time.time() / 60) % 60)
+             q_cycle = (current_minute // 15) + 1
+             
+             if q_cycle in [2, 4]: # Q2 (Shift) or Q4 (Fix)
+                  allow_scalp = True
+                  reason = f"Cycle Q{q_cycle} (Reversion Zone)"
+                  
+             # 2. Check Entropy (Chaos allows Scalps)
+             # Try to get entropy from context, default to 0.5
+             entropy = agi_context.get('market_entropy', 0.5) if agi_context else 0.5
+             if entropy > 0.85:
+                  allow_scalp = True
+                  reason = "High Entropy (Chaos)"
+                  
+             # 3. Extreme Extension (Rubber Band)
+             if abs(trend_score) > 0.92:
+                  allow_scalp = True
+                  reason = "Extreme Extension (Snap Back)"
+             
+             if allow_scalp:
+                  # REDUCE RISK but ALLOW TRADE
+                  logger.info(f"NEOGENESIS: Overriding Counter-Trend Veto. {internal_signal.signal_type} Allowed. Reason: {reason}")
+                  final_signal = internal_signal._replace(confidence=min(internal_signal.confidence, 75.0))
+                  if not internal_signal.meta_data: internal_signal = internal_signal._replace(meta_data={})
+                  final_signal.meta_data['method'] = "ELASTIC_SCALP"
+                  
+             else:
+                  # If we cannot scalp (Trend is strong and time is Q1/Q3), we INVERT (Aikido).
+                  # "Buying the Dip"
+                  if internal_signal.signal_type == "SELL" and trend_score > 0:
+                       logger.info(f"NEOGENESIS: Trend Aikido (Inversion). SELL -> BUY. Reason: Strong Trend + Q{q_cycle}")
+                       final_signal = internal_signal._replace(signal_type="BUY", confidence=0.85) # High confidence trend follow
+                       if not internal_signal.meta_data: internal_signal = internal_signal._replace(meta_data={})
+                       final_signal.meta_data['method'] = "TREND_AIKIDO_V2"
+                  
+                  elif internal_signal.signal_type == "BUY" and trend_score < 0:
+                       logger.info(f"NEOGENESIS: Trend Aikido (Inversion). BUY -> SELL. Reason: Strong Bear + Q{q_cycle}")
+                       final_signal = internal_signal._replace(signal_type="SELL", confidence=0.85)
+                       final_signal.meta_data['method'] = "TREND_AIKIDO_V2"
+                  
+                  else:
+                       # Fallback Safety
+                       logger.warning(f"NEOGENESIS: Vetoed Counter-Trend {internal_signal.signal_type} - Trend Score: {trend_score:.2f}. Safety First.")
+                       final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
         
         # 2. Low Quality Veto
         elif reflection_result.reasoning_quality < 0.5:
              logger.warning(f"NEOGENESIS: Vetoed {internal_signal.signal_type} - Poor Reasoning Quality")
              final_signal = internal_signal._replace(signal_type="WAIT", confidence=0.0)
         
-        # 3. GLOBAL CORRELATION VETO (The Web)
+        # 3. GLOBAL CORRELATION VETO & SYMPATHY (The Web)
+        # Improved Logic: Uses direct correlation matrix + open positions
+        elif open_positions:
+             sym = market_data_map.get('symbol', 'UNKNOWN')
+             
+             # A. Direct Conflict Check
+             conflict, reason = self.correlation_synapse.check_correlation_conflict(sym, final_signal.signal_type, open_positions)
+             if conflict:
+                  logger.warning(f"CORRELATION GUARD: Vetoing {final_signal.signal_type} -> {reason}")
+                  final_signal = final_signal._replace(signal_type="WAIT", confidence=0.0)
+                  
+             # B. Sympathy Play (Boost)
+             elif final_signal.signal_type != "WAIT":
+                  symp, reason = self.correlation_synapse.scan_sympathy_opportunities(sym, open_positions)
+                  if symp:
+                       logger.info(f"SYMPATHY PLAY: Boosting {final_signal.signal_type} -> {reason}")
+                       final_signal = final_signal._replace(confidence=min(1.0, final_signal.confidence * 1.25))
+                       if not final_signal.meta_data: final_signal = final_signal._replace(meta_data={})
+                       final_signal.meta_data['sympathy'] = True
+
+        # Fallback: Macro Risk Check (If no specific positions to conflict with, or just general safety)
         elif agi_context and 'global_risk' in agi_context:
             risk_data = agi_context['global_risk']
             sentiment = risk_data.get('global_risk_sentiment', 'NEUTRAL')

@@ -69,7 +69,7 @@ class HolographicPlateUltra:
     - Multi-index for categorical memory organization
     """
     
-    def __init__(self, dimensions: int = 65536):
+    def __init__(self, dimensions: int = 4096):
         """
         Initialize the ultra-scale holographic plate.
         
@@ -443,7 +443,7 @@ class HolographicMemory:
     def __init__(
         self,
         persistence_file: str = "brain/holographic_plate.npy",
-        dimensions: int = 65536  # AGI Ultra: 65536 dimensions
+        dimensions: int = 4096  # Optimized: Reduced from 65536 to 4096 (16x lighter)
     ):
         self.persistence_file = persistence_file
         self.dimensions = dimensions

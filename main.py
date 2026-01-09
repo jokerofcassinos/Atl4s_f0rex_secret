@@ -2,6 +2,7 @@
 import logging
 import pandas as pd
 import datetime
+import time
 from core.zmq_bridge import ZmqBridge
 from core.system_guard import SystemGuard # Zombie Defense
 # from core.api_server import APIServer # Next.js Dashboard Link (Future)
@@ -106,6 +107,9 @@ class OmegaSystem:
         # --- PHASE 6: HISTORY ENGINE ---
         self.history_engine = HistoryLearningEngine(self.data_loader)
         self.agi.connect_learning_engine(self.history_engine)
+        
+        # SYSTEM START TIMER (Smart Warm-Up)
+        self._system_start_time = time.time()
         
         # --- PERSISTENCE ---
         self.cached_data_map = None
@@ -522,6 +526,12 @@ class OmegaSystem:
                     # The Brain reasons about the market before the Body moves.
                     # Phase 7: Now receives full data_map for Temporal/Abstract reasoning
                     agi_adjustments = self.agi.pre_tick(tick, self.config, data_map)
+                    
+                    # FORCE INJECTION OF OPEN POSITIONS (Critical for Directional Lock)
+                    if agi_adjustments is None: agi_adjustments = {}
+                    agi_adjustments['open_positions'] = tick.get('trades_json', [])
+                    agi_adjustments['symbol'] = self.symbol
+                    
                     if agi_adjustments:
                          self.latest_agi_context = agi_adjustments # CACHE FOR NEXT LOOP
                          # Apply self-healing or optimization adjustments
@@ -550,7 +560,9 @@ class OmegaSystem:
                     swarm_signal = {'direction': swarm_dir, 'confidence': confidence / 100.0}
                     
                     # Ask the Singularity Swarm (AlphaSynergy)
-                    singularity_packet = self.agi.synthesize_singularity_decision(swarm_signal, market_data_map=data_map, agi_context=agi_adjustments)
+                    # Pass Open Positions for Correlation Logic
+                    open_trades = tick.get('trades_json', [])
+                    singularity_packet = self.agi.synthesize_singularity_decision(swarm_signal, market_data_map=data_map, agi_context=agi_adjustments, open_positions=open_trades)
                     final_verdict = singularity_packet.get('verdict', 'WAIT')
                     final_conf = singularity_packet.get('confidence', 0.0) * 100.0
                     
@@ -583,27 +595,34 @@ class OmegaSystem:
                     
                     # 4. Neural Execution 
                     if decision == "BUY" or decision == "SELL":
-                        # WARM-UP GUARD: Don't trade in first 30 seconds (allow analysis to stabilize)
-                        import time as warm_time
-                        if not hasattr(self, '_start_trade_time'):
-                            self._start_trade_time = warm_time.time()
+                        # WARM-UP GUARD: Don't trade in first 30 seconds of SYSTEM START
+                        # User Request: Count from INIT, not from first signal.
                         
                         warm_up_secs = 30
-                        elapsed = warm_time.time() - self._start_trade_time
+                        # If for some reason init didn't run (unlikely), fallback to now
+                        if not hasattr(self, '_system_start_time'): self._system_start_time = time.time()
+                        
+                        elapsed = time.time() - self._system_start_time
                         if elapsed < warm_up_secs:
-                            logger.info(f"WARM-UP: Skipping trade ({elapsed:.0f}s/{warm_up_secs}s)")
+                            logger.info(f"WARM-UP: Skipping trade ({elapsed:.0f}s/{warm_up_secs}s) - System stabilizing...")
                             continue
                             
-                        # --- CANDLE START SYNCHRONIZATION (User Request) ---
-                        # Prevent entering trades mid-candle (e.g. Minute 3 or 4 of 5m block)
-                        # Only allow entry in the first 90 seconds of the 5-minute candle.
+                        # --- CANDLE START SYNCHRONIZATION (User Request: 3m 40s Rule) ---
+                        # STRICT TIME GATE: Only enter in the "Golden Third" (220s - 300s)
+                        # We calculate seconds into the 5-minute block.
                         now = datetime.datetime.now()
                         seconds_into_block = (now.minute % 5) * 60 + now.second
                         
-                        if seconds_into_block > 90 and self.config['mode'] not in ["SCALPER", "HYDRA"]: 
-                            # Scalpers and Hydra might ignore this, but Hybrid/Sniper should respect it.
-                            logger.info(f"CANDLE SYNC: Waiting for M5 Open ({seconds_into_block}s > 90s). Trigger blocked.")
+                        # RULE: If we are BEFORE 220s (3m 40s), WE WAIT.
+                        if seconds_into_block < 220:
+                            # Log only periodically to avoid spam
+                            if seconds_into_block % 30 == 0:
+                                 logger.info(f"TIME GATE: Too early ({seconds_into_block}s). Waiting for Golden Third (220s).")
                             continue
+                            
+                        # If allowed (>= 220s), we proceed.
+                        if seconds_into_block >= 220:
+                             logger.info(f"TIME GATE: OPEN ({seconds_into_block}s). Golden Third Active.")
                             
                         cmd = 0 if decision == "BUY" else 1
                         

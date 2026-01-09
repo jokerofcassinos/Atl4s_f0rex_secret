@@ -193,7 +193,25 @@ class RecursiveReflection:
         if is_legacy:
             # Return dict for legacy compatibility (SwarmOrchestrator)
             # Legacy score was 0-100
-            adjusted_conf = float(quality * internal_decision.get('confidence', 0.5) * 100.0)
+            
+            # PROPOSED FIX: Non-Linear Scaling
+            # Don't penalize "Good" reasoning (0.6+). Only penalize "Bad" (<0.5).
+            if quality > 0.8:
+                 scale = 1.15 # Boost for Excellent Reasoning
+            elif quality > 0.6:
+                 scale = 1.0  # Nuetral for Good Reasoning (Don't dampen)
+            elif quality > 0.5:
+                 scale = 0.9  # Slight penalty
+            else:
+                 scale = quality # Linear penalty for bad reasoning
+                 
+            # Apply scale to original confidence
+            base_conf = internal_decision.get('confidence', 0.5) * 100.0
+            adjusted_conf = float(base_conf * scale)
+            
+            # Cap at 99.0
+            adjusted_conf = min(99.0, adjusted_conf)
+            
             return {
                 'adjusted_confidence': adjusted_conf,
                 'notes': corrections + [synthesis]

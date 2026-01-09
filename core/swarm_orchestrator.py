@@ -58,6 +58,8 @@ from analysis.swarm.active_inference_swarm import ActiveInferenceSwarm
 from analysis.swarm.hawking_swarm import HawkingSwarm
 # Phase 115
 from analysis.swarm.riemann_swarm import RiemannSwarm
+from core.agi.inference.causal_engine import CausalInferenceEngine
+from core.risk.entropy_harvester import EntropyHarvester # Phase 26
 from analysis.swarm.event_horizon_swarm import EventHorizonSwarm
 from analysis.swarm.gravity_swarm import GravitySwarm
 from analysis.swarm.holographic_swarm import HolographicSwarm
@@ -145,6 +147,12 @@ class SwarmOrchestrator:
             'INSTITUTIONAL': ['Whale_Swarm', 'Order_Flow', 'Liquidity_Map', 'SMC_Swarm', 'News_Swarm', 'Apex_Swarm'],
             'META': ['Veto_Swarm', 'Red_Team_Swarm', 'Dream_Swarm', 'Reflection_Swarm', 'Zen_Swarm', 'Council_Swarm', 'Overlord_Swarm', 'Sovereign_Swarm']
         }
+        
+        # --- PHASE 200+: CAUSAL INFERENCE ---
+        self.causal_engine = CausalInferenceEngine()
+        
+        # --- PHASE 26: ENTROPY HARVESTER (CHAOS) ---
+        self.entropy_harvester = EntropyHarvester(None, None) # Standalone mode for Analysis
 
     async def initialize_swarm(self):
         logger.info("--- GENESIS PROTOCOL: AWAKENING SWARM ---")
@@ -425,14 +433,16 @@ class SwarmOrchestrator:
         decision, score, meta = self.synthesize_thoughts(thoughts, swarm_snapshot, 
                                                         mode=config.get('mode', 'SNIPER') if config else 'SNIPER',
                                                         agi_context=agi_adj,
-                                                        config=config)
+                                                        config=config,
+                                                        data_context={'df': df_m5, 'tick': tick})
         return decision, score, meta
 
     def synthesize_thoughts(self, thoughts: List[SwarmSignal] = None, 
                          current_state_vector: Dict = None, 
                          mode: str = "SNIPER", 
                          agi_context: Dict = None,
-                         config: Dict = None) -> Tuple[str, float, Dict]:
+                         config: Dict = None,
+                         data_context: Dict = None) -> Tuple[str, float, Dict]:
         if not thoughts:
             thoughts = self.bus.get_recent_thoughts()
         
@@ -574,6 +584,65 @@ class SwarmOrchestrator:
                 if key not in meta_data:
                     meta_data[key] = val
             meta_data.setdefault('factors', []).append("AGI_HYPER_COMPLEX_INTEGRATION")
+            
+            # --- PHASE 155: ANTI-SCHIZOPHRENIA GUARD (Directional Lock) ---
+            # Prevents opening BUY and SELL on the same symbol (unless Hedging Mode enabled).
+            # User reported bot opening disjointed orders in the same candle.
+            
+            if final_decision in ["BUY", "SELL"]:
+                 open_positions = agi_context.get('open_positions', [])
+                 if open_positions:
+                      # Check for opposite positions on SAME symbol
+                      has_buy = any(p['symbol'] == agi_context.get('symbol', 'UNKNOWN') and p['type'] == 'BUY' for p in open_positions)
+                      has_sell = any(p['symbol'] == agi_context.get('symbol', 'UNKNOWN') and p['type'] == 'SELL' for p in open_positions)
+                      
+                      # Note: Dictionary usually has type as String "BUY"/"SELL" or int 0/1. 
+                      # main.py passes trades_json where 'type' is likely INT (0=Buy, 1=Sell).
+                      # Let's handle both just in case.
+                      
+                      current_symbol = agi_context.get('symbol')
+                      
+                      # Re-scan with robust type check
+                      has_buy = False
+                      has_sell = False
+                      
+                      for p in open_positions:
+                           if p.get('symbol') != current_symbol: continue
+                           
+                           t_type = p.get('type')
+                           if t_type == 0 or t_type == "BUY": has_buy = True
+                           if t_type == 1 or t_type == "SELL": has_sell = True
+                      
+                      # ELASTIC SNAP LOGIC (Smart Inversion)
+                      # If we have a High Conviction (>75%) signal in the opposite direction,
+                      # we admit the previous trade was wrong (or trend changed) -> CLOSE IT -> OPEN REVERSE.
+                      # If signal is weak, we VETO (Anti-Hedge).
+                      
+                      is_high_conviction = final_score >= 75.0
+                      
+                      if final_decision == "SELL" and has_buy:
+                           if is_high_conviction:
+                                logger.warning(f"ELASTIC SNAP: High Confidence Short ({final_score:.1f}%). Closing Longs to Reverse.")
+                                # Return EXIT_LONG to Execution Engine (which will close buys)
+                                # Next tick, the SELL signal will persist (Or we can force it here? No, let's just exit first for safety/margin).
+                                # Actually, better to switch signal to "EXIT_LONG".
+                                # The loop usually processes one action.
+                                final_decision = "EXIT_LONG" 
+                                meta_data['reason'] = "Elastic Snap Reverse (High Conf Short)"
+                           else:
+                                logger.warning(f"DIRECTIONAL LOCK: Blocked SELL on {current_symbol} (Conf {final_score:.1f}% < 75%) because we hold BUYs.")
+                                final_decision = "WAIT"
+                                meta_data['veto_reason'] = "Directional Lock (Anti-Hedge)"
+                           
+                      elif final_decision == "BUY" and has_sell:
+                           if is_high_conviction:
+                                logger.warning(f"ELASTIC SNAP: High Confidence Long ({final_score:.1f}%). Closing Shorts to Reverse.")
+                                final_decision = "EXIT_SHORT"
+                                meta_data['reason'] = "Elastic Snap Reverse (High Conf Long)"
+                           else:
+                                logger.warning(f"DIRECTIONAL LOCK: Blocked BUY on {current_symbol} (Conf {final_score:.1f}% < 75%) because we hold SELLs.")
+                                final_decision = "WAIT"
+                                meta_data['veto_reason'] = "Directional Lock (Anti-Hedge)"
 
         # Harvester Override (Priority)
         for t in thoughts:
@@ -584,9 +653,15 @@ class SwarmOrchestrator:
         # If Fractal/Trend Swarm signals strong trend, block opposing trades.
         trend_direction = None
         trend_strength = 0.0
+        is_exhausted = False
         
         for t in thoughts:
              if t.source in ["Fractal_Vision_Swarm", "Trending_Swarm", "Navier_Stokes_Swarm"]:
+                 # Check for Exhaustion FIRST
+                 if t.meta_data.get('exhaustion'):
+                     is_exhausted = True
+                     logger.warning(f"TREND EXHAUSTION DETECTED: {t.meta_data.get('exhaustion_reason')}")
+                     
                  if t.confidence > 75.0 and t.signal_type in ["BUY", "SELL"]:
                      if trend_direction is None:
                          trend_direction = t.signal_type
@@ -599,16 +674,42 @@ class SwarmOrchestrator:
                          break
         
         if trend_direction and final_decision != "WAIT" and final_decision != trend_direction:
-             # We are opposing a Strong Trend.
-             # Only allow if Reversion Swarm is VERY confident (>95%)?
-             # For now, SAFETY FIRST. Block it.
-             logger.warning(f"TREND VETO: Blocked {final_decision} against Strong {trend_direction} Trend (Conf: {trend_strength:.1f})")
-             final_decision = "WAIT"
-             meta_data['veto_reason'] = f"Counter-Trend Protection ({trend_direction})"
+             # TREND AIKIDO: If Trend is POWERFUL (>80), we don't just Veto. We Join.
+             # The Counter-Trend signal provided the Volatility Trigger, but the Macro Trend dictates direction.
+             if trend_strength > 80.0 and not is_exhausted:
+                  logger.warning(f"TREND AIKIDO: Inverting {final_decision} -> {trend_direction} (Trend Conf: {trend_strength:.1f})")
+                  
+                  # Invert Decision
+                  final_decision = trend_direction 
+                  
+                  # Boost confidence (Trend Support + Volatility Trigger)
+                  final_score = (final_score + trend_strength) / 2.0
+                  
+                  meta_data['method'] = "TREND_AIKIDO"
+                  meta_data['aikido_flip'] = True
+             else:
+                  # Weak Trend? 
+                  # OLD LOGIC: Standard Safety Veto.
+                  # NEW LOGIC: User requested "More Reasoning".
+                  # If Trend is WEAK (e.g. 77.8), a strong Counter-Signal might be a Reversal or Correction.
+                  
+                  # Check if the Counter-Signal is strong enough to justify a fight
+                  if final_score > 70.0:
+                       # Allow the trade but mark as "Reversal"
+                       logger.info(f"TREND COUNTER-ATTACK: Allowing {final_decision} against Weak {trend_direction} (Trend Conf: {trend_strength:.1f} < 80). Reason: High Conviction Reversal.")
+                       meta_data['method'] = "REVERSAL_SCALP"
+                       meta_data['trend_conflict'] = True
+                       # Mild penalty to confidence for fighting trend
+                       final_score *= 0.9
+                  else:
+                       # Weak Signal vs Weak Trend -> Chop. Stay out.
+                       logger.warning(f"TREND VETO: Blocked Weak {final_decision} ({final_score:.1f}) against Weak {trend_direction} Trend.")
+                       final_decision = "WAIT"
+                       meta_data['veto_reason'] = f"Chop Protection ({trend_direction})"
 
         # 4. Active Inference Arbitration (The Free Energy Principal)
         # If the Swarm is split or uncertain, we check which decision minimizes Free Energy (Risk + Ambiguity)
-        active_inf_decision = self._resolve_active_inference(thoughts, final_decision)
+        active_inf_decision = self._resolve_active_inference(thoughts, final_decision, weights)
         if active_inf_decision:
              final_decision, final_score, meta_new = active_inf_decision
              meta_data.update(meta_new)
@@ -616,6 +717,46 @@ class SwarmOrchestrator:
 
         # 5. Metacognitive Reflection (Self-Correction)
         # "Before I act, let me think about why I am acting."
+        
+        # --- PHASE 26: ENTROPY STATE INJECTION ---
+        # Calculate Market Entropy (Chaos)
+        if data_context and 'df' in data_context:
+             df_entropy = data_context['df']
+             if 'close' in df_entropy.columns:
+                 market_entropy = self.entropy_harvester.calculate_shannon_entropy(df_entropy['close'])
+                 meta_data['market_entropy'] = market_entropy
+                 
+                 # 1. Start with Entropy (0.0 to 1.0)
+                 # > 0.8 = High Chaos (Random) -> Favor Mean Reversion? Risk Off?
+                 # < 0.3 = Order (Trend) -> Favor Trend?
+                 
+                 if market_entropy > 0.85:
+                      logger.warning(f"ENTROPY WARNING: High Chaos ({market_entropy:.2f}). Market is Random.")
+                      # Penalize Trend Trades
+                      if meta_data.get('method') == "TREND_AIKIDO" or trend_strength > 50:
+                           final_score *= 0.7
+                           meta_data['entropy_penalty'] = True
+                           
+                 elif market_entropy < 0.30:
+                      # High Order -> Trend likely stable
+                      if meta_data.get('method') == "TREND_AIKIDO" or trend_strength > 50:
+                           final_score *= 1.15
+                           meta_data['entropy_boost'] = True
+        
+        # --- PHASE 200: CAUSAL TRUTH FILTER ---
+        # Before Metacognition, we check "Ontological Truth".
+        # If Price is Hallucinating (No Causal support), we kill it.
+        if final_decision in ["BUY", "SELL"]:
+             df_causal = data_context.get('df') if data_context else None
+             causal_analysis = self.causal_engine.analyze_causality(df_causal) 
+             meta_data['causal_truth'] = causal_analysis['truth_score']
+             
+             if causal_analysis['truth_score'] < 0.4:
+                  # Major Causal Disconnect (Hallucination)
+                  logger.warning(f"CAUSAL VETO: Truth Score {causal_analysis['truth_score']:.2f} < 0.4. Blocking Hallucination.")
+                  final_decision = "WAIT"
+                  meta_data['veto_reason'] = "Causal Disconnect (Hallucination)"
+        
         reflection = self.metacognition.reflect(final_decision, final_score, meta_data, {'config': {'mode': mode}})
         final_score = reflection['adjusted_confidence']
         if reflection['notes']:
@@ -623,10 +764,92 @@ class SwarmOrchestrator:
             # If validation failed (score -> 0), switch to WAIT
             # Relaxed Threshold: 47.0 (was 35.0) per User Request (Raising the Bar)
             if final_score < 47.0 and final_decision != "EXIT_ALL":
-                final_decision = "WAIT"
-                logger.info(f"METACOGNITION: Vetoed Decision. Score {final_score:.1f} < 47.0. Reason: {reflection['notes']}")
+                # NEW LOGIC: Attempt to rescue the decision via Deep Reasoning
+                rescued_decision, rescued_score, rescue_reason = self._attempt_deep_reasoning_fix(
+                    final_decision, final_score, reflection['notes'], meta_data
+                )
+                
+                if rescued_decision != "WAIT":
+                    final_decision = rescued_decision
+                    # Boost score slightly above threshold to let it pass execution filters
+                    final_score = max(rescued_score, 50.0) 
+                    meta_data['rescue_reason'] = rescue_reason
+                    meta_data['deep_reasoning'] = True
+                    logger.info(f"DEEP REASONING: Rescued 'Poor Reasoning' decision. {rescue_reason}")
+                else:
+                    final_decision = "WAIT"
+                    logger.info(f"METACOGNITION: Vetoed Decision. Score {final_score:.1f} < 47.0. Reason: {reflection['notes']}")
             else:
                 logger.info(f"METACOGNITION: Passed. Score {final_score:.1f} (Threshold 47.0)")
+        
+        # --- PHASE 250: TIME CONFIRMATION BIAS (The Golden Third) ---
+        # "Entering at 3:40 (220s) avoids noise and closing algos."
+        
+        # STRICT GATE: Use System Time as requested ("horario do meu computador")
+        # Ensure we are synchronized with the 5-minute grid.
+        system_time = time.time()
+        seconds_in_bar = int(system_time % 300)
+        
+        if final_decision in ["BUY", "SELL"]:
+             meta_data['bar_time'] = seconds_in_bar
+             
+             # RULE 1: STRICT PRE-GATE (0 - 219s) -> BLOCK ENTRIES
+             # User Request: "entrar somente em 3 minutos e 40 segundos"
+             if seconds_in_bar < 220:
+                  logger.info(f"TIME GATE: Too early ({seconds_in_bar}s). Waiting for Golden Third (220s).")
+                  final_decision = "WAIT"
+                  meta_data['veto_reason'] = f"Time Gate (Wait for 3m40s). Current: {seconds_in_bar}s"
+                       
+             # RULE 2: THE GOLDEN THIRD (220s - 280s) -> BOOST
+             elif 220 <= seconds_in_bar <= 280:
+                  final_score *= 1.25 # Significant Boost
+                  final_score = min(final_score, 99.0)
+                  logger.info(f"TIME BIAS: Golden Third ({seconds_in_bar}s). Perfect Entry Window. Score -> {final_score:.1f}")
+                  meta_data['golden_time'] = True
+                  
+             # RULE 3: CLOSING ALGOS (285s+) -> DANGER
+             elif seconds_in_bar > 285:
+                  final_score *= 0.6
+                  logger.warning(f"TIME BIAS: Closing Algo Danger ({seconds_in_bar}s). Penalizing. Score -> {final_score:.1f}")
+                  if final_score < 55.0:
+                       final_decision = "WAIT"
+                       meta_data['veto_reason'] = "Closing Algo Risk"
+                       
+             # --- PHASE 255: ALGORITHMIC QUARTER CYCLES (Macro Timing) ---
+             # Determines bias based on 15-minute blocks within the hour.
+             # tick_time is Epoch Seconds.
+             # Minute of hour:
+             minute_of_hour = int((time.time() / 60) % 60)
+             quarter_cycle = (minute_of_hour // 15) + 1 # 1, 2, 3, 4
+             meta_data['quarter_cycle'] = quarter_cycle
+              
+             # Q1 (00-15): The Trap / Accumulation. Breakouts often fail.
+             if quarter_cycle == 1:
+                  if final_decision != "WAIT":
+                       # Slight Penalty for Breakouts due to "Judas Swing" risk
+                       # But if it's a "Reversal" trade (Sniper), it's good.
+                       if meta_data.get('method') in ["BREAKOUT", "TREND_AIKIDO"]:
+                            final_score *= 0.9
+                            logger.info(f"CYCLE BIAS: Q1 (The Trap). Caution on Breakout. Score -> {final_score:.1f}")
+              
+             # Q2 (15-30): The Shift / Reversal. True Trend often starts here.
+             elif quarter_cycle == 2:
+                  # Good for Reversals and New Trends
+                  final_score *= 1.1
+                  logger.info(f"CYCLE BIAS: Q2 (The Shift). Boosting Validity. Score -> {final_score:.1f}")
+                  
+             # Q3 (30-45): The Flow. Best for Continuation.
+             elif quarter_cycle == 3:
+                   # Best for Trend Following
+                   if meta_data.get('method') == "TREND_AIKIDO" or trend_strength > 50:
+                        final_score *= 1.2
+                        logger.info(f"CYCLE BIAS: Q3 (The Flow). Strong Trend Support. Score -> {final_score:.1f}")
+                        
+             # Q4 (45-60): The Fix / Closing. Mean Reversion.
+             elif quarter_cycle == 4:
+                   # High risk of closing algos.
+                   final_score *= 0.9
+                   logger.info(f"CYCLE BIAS: Q4 (The Fix). Caution (Closing Algos). Score -> {final_score:.1f}")
         
         # 6. Neural Resonance Sync (Phase 150+)
         # Synchronize decision with user intent model (Symbiosis)
@@ -639,12 +862,11 @@ class SwarmOrchestrator:
 
         return (final_decision, final_score, meta_data)
 
-    def _resolve_active_inference(self, thoughts: List[SwarmSignal], current_consensus: str) -> Tuple[str, float, Dict]:
+    def _resolve_active_inference(self, thoughts: List[SwarmSignal], current_consensus: str, weights: Dict[str, float] = None) -> Tuple[str, float, Dict]:
         """
         Calculates Expected Free Energy based on Swarm Hypotheses.
         """
-        # If consensus is strong (>80%), skip expensive calculation
-        # if final_score > 80: return None
+        if weights is None: weights = {}
         
         # We evaluate 3 Policies: BUY, SELL, HOLD (WAIT)
         policies = ["BUY", "SELL", "HOLD"]
@@ -655,12 +877,29 @@ class SwarmOrchestrator:
         # Calculate Consensus Score for the Current Decision
         consensus_score = 0.0
         count = 0
-        for t in thoughts:
-             if t.signal_type == current_consensus:
-                  consensus_score += t.confidence
-                  count += 1
-        if count > 0: consensus_score /= count
         
+        # Calculate Coherence (WEIGHTED Vote Ratio)
+        buy_weight = 0.0
+        sell_weight = 0.0
+        
+        for t in thoughts:
+             w = weights.get(t.source, 1.0)
+             
+             if t.signal_type == current_consensus:
+                  consensus_score += t.confidence * w
+                  # Normalize later? No, raw strength is fine here.
+                  count += w
+             
+             if t.signal_type == "BUY": buy_weight += t.confidence * w
+             elif t.signal_type == "SELL": sell_weight += t.confidence * w
+
+        if count > 0: consensus_score /= count # Normalized Weighted Average Confidence
+        
+        total_weight = buy_weight + sell_weight
+        coherence = 0.0
+        if total_weight > 0:
+             coherence = max(buy_weight, sell_weight) / total_weight
+             
         # Get Volatility/Entropy from Short Term Memory if available
         volatility = 0.01
         entropy = 0.5
@@ -672,7 +911,8 @@ class SwarmOrchestrator:
              'consensus_decision': current_consensus,
              'consensus_confidence': consensus_score,
              'volatility': volatility,
-             'entropy': entropy
+             'entropy': entropy,
+             'coherence': coherence
         }
 
         result = self.free_energy_minimizer.select_best_policy(policies, context)
@@ -691,20 +931,27 @@ class SwarmOrchestrator:
              return (best_policy, 65.0, {'active_inference_G': best_G})
              
         if current_consensus != "WAIT" and best_policy == "WAIT":
-             # Active Inference suggests Holding is safer (lower Free Energy)
-             # But if Consensus is VERY strong, we ignore the caution (Risk Taker)
-             # MODIFIED: Lowered threshold from 80.0 to 60.0. Added Mode sensitivity.
+             # Active Inference suggests Holding is safer.
+             # We only override if the Swarm is STRONGLY united.
              
              threshold = 60.0
              mode = context.get('mode', 'SNIPER')
              if mode in ['HYDRA', 'WOLF_PACK']:
-                 threshold = 50.0 # Aggressive modes ignore caution more easily
-                 
+                 threshold = 50.0 
+
+             # CRITICAL FIX: Check Coherence (Vote Ratio)
+             # If Swarm is split (e.g. 51% Buy vs 49% Sell), we CANNOT override safety.
+             coherence = context.get('coherence', 0.5) 
+             
+             # If Consensus is weak (low coherence), we trust Active Inference (WAIT)
+             if coherence < 0.6 and context['consensus_confidence'] < 85.0:
+                  logger.info(f"ACTIVE INFERENCE: Vetoing {current_consensus} (Low Coherence {coherence:.2f} < 0.6)")
+                  return ("WAIT", 0.0, {'active_inference_veto': True, 'G': best_G})
+
              if context['consensus_confidence'] > threshold:
-                  logger.info(f"ACTIVE INFERENCE: Constraint OVERRIDDEN by Swarm Power ({context['consensus_confidence']} > {threshold})")
+                  logger.info(f"ACTIVE INFERENCE: Constraint OVERRIDDEN by Swarm Power ({context['consensus_confidence']} > {threshold} & Coherence {coherence:.2f})")
                   return (current_consensus, context['consensus_confidence'], {'active_inference_veto': False, 'note': 'High Confidence Override'})
              
-             logger.info(f"ACTIVE INFERENCE: Vetoing {current_consensus} (Confidence {context['consensus_confidence']} < {threshold})")
              return ("WAIT", 0.0, {'active_inference_veto': True, 'G': best_G})
              
         return None
@@ -725,13 +972,13 @@ class SwarmOrchestrator:
         # 1. Mode Multiplier
         # 1. Mode Multiplier
         if mode == "WOLF_PACK":
-            base_slots = 15 # Boosted from 10
+            base_slots = 20 # Boosted for Pack Logic
         elif mode == "HYBRID":
-            base_slots = 20 # Boosted from 10
+            base_slots = 30 # Increased Capacity
         elif mode == "HYDRA":
-            base_slots = 25 # Aggressive Base
+            base_slots = 60 # Machine Gun Mode (User Request)
         elif mode == "AGI_MAPPER":
-            base_slots = 40 # Heavy scaling for $8k+ accounts
+            base_slots = 100 # Unlimited Power for GrandMaster
             
         # 2. Entropy / Volatility Damper
         # Volatility 0-100
@@ -754,8 +1001,8 @@ class SwarmOrchestrator:
             
         final_slots = int(base_slots * entropy_factor * trend_factor)
         
-        # Hard Limits (Raised for $8k account)
-        final_slots = max(1, min(final_slots, 60))
+        # Hard Limits (Raised significantly for Scalability)
+        final_slots = max(1, min(final_slots, 200))
         
         # logger.debug(f"AGI SLOTS: Base {base_slots} * Ent {entropy_factor} * Trend {trend_factor} = {final_slots}")
         
@@ -1026,8 +1273,70 @@ class SwarmOrchestrator:
         if final_conf > 50:
             final_conf = min(85.0, final_conf * 1.1)  # 10% boost, max 85% 
         
+        # --- SMART CIVIL WAR RESOLUTION ---
+        # If we are gridlocked ("WAIT") but there is significant volume/conviction in the room.
+        if final_decision == "WAIT" and (buy_strength + sell_strength) > 300:
+             # 1. Elite Agent Arbitration (Whales & Smart Money have 2x Vote)
+             elite_balance = 0.0
+             elite_agents = ["Whale_Swarm", "SmartMoney_Swarm", "Apex_Swarm", "Quantum_Grid_Swarm"]
+             
+             for t in thoughts:
+                 if t.source in elite_agents:
+                     if t.signal_type == "BUY": elite_balance += t.confidence
+                     elif t.signal_type == "SELL": elite_balance -= t.confidence
+             
+             if elite_balance > 100.0:
+                 final_decision = "BUY"
+                 final_conf = 70.0 # Enough to trigger, not enough for Wolf Pack
+                 logger.info(f"CIVIL WAR RESOLVED: Elite Agents ({elite_balance:.0f}) broke the tie -> BUY")
+                 meta_data['resolution'] = "ELITE_VOTE"
+                 
+             elif elite_balance < -100.0:
+                 final_decision = "SELL"
+                 final_conf = 70.0
+                 logger.info(f"CIVIL WAR RESOLVED: Elite Agents ({elite_balance:.0f}) broke the tie -> SELL")
+                 meta_data['resolution'] = "ELITE_VOTE"
+        
         if final_decision not in allowed_actions: final_decision = "WAIT"
 
-        return final_decision, final_conf, {'attention_weights': attn_weights.tolist()}
+        meta_data['attention_weights'] = attn_weights.tolist()
+        return final_decision, final_conf, meta_data
 
 
+
+    def _attempt_deep_reasoning_fix(self, decision: str, score: float, notes: List[str], meta_data: Dict) -> Tuple[str, float, str]:
+        """
+        Attempt to rescue a decision that failed Metacognition (Poor Reasoning).
+        We check if the 'Unreasonable' decision is actually 'Intuitive' or 'Reflexive'.
+        """
+        # 0. SAFETY LOCK: Never rescue if the Swarm detected Exhaustion.
+        if meta_data.get('exhaustion'):
+             return "WAIT", 0.0, f"Rescue Blocked by Exhaustion ({meta_data.get('exhaustion_reason')})"
+
+        # 1. Elite Authority Check
+        # If the signal originated from an Elite Agent, we trust it more than the general consensus.
+        # We need to check which agents contributed to this decision.
+        # This is hard because 'thoughts' are not passed here, but we can infer from meta_data or simply trust the Elite Agents blindly for now if we had access.
+        # FIX: We don't have 'thoughts' here easily. 
+        # But we can check 'resolution' in meta_data. If it was an ELITE_VOTE, we should have passed!
+        
+        if meta_data.get('resolution') == 'ELITE_VOTE':
+            return decision, 70.0, "Elite Vote Authority overrides Poor Reasoning"
+            
+        # 2. Volatility Reflex Exception
+        # If Volatility is Extreme, standard logic (spread checks, session checks) might be too slow.
+        # We assume High Entropy = High Volatility context.
+        entropy = 0.5
+        if 'market_metrics' in self.short_term_memory:
+             entropy = self.short_term_memory['market_metrics'].get('entropy', 0.5)
+             
+        if entropy > 0.8: # Chaos Mode
+             return decision, 60.0, "High Entropy Reflex: Speed > Logic"
+             
+        # 3. Trend Aikido Exception
+        # If we just performed a Trend Aikido flip, it MIGHT look like poor reasoning (counter-intuitive).
+        # But we know it's a valid strategy.
+        if meta_data.get('aikido_flip'):
+             return decision, 65.0, "Trend Aikido Strategy is Valid by Design"
+
+        return "WAIT", 0.0, "Rescue Failed"

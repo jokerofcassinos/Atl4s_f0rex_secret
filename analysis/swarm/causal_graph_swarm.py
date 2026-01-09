@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from core.interfaces import SubconsciousUnit, SwarmSignal
 from analysis.order_flow import OrderFlowEngine
+from core.agi.big_beluga.snr_matrix import SNRMatrix
 
 logger = logging.getLogger("CausalGraphSwarm")
 
@@ -20,6 +21,7 @@ class CausalGraphSwarm(SubconsciousUnit):
     def __init__(self):
         super().__init__("Causal_Graph_Swarm")
         self.order_flow = OrderFlowEngine()
+        self.snr_matrix = SNRMatrix()
         # Causal Edges Probabilities
         self.edges = {
             ('delta', 'price'): 0.5,
@@ -38,7 +40,28 @@ class CausalGraphSwarm(SubconsciousUnit):
         is_whale = flow_state['is_whale']
         is_absorption = flow_state['is_absorption']
         
-        # 2. Analyze Effect (Price)
+        # 2. Analyze Structure (The "Ontological Context")
+        # Is there a Wall in front of us?
+        current_price = df_m5['close'].iloc[-1]
+        self.snr_matrix.scan_structure(df_m5)
+        # Assuming M5 ATR is approx 0.0010 (10 points) or calculated:
+        high_low = df_m5['high'] - df_m5['low']
+        atr = high_low.rolling(14).mean().iloc[-1]
+        if pd.isna(atr) or atr == 0: atr = 0.0010
+        
+        levels = self.snr_matrix.get_nearest_levels(current_price)
+        dist_res = levels.get('res_dist', 99.0)
+        dist_sup = levels.get('sup_dist', 99.0)
+        
+        # STRUCTURAL CAUSALITY (The Wall Principle)
+        # Cause: Momentum -> Effect: Price Move?
+        # Check: Does Obstacle block Effect?
+        # If Dist to Wall < 0.5 * ATR (Very close), we need MASSIVE energy to break it.
+        wall_proximity = 0.5 * atr
+        hit_resistance = dist_res < wall_proximity
+        hit_support = dist_sup < wall_proximity
+        
+        # 3. Analyze Effect (Price)
         price_change = df_m5['close'].iloc[-1] - df_m5['open'].iloc[-1]
         is_bullish_candle = price_change > 0
         
@@ -50,18 +73,43 @@ class CausalGraphSwarm(SubconsciousUnit):
         # Case A: Valid Move (Cause == Effect)
         # Price UP AND Delta POSITIVE (Aggressive Buying)
         if is_bullish_candle and delta > 0:
-            signal = "BUY"
-            confidence = 75.0
-            if is_whale: 
-                confidence += 15.0 # Whale support
-                reason = "VALID: Whale Buying supporting Price."
+            if hit_resistance:
+                 # We are hitting a wall.
+                 if is_whale:
+                     # Whales Break Walls.
+                     signal = "BUY"
+                     confidence = 85.0
+                     reason = "BREAKOUT: Whale Smashing Resistance."
+                 else:
+                     # "Structural Inversion": The Wall will hold. Retail is trapped.
+                     # Instead of waiting, we FADE the move.
+                     signal = "SELL" 
+                     confidence = 70.0 # Good probability rejection
+                     reason = "REJECTION: Buying into Wall without Whale Support (Fade)."
             else:
-                reason = "VALID: Delta supports Price."
+                signal = "BUY"
+                confidence = 75.0
+                if is_whale: 
+                    confidence += 15.0 # Whale support
+                    reason = "VALID: Whale Buying supporting Price."
+                else:
+                    reason = "VALID: Delta supports Price."
 
         # Case B: Valid Move (Cause == Effect)
         # Price DOWN AND Delta NEGATIVE (Aggressive Selling)    
         elif not is_bullish_candle and delta < 0:
-            signal = "SELL"
+            if hit_support:
+                if is_whale:
+                    signal = "SELL"
+                    confidence = 85.0
+                    reason = "BREAKOUT: Whale Smashing Support."
+                else:
+                    # Structural Inversion: Support will hold.
+                    signal = "BUY"
+                    confidence = 70.0
+                    reason = "BOUNCE: Selling into Support without Whale Support (Fade)."
+            else:
+                signal = "SELL"
             confidence = 75.0
             if is_whale:
                 confidence += 15.0
@@ -79,9 +127,14 @@ class CausalGraphSwarm(SubconsciousUnit):
         elif is_bullish_candle and delta < 0:
             # Trap? Or Reversal?
             # Rising Price on Selling Volume is suspicious.
-            signal = "SELL" # Fade the move?
-            confidence = 60.0
-            reason = "ANOMALY: Price Rising on Selling Delta (Divergence)"
+            if hit_resistance:
+                signal = "SELL"
+                confidence = 80.0
+                reason = "TRAP: Rising into Resistance on Selling Delta (Fakeout)."
+            else:
+                signal = "SELL" # Fade the move?
+                confidence = 60.0
+                reason = "ANOMALY: Price Rising on Selling Delta (Divergence)"
             
         elif not is_bullish_candle and delta > 0:
             # Price Dropping on Buying Volume.

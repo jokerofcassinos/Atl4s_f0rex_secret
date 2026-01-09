@@ -2,7 +2,7 @@
 import logging
 import asyncio
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from risk.dynamic_leverage import DynamicLeverage
 from risk.great_filter import GreatFilter
@@ -52,12 +52,16 @@ class ExecutionEngine:
         # 2. Check Individual Guards (VTP / VSL)
         self.check_individual_guards(trades, v_tp, v_sl)
         
-        # 3. Check Predictive Exits (The Magnet)
+        # 3. Pack Synchronization (Wolf Pack Logic)
+        # If leader secured bag, stragglers must move to safety.
+        self.apply_pack_synchronization(trades, tick)
+        
+        # 4. Check Predictive Exits (The Magnet)
         for trade in trades:
              if not isinstance(trade, dict): continue
              
              # A. Predictive Exit (VTP)
-             closed = self.check_predictive_exit(trade, tick)
+             closed = self.check_predictive_exit(trade, tick, agi_context)
              if closed: continue
              
              # B. Stalemate Check (The Broom)
@@ -253,7 +257,8 @@ class ExecutionEngine:
         account_info: Optional[Dict] = None,
         volatility: float = 50.0,
         entropy: float = 0.5,
-        infinite_depth: int = 0
+        infinite_depth: int = 0,
+        atr_value: float = None # Added for GreatFilter Spread Guard
     ):
         """
         PHASE 11: HYDRA PROTOCOL (AGI Multi-Vector Execution).
@@ -323,7 +328,9 @@ class ExecutionEngine:
                 confidence=confidence,
                 account_info=account_info,
                 volatility=volatility,
-                hydra_multiplier=scaling_factor # Pass scaling
+                volatility=volatility,
+                hydra_multiplier=scaling_factor, # Pass scaling
+                atr_value=atr_value # Pass ATR for Spread Guard
             )
             
             # Micro-sleep to prevent sequence errors in MT5
@@ -443,10 +450,11 @@ class ExecutionEngine:
         
         return final_tp, final_sl
 
-    def check_predictive_exit(self, trade: Dict, current_tick: Dict):
+    def check_predictive_exit(self, trade: Dict, current_tick: Dict, agi_context: Dict = None):
         """
-        Virtual TP 2.0 (The Magnet)
+        Virtual TP 2.0 (The Magnet) with Dynamic Assessment.
         Checks if we should close BEFORE the hard TP to secure bag.
+        Analyzes "Difficulty" of reaching the target using AGI Context.
         """
         symbol = trade.get('symbol')
         ticket = trade.get('ticket')
@@ -469,11 +477,60 @@ class ExecutionEngine:
         progress = current_dist / total_dist
         
         # 2. Virtual Hit Logic - SIMPLIFIED
-        # Close immediately when profit >= $2.00 (User Request)
+        # Close immediately when profit >= $2.00 (Reference)
         if profit >= 2.0:
              logger.info(f"VTP: {symbol} reached ${profit:.2f}. Closing immediately.")
              self.close_trade(ticket, symbol)
              return True
+             
+        # 3. Dynamic "Smart Greed" (Difficulty Analysis) (User Request)
+        # Scan 0.00 -> 2.00 Range.
+        # If we are profitable (>0.50) but facing "Heavy Resistance", take the money.
+        
+        if profit > 0.50:
+             difficulty_score = 0.0
+             reason = []
+             
+             # A. Agi Context Analysis
+             if agi_context:
+                  # 1. Volatility Drop (Dead Market)
+                  vol = agi_context.get('volatility_score', 50.0)
+                  if vol < 35.0: # Dying momentum
+                       difficulty_score += 30.0
+                       reason.append("Low Vol")
+                       
+                  # 2. Counter-Trend Bias
+                  chronos = agi_context.get('chronos_narrative', {})
+                  trend_bias = chronos.get('trend_bias', 'NEUTRAL')
+                  trade_type = trade.get('type') # 0=Buy
+                  
+                  if trade_type == 0 and "BEAR" in trend_bias:
+                       difficulty_score += 40.0 # Fighting the tide
+                       reason.append("Trend Mismatch")
+                  elif trade_type == 1 and "BULL" in trend_bias:
+                       difficulty_score += 40.0
+                       reason.append("Trend Mismatch")
+                       
+             # B. Time Decay (Stagnation)
+             current_time = self._get_current_time_msc() / 1000.0
+             if ticket in self.trade_start_times:
+                  age = current_time - self.trade_start_times[ticket]
+                  if age > 900: # 15 mins
+                       difficulty_score += 20.0
+                       reason.append("Stagnation")
+             
+             # C. Threshold Logic
+             # High Profit (> 1.20) -> Low Difficulty needed to close (Secure 60% of target)
+             if profit > 1.20 and difficulty_score >= 20.0:
+                  logger.info(f"SMART GREED: Closing {ticket} at ${profit:.2f}. Difficulty: {difficulty_score} ({reason})")
+                  self.close_trade(ticket, symbol)
+                  return True
+                  
+             # Medium Profit (> 0.50) -> High Difficulty needed to close (Bail out)
+             if profit > 0.50 and difficulty_score >= 50.0:
+                  logger.info(f"SMART BAILOUT: Closing {ticket} at ${profit:.2f}. High Difficulty: {difficulty_score} ({reason})")
+                  self.close_trade(ticket, symbol)
+                  return True
         
         return False
 
@@ -636,6 +693,94 @@ class ExecutionEngine:
                 self.close_trade(ticket, symbol)
                 self.close_attempts[ticket] = current_time  # Mark attempt
                 continue
+
+    def apply_pack_synchronization(self, trades: List[Dict], tick: Dict):
+        """
+        Wolf Pack Synchronization.
+        If any trade in the pack has secured significant profit (e.g. > $2.0 or hit TP1),
+        all other trades in that direction MUST move to Break-Even immediately.
+        We do not allow a winning prediction to turn into a losing position for the stragglers.
+        """
+        if not trades: return
+        
+        # 1. Group by Direction
+        buys = [t for t in trades if t.get('type') == 0 and t.get('symbol') == tick.get('symbol')]
+        sells = [t for t in trades if t.get('type') == 1 and t.get('symbol') == tick.get('symbol')]
+        
+        self.sync_direction_pack(buys, "BUY", tick)
+        self.sync_direction_pack(sells, "SELL", tick)
+
+    def sync_direction_pack(self, pack: List[Dict], side: str, tick: Dict):
+        if not pack: return
+        
+        # 2. Check for Leaders (Winners)
+        # A Leader is a trade that has > $2.0 profit OR has already been closed (can't check closed here easily, so we rely on Open pnl)
+        # OR if we detect a High Water Mark? No, keep it simple.
+        
+        max_profit = -999.0
+        leader_ticket = None
+        
+        for t in pack:
+             p = float(t.get('profit', 0.0))
+             if p > max_profit:
+                 max_profit = p
+                 leader_ticket = t.get('ticket')
+                 
+        # 3. Decision Logic
+        # User Issue: "Fechou +2 e outros ficaram 0.00 e desceram".
+        # If Max Profit > 1.50 (slightly less than 2.0 to catch early), we trigger "Safety Mode".
+        
+        if max_profit > 1.50:
+             # logger.debug(f"PACK SYNC ({side}): Leader {leader_ticket} reached ${max_profit:.2f}. Securing Stragglers.")
+             
+             for t in pack:
+                 ticket = t.get('ticket')
+                 if ticket == leader_ticket: continue # Leader is managed by VTP
+                 
+                 profit = float(t.get('profit', 0.0))
+                 open_price = float(t.get('open_price', 0.0))
+                 current_sl = float(t.get('sl', 0.0))
+                 
+                 # 4. Check if Straggler is unsafe (Negative or 0.00 SL)
+                 # We want to force SL to Break-Even + Spread
+                 
+                 # Calculate Break-Even Level
+                 # For BUY: Open Price + Spread
+                 # For SELL: Open Price - Spread
+                 
+                 current_price = tick.get('bid')
+                 spread = tick.get('ask', 0) - tick.get('bid', 0)
+                 if spread <= 0: spread = 0.0001
+                 
+                 be_level = 0.0
+                 update_needed = False
+                 
+                 if side == "BUY":
+                      target_sl = open_price + (spread * 1.5) # Slight profit to cover comms
+                      if current_sl < target_sl:
+                          # Only update if Price is currently ABOVE target (otherwise we close immediately? No, we set SL and let market modify)
+                          # Actually, bridge handles modify.
+                          # But MT5 rejects SL if price is too close.
+                          if current_price > target_sl + spread:
+                               be_level = target_sl
+                               update_needed = True
+                 else: # SELL
+                      target_sl = open_price - (spread * 1.5)
+                      # Sell SL is ABOVE price. We want to move it DOWN to Entry.
+                      # If Current SL is 0 (no SL) or > Target SL (Riskier), we tighten.
+                      if (current_sl == 0 or current_sl > target_sl):
+                           if current_price < target_sl - spread:
+                                be_level = target_sl
+                                update_needed = True
+                                
+                 if update_needed:
+                      # logger.info(f"PACK SAFETY: Dragging Straggler {ticket} to BE ({be_level:.5f}) because Leader is up ${max_profit:.2f}")
+                      if self.bridge:
+                           tp = t.get('tp', 0.0)
+                           self.bridge.send_command("MODIFY_TRADE", [str(ticket), f"{be_level:.5f}", f"{tp:.2f}"])
+                           # Mark as updated to avoid spam? 
+                           # Implementation detail: MT5 bridge might reject spam, but here we only send if condition met.
+                           # We relying on next tick to update 'sl' in json, so we won't spam infinitely if update works.
 
     def check_stalemate(self, trade: Dict, current_tick: Dict, agi_context: Dict = None):
         """

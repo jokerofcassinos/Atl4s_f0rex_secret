@@ -55,27 +55,34 @@ class GreatFilter:
             reasons.append(f"UNPROFITABLE: Friction ({friction_cost:.5f}) eats Reward ({target_profit:.5f})")
             allowed = False
             
-        return {
-            'allowed': allowed,
-            'decision_id': "GF-" + str(int(market_state.get('tick_time', 0))),
-            'reason': "; ".join(reasons)
-        }
-
         # 3. Spread Check (Block if spread is excessive)
-        # For Forex: spread is in price units (0.0003 = 3 pips for GBPUSD)
-        # For Gold: spread is in price units (0.50 = 50 cents)
         spread = market_state.get("spread", 0.0)
+        atr_value = market_state.get('metrics', {}).get('atr_value', 0.0)
+        candle_size = market_state.get('candle_size', 0.0) # Need to ensure this is passed
         
-        # Use relative threshold: block if spread > 0.05% of price (covers both Forex and Gold)
-        # For GBPUSD ~1.34: 0.05% = 0.00067 (~6.7 pips) 
-        # For USDJPY ~156: 0.05% = 0.078 (~7.8 pips)
-        # For Gold ~2600: 0.05% = 1.30 ($1.30)
+        # A. ATR Based Guard (Best)
+        if atr_value > 0:
+             max_spread = atr_value * 0.35 # Max 35% of ATR (Stricter)
+             if spread > max_spread:
+                  reasons.append(f"Spread {spread:.5f} > 35% ATR ({max_spread:.5f}) - Impossible Scalp")
+                  allowed = False
+        
+        # B. Candle Context Guard (User Innovation)
+        # "Observe where the candle is... spread is 3x above"
+        # If Spread > Candle Body * 0.8 -> We are paying more in spread than the candle moved!
+        if candle_size > 0:
+             if spread > candle_size * 0.9: # Almost equal to the entire candle movement
+                  reasons.append(f"Spread {spread:.5f} consumes Candle ({candle_size:.5f}) - Ghost Spread")
+                  allowed = False
+                  
+        # C. Hard Cap (Fallback)
+        typical_price = market_state.get("typical_price", 1.0)
         max_spread_ratio = 0.0005  # 0.05%
-        typical_price = market_state.get("typical_price", 1.0)  # Fallback
-        max_spread = typical_price * max_spread_ratio if typical_price > 10 else max_spread_ratio
+        max_spread_hard = typical_price * max_spread_ratio
+        if max_spread_hard < 0.00020: max_spread_hard = 0.00020
         
-        if spread > max_spread and spread > 0.0008:  # Also hard floor of 8 pips
-            reasons.append(f"Spread {spread:.5f} too wide (max: {max_spread:.5f})")
+        if spread > max_spread_hard and spread > 0.0008:
+            reasons.append(f"Spread {spread:.5f} too wide (Hard Limit)")
             allowed = False
 
         if not reasons:
