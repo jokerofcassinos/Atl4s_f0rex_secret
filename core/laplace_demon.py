@@ -51,6 +51,10 @@ from analysis.swarm.vortex_swarm import VortexSwarm
 from core.agi.big_beluga.snr_matrix import SNRMatrix
 from core.agi.microstructure.flux_heatmap import FluxHeatmap
 
+# HEISENBERG PROTOCOL: Quantum Physics Modules
+from analysis.quantum_core import QuantumCore
+from core.agi.active_inference.free_energy import FreeEnergyMinimizer
+
 logger = logging.getLogger("LaplaceDemon")
 
 
@@ -215,8 +219,13 @@ class LaplaceDemonCore:
         self.snr_matrix = SNRMatrix()    # Structural Nexus Resonance (S/R Filter)
         self.heatmap = FluxHeatmap()     # Microstructure Liquidity Radar
         
+        # HEISENBERG PROTOCOL: Quantum Physics
+        self.quantum = QuantumCore()              # Quantum Tunneling & Uncertainty
+        self.free_energy = FreeEnergyMinimizer()  # Surprise Minimization
+        
         logger.info("LAPLACE DEMON INITIALIZED - Deterministic Intelligence Active")
         logger.info("OMNI-CORTEX: SNRMatrix & FluxHeatmap Online.")
+        logger.info("HEISENBERG PROTOCOL: QuantumCore & FreeEnergy Active.")
     
     def analyze(self,
                 df_m1: pd.DataFrame,
