@@ -774,41 +774,61 @@ class LaplaceDemonCore:
                          structure_result: Dict,
                          setup_type: str = "NORMAL") -> Dict:
         """
-        ASYMMETRIC TARGETING ENGINE (Hydra Protocol)
+        [PROTOCOLO AEGIS] - DYNAMIC GEOMETRY
         
-        Lion = Infinite Horizon (Trend Following, 6x R:R)
-        Snake = Mean Reversion (Precision Strike, 2.5x R:R)
+        SL baseado em Market Structure (Swing Points) ao invés de pips fixos.
+        Isso evita o "Efeito Gaiola" onde oscilações normais destroem trades bons.
         """
-        pip_size = 0.0001  # GBPUSD
+        pip_size = 0.0001
+        sl_pips = 0.0
         
-        # 1. Stop Loss: Sempre Técnico ou Baseado em Volatilidade (Sobrevivência)
-        sl_pips = max(10, atr_pips * 1.5)
+        # --- 1. SMART STOP LOSS (STRUCTURAL DEFENSE) ---
+        # Tenta encontrar um Swing Point (Liquidity Pool) para proteger
+        pools = structure_result.get('liquidity_pools', [])
+        structure_sl_price = None
         
-        # Ajuste estrutural se disponível
-        ob = structure_result.get('ob')
-        if ob and ob.get('sl_price'):
-            structure_sl = abs(current_price - ob['sl_price']) / pip_size
-            if 5 < structure_sl < 30:  # Aceitamos SL estrutural se razoável
-                sl_pips = structure_sl
-        
-        # 2. Take Profit: AQUI MORA O LUCRO EXPONENCIAL
+        if direction == 'BUY':
+            # Para compra, queremos o Swing Low mais recente ABAIXO do preço
+            valid_lows = [p.level for p in pools if hasattr(p, 'type') and p.type == 'LOW' and p.level < current_price]
+            if valid_lows:
+                # O mais alto dos baixos (fundo mais recente)
+                structure_sl_price = max(valid_lows) - (5 * pip_size)  # 5 pips de folga
+        else:
+            # Para venda, queremos o Swing High mais recente ACIMA do preço
+            valid_highs = [p.level for p in pools if hasattr(p, 'type') and p.type == 'HIGH' and p.level > current_price]
+            if valid_highs:
+                # O mais baixo dos altos (topo mais recente)
+                structure_sl_price = min(valid_highs) + (5 * pip_size)  # 5 pips de folga
+
+        # Lógica de Decisão do SL
+        if structure_sl_price:
+            dist = abs(current_price - structure_sl_price) / pip_size
+            
+            # FILTRO DE SANIDADE:
+            # Se SL estrutural > 50 pips, é muito risco. Use ATR.
+            # Se SL estrutural < 10 pips, é ruído. Use ATR.
+            if 10 < dist < 50:
+                sl_pips = dist
+            else:
+                sl_pips = max(20, atr_pips * 2.0)  # Fallback ATR largo
+        else:
+            # Sem estrutura clara? Use Volatilidade pura (ATR Wide)
+            sl_pips = max(20, atr_pips * 2.0)  # 2.0x ATR = aprox 25-30 pips
+
+        # --- 2. DYNAMIC TAKE PROFIT (ASYMMETRIC HORIZON) ---
         tp_pips = 0.0
         
         if "LION" in setup_type:
-            # LION MODE: Trend Following.
-            # O objetivo é a Home Run que paga por 10 perdas.
-            # Alvo: 5x a 6x o Risco (R:R 1:5 ou 1:6)
-            tp_pips = max(50, sl_pips * 6.0)  # Alvo massivo (50-100+ pips)
+            # LION: Risco aumentou (20-30 pips), alvo tem que aumentar
+            # Alvo: 4x a 5x o risco estrutural (80-150 pips)
+            tp_pips = max(80, sl_pips * 5.0)
             
         elif "SNAKE" in setup_type:
-            # SNAKE MODE: Reversão à média.
-            # O mercado pega liquidez e volta rápido, não vai longe.
-            # Não seja ganancioso. Saia no próximo OB ou 2.5R.
-            tp_pips = max(20, sl_pips * 2.5)  # Alvo cirúrgico (20-40 pips)
+            # SNAKE: Precisão cirúrgica
+            tp_pips = max(25, sl_pips * 2.0)
             
         else:
-            # Default: 2x R:R
-            tp_pips = sl_pips * 2.0
+            tp_pips = sl_pips * 2.5
 
         # Preços Finais
         if direction == 'BUY':
