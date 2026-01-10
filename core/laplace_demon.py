@@ -287,7 +287,7 @@ class LaplaceDemonCore:
             h4_trend=h4_ocean,
             d1_trend=d1_galaxy,
             df_m5=df_m5, # Passed for Candle Size check
-            df_m8=self._resample_to_m8(df_m1) if df_m1 is not None else None,
+            df_m8=self._resample_to_m8(df_m1, df_m5),
             df_h1=df_h1,
             df_h4=df_h4,
             current_time=current_time
@@ -319,12 +319,16 @@ class LaplaceDemonCore:
 
     def _synthesize_agi_decision(self, structure: Dict, momentum: Dict, timing: Any, current_price: float, h4_trend: int = 0, d1_trend: int = 0, df_m5: pd.DataFrame = None, df_m8: pd.DataFrame = None, df_h1: pd.DataFrame = None, df_h4: pd.DataFrame = None, current_time: datetime = None) -> Dict:
         """
-        [AGI METACOGNITION] v6.0 - PROTOCOL 70% (DIVINE ENTRY)
+        [AGI METACOGNITION] v7.0 - PROTOCOL CHIMERA (THE LION & THE SNAKE)
         
-        Refined Logic Gates:
-        1. THE ROYAL COURT: D1 and H4 MUST agree.
-        2. DIVINE GATE: Must have M8 Time Window OR Vortex Price Alignment.
-        3. VOLATILITY GATE: Candle Body > 4.5 pips.
+        Decoupled Logic:
+        1. THE LION (Trend Follower): 
+           - Condition: D1 == H4 (Strong Trend)
+           - Filters: Minimal (Spread Gate Only). Ignites Volume.
+           
+        2. THE SNAKE (Reversal Sniper):
+           - Condition: D1 != H4 (Neutral/Conflict)
+           - Filters: MAXIMUM (Divine Gate: M8 or Vortex). Ignites Precision.
         """
         decision = {
             'execute': False,
@@ -334,111 +338,115 @@ class LaplaceDemonCore:
             'setup_type': 'None'
         }
         
-        # 0. THE ROYAL COURT (Hierarchy Supreme)
-        if d1_trend != 0 and h4_trend != 0:
-            if d1_trend != h4_trend:
-                # decision['warnings'] = ["VETO: Civil War (D1 vs H4)"]
-                return decision
-        
-        master_trend = h4_trend if h4_trend != 0 else d1_trend
-        
-        # 0.5 VOLATILITY GATE (Spread Eater)
+        # 0. VOLATILITY GATE (Common Shield)
+        # Check size of the last closed candle
         if df_m5 is not None and not df_m5.empty:
             last_candle = df_m5.iloc[-1]
             params_spread = 0.00015
             min_body_size = 3 * params_spread
             body_size = abs(last_candle['close'] - last_candle['open'])
             if body_size < min_body_size:
-                # decision['warnings'] = ["VETO: Anemic Candle (Spread Risk)"]
+                # decision['warnings'] = ["VETO: Anemic Candle"]
                 return decision
 
-        # --- DIVINE GATE KEEPER (Protocol 70%) ---
+        # --- CONTEXT RECOGNITION ---
+        # Determine if we are in Lion Territory or Snake Territory
+        is_lion_territory = (d1_trend != 0) and (h4_trend != 0) and (d1_trend == h4_trend)
+        master_trend = h4_trend if h4_trend != 0 else d1_trend
+        
+        # --- DIVINE GATE CALCULATION (Pre-calc for Snake only, or logging) ---
         m8_open = False
         vortex_aligned = False
+        vortex_signal = self.vortex.process({'df_m5': df_m5, 'tick': {'bid': current_price, 'ask': current_price}})
         
-        # 1. M8 Temporal Gate
         if df_m8 is not None and df_h1 is not None and df_h4 is not None:
             m8_eval = self.m8_fib.evaluate(df_h1, df_h4, df_m8, None, current_time)
             m8_open = m8_eval['total_score'] >= 7
-        
-        # 2. Vortex Price Gate
-        vortex_signal = self.vortex.process({'df_m5': df_m5, 'tick': {'bid': current_price, 'ask': current_price}})
-        
-        # Intermediate logic to determine direction first (Technical Signal)
-        tech_direction = "WAIT"
-        tech_setup = "None"
-        
-        # 1. Analyze Flow State (Technical)
-        flow = momentum.get('flow')
-        if flow:
-             # COMPRESSION BREAKOUT
-             if flow['compression']['detected']:
-                 if flow['expansion']['detected']:
-                      dir_candidate = "BUY" if flow['expansion']['direction'] == "UP" else "SELL"
-                      # VETO: Counter-Trend or NO TREND (Silent King)
-                      if master_trend != 0:
-                          if not ((master_trend == 1 and dir_candidate == "SELL") or (master_trend == -1 and dir_candidate == "BUY")):
-                              tech_direction = dir_candidate
-                              tech_setup = "COMPRESSION_BREAKOUT"
-
-        # 2. Check Liquidity Sweeps (Turtle Soup SFP)
-        swept_pools = [p for p in structure['liquidity_pools'] if p.swept]
-        if swept_pools:
-             last_sweep = swept_pools[-1]
-             sweep_dir = "SELL" if last_sweep.type == "BUY" else "BUY" # Inverse of pool type
-             
-             # Neutral Market OK for Turtle Soup
-             valid_sweep = False
-             if master_trend == 0: valid_sweep = True
-             elif master_trend == 1 and sweep_dir == "BUY": valid_sweep = True
-             elif master_trend == -1 and sweep_dir == "SELL": valid_sweep = True
-             
-             if valid_sweep:
-                  tech_direction = sweep_dir
-                  tech_setup = "TURTLE_SOUP_AGI"
-
-        # 3. Order Block Flow
-        entry = structure.get('entry_signal', {})
-        if entry.get('direction'):
-             ob_dir = entry['direction']
-             # VETO: No Trend = No Continuation
-             if master_trend != 0:
-                  if not ((master_trend == 1 and ob_dir == "SELL") or (master_trend == -1 and ob_dir == "BUY")):
-                        # Additional RSI Check
-                        momentum_aligned = True
-                        if ob_dir == "BUY" and momentum['rsi']['overbought']: momentum_aligned = False
-                        if ob_dir == "SELL" and momentum['rsi']['oversold']: momentum_aligned = False
-                        
-                        if momentum_aligned:
-                             tech_direction = ob_dir
-                             tech_setup = "ORDER_BLOCK_FLOW"
-
-        # NOW APPLY DIVINE GATE
-        if tech_direction == "WAIT":
-             return decision
-
-        if vortex_signal is not None:
-             if vortex_signal.signal_type == tech_direction:
-                  vortex_aligned = True
-
-        # REGRA DE OURO: Pelo menos um "Deus" deve aprovar
-        is_divine = m8_open or vortex_aligned
-        
-        if not is_divine:
-            # decision['warnings'] = [f"VETO: Divine Gate Failed. M8={m8_open}, Vortex={vortex_aligned}"]
-            return decision
             
-        decision['execute'] = True
-        decision['direction'] = tech_direction
-        decision['confidence'] = 95
-        decision['setup_type'] = tech_setup
-        decision['reasons'].append(f"Technical: {tech_setup}")
-        decision['reasons'].append(f"DIVINE ENTRY CONFIRMED (M8: {m8_open} | Vortex: {vortex_aligned})")
+        divine_confirmation = False
         
+        # ════════════════════════════════════════════════
+        # PATH 1: THE LION (Trend Following)
+        # ════════════════════════════════════════════════
+        if is_lion_territory:
+            # We are surfing a Tsunami. Don't ask for permission from M8.
+            target_direction = "BUY" if master_trend == 1 else "SELL"
+            
+            flow = momentum.get('flow')
+            if flow:
+                # A. Compression Breakout (Pattern 1)
+                if flow['compression']['detected'] and flow['expansion']['detected']:
+                    exp_dir = "BUY" if flow['expansion']['direction'] == "UP" else "SELL"
+                    if exp_dir == target_direction:
+                         decision['execute'] = True
+                         decision['direction'] = target_direction
+                         decision['confidence'] = 80 # Solid
+                         decision['setup_type'] = "LION_BREAKOUT"
+                         decision['reasons'].append(f"Lion Trend Follow: {target_direction}")
+                         return decision
+            
+            # B. Order Block Continuation (Pattern 2)
+            entry = structure.get('entry_signal', {})
+            if entry.get('direction') == target_direction:
+                 # Minimal RSI check
+                 rsi_ok = True
+                 if target_direction == "BUY" and momentum['rsi']['overbought']: rsi_ok = False
+                 if target_direction == "SELL" and momentum['rsi']['oversold']: rsi_ok = False
+                 
+                 if rsi_ok:
+                     decision['execute'] = True
+                     decision['direction'] = target_direction
+                     decision['confidence'] = 75
+                     decision['setup_type'] = "LION_CONTINUATION"
+                     decision['reasons'].append(f"Lion OB Retest: {target_direction}")
+                     return decision
+                     
+            # C. Shallow Pullback (Pattern 3 - M8 Bonus)
+            # If M8 says GO in trend direction, we add conviction, but it's optional?
+            # Implemented as a "Nice to have" booster.
+            if m8_open:
+                 pass # Could boost confidence to 90
+        
+        # ════════════════════════════════════════════════
+        # PATH 2: THE SNAKE (Reversal / Neutral)
+        # ════════════════════════════════════════════════
+        else: # (is_lion_territory == False) -> Neutral or Conflict
+            # We are in the Jungle. Every step is potential death.
+            # Divine Gate is MANDATORY.
+            
+            # 1. Identify Candidate Move (SFP / Turtle Soup)
+            swept_pools = [p for p in structure['liquidity_pools'] if p.swept]
+            candidate_dir = "WAIT"
+            
+            if swept_pools:
+                 last_sweep = swept_pools[-1]
+                 # Reversal from sweep
+                 candidate_dir = "SELL" if last_sweep.type == "BUY" else "BUY" 
+                 
+                 # 2. CHECK THE GODS (Divine Gate)
+                 m8_says_go = m8_open 
+                 vortex_says_go = False
+                 if vortex_signal and vortex_signal.signal_type == candidate_dir:
+                      vortex_says_go = True
+                      
+                 divine_confirmation = m8_says_go or vortex_says_go
+                 
+                 if divine_confirmation:
+                      # Execute Reversal
+                      decision['execute'] = True
+                      decision['direction'] = candidate_dir
+                      decision['confidence'] = 90 # High Precision
+                      decision['setup_type'] = "SNAKE_AMBUSH"
+                      decision['reasons'].append(f"Snake Reversal (Divine Gate: M8={m8_says_go} V={vortex_says_go})")
+                      return decision
+                      
         return decision
     
-    def _resample_to_m8(self, df_m1: pd.DataFrame) -> pd.DataFrame:
-        """Resample M1 data to M8 (8-minute) timeframe."""
+    def _resample_to_m8(self, df_m1: pd.DataFrame = None, df_m5: pd.DataFrame = None) -> pd.DataFrame:
+        """
+        Resample to M8 (8-minute) timeframe.
+        Priority: M1 > M5 (Fallback)
+        """
         agg = {
             'open': 'first',
             'high': 'max',
@@ -446,7 +454,15 @@ class LaplaceDemonCore:
             'close': 'last',
             'volume': 'sum'
         }
-        return df_m1.resample('8min').agg(agg).dropna()
+        
+        if df_m1 is not None and not df_m1.empty:
+            return df_m1.resample('8min').agg(agg).dropna()
+            
+        if df_m5 is not None and not df_m5.empty:
+            # Low Resolution Fallback
+            return df_m5.resample('8min').agg(agg).dropna()
+            
+        return None
     
     def _analyze_timing(self, 
                         df_m1: pd.DataFrame,

@@ -177,6 +177,13 @@ class LaplaceBacktestRunner:
             slice_h1 = self.df_h1[self.df_h1.index <= current_time]
             slice_h4 = self.df_h4[self.df_h4.index <= current_time]
             
+            # Slice M1 for M8 generation (Last 300 minutes ~ 300 rows is fast enough)
+            if not use_m5 and hasattr(self, 'df_m1'):
+                 # Ensure we have M1 data loaded
+                 slice_m1 = self.df_m1.loc[current_time - pd.Timedelta(minutes=300):current_time]
+            else:
+                 slice_m1 = None
+
             # Check active trades first
             for trade in self.engine.active_trades[:]:
                 exit_reason = self.engine.update_trade(trade, current_price, current_time)
@@ -202,7 +209,7 @@ class LaplaceBacktestRunner:
             # Get Laplace Demon prediction
             try:
                 prediction = self.laplace.analyze(
-                    df_m1=None,  # Skip M1 for speed
+                    df_m1=slice_m1,  # Passed M1 slice
                     df_m5=slice_m5,
                     df_h1=slice_h1,
                     df_h4=slice_h4,
