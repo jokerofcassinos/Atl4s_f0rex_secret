@@ -124,6 +124,12 @@ class FractalVision:
             'ha_trend': 'NEUTRAL',
             'score': 0
         }
+
+        # Null checks for robust operation
+        if df_h1 is None or df_h1.empty:
+            return results
+        if df_h4 is None:
+            df_h4 = pd.DataFrame() # Fallback to empty instead of None
         
         # 1. Heikin Ashi Trend (H1)
         ha_df = self.calculate_heikin_ashi(df_h1)

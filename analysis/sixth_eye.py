@@ -21,10 +21,11 @@ class SixthEye:
         self.macro_context = {}
         self.last_macro_sync = datetime.min
         self.regime_prob = 0.5 # Bayesian Prior
+        self.sync_enabled = True
         
     def sync_macro_fundamentals(self):
         """Fetches macro data for Real Rate calculations (e.g., TIPS proxies)."""
-        if datetime.now() - self.last_macro_sync < timedelta(days=1):
+        if not self.sync_enabled or datetime.now() - self.last_macro_sync < timedelta(days=1):
             return
             
         logger.info("Syncing Macro Fundamentals (TIPS, CPI Proxies)...")

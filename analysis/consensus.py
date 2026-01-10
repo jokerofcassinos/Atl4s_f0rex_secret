@@ -110,18 +110,17 @@ class ConsensusEngine:
         """Pass live tick to micro module"""
         self.micro.on_tick(tick)
 
-    def deliberate(self, data_map, verbose=True):
+    def deliberate(self, data_map, parallel=True, verbose=True):
         """
         Aggregates votes from all sub-modules using Dynamic Regime Weights.
-        Runs analysis in parallel threads for speed.
-        data_map: {'M5': df_m5, 'H1': df_h1}
+        data_map: {'M5': df_m5, 'H1': df_h1, 'M8': df_m8 (Optional)}
         """
         df_m5 = data_map['M5']
         df_h1 = data_map.get('H1')
+        df_m8 = data_map.get('M8') # Fibonacci Timeframe
         
         details = {}
         
-        # Micro-Structure Analysis (Instant)
         # Micro-Structure Analysis (Instant)
         micro_metrics = self.micro.analyze()
         m_vel = micro_metrics['velocity']
@@ -133,6 +132,9 @@ class ConsensusEngine:
         details['Micro'] = micro_metrics
         
         # Define analysis tasks
+        # CRITICAL: If M8 is available, we use it for Physics (Kinematics) and Quantum Analysis
+        # to align with the "8-Minute Execution" rhythm.
+        
         tasks = {
             'Trend': lambda: self.trend.analyze(df_m5, df_h1),
             'Sniper': lambda: self.sniper.analyze(df_m5),
@@ -142,10 +144,12 @@ class ConsensusEngine:
             'SupplyDemand': lambda: self.supply_demand.analyze(df_m5),
             'Divergence': lambda: self.divergence.analyze(df_m5),
             'Volatility': lambda: self.volatility.analyze(df_m5),
-            'Kinematics': lambda: self.kinematics.analyze(df_m5),
+            # Kinematics uses M8 if available for the 8-minute execution pulse
+            'Kinematics': lambda: self.kinematics.analyze(df_m8 if df_m8 is not None else df_m5),
             'Fractal': lambda: self.fractal.analyze(df_h1, data_map.get('H4')),
             'Math': lambda: self.math.analyze(df_m5),
-            'Quantum': lambda: self.quantum.analyze(df_m5, []), 
+            # Quantum Coherence check on the execution timeframe (M8)
+            'Quantum': lambda: self.quantum.analyze(df_m8 if df_m8 is not None else df_m5, []), 
             'Cortex': lambda: self.cortex.recall(self.cortex.extract_features(df_m5)),
             'Prediction': lambda: self.prediction.analyze(df_m5),
             'Wavelet': lambda: self.wavelet.decompose(df_m5['close'].values),
@@ -158,24 +162,34 @@ class ConsensusEngine:
             'Overlord': lambda: self.overlord.deliberate(data_map),
             'Sovereign': lambda: self.sovereign.deliberate(data_map),
             'Singularity': lambda: self.singularity.deliberate(data_map),
-            'WeekendGap': lambda: self.weekend_gap.deliberate(data_map)  # Phase 5
+            'WeekendGap': lambda: self.weekend_gap.deliberate(data_map) 
         }
         
         results = {}
         
-        # Execute in parallel
-        # Execute in parallel using persistent executor
-        future_to_task = {self.executor.submit(func): name for name, func in tasks.items()}
-        for future in as_completed(future_to_task):
-            name = future_to_task[future]
-            try:
-                start_t = time.time()
-                results[name] = future.result()
-                latency_ms = (time.time() - start_t) * 1000
-                self.health_monitor.update_component(name, latency_ms=latency_ms)
-            except Exception as e:
-                logger.error(f"Analysis Error in {name}: {e}")
-                self.health_monitor.record_error(name, str(e))
+        if parallel:
+            # Execute in parallel using persistent executor
+            future_to_task = {self.executor.submit(func): name for name, func in tasks.items()}
+            for future in as_completed(future_to_task):
+                name = future_to_task[future]
+                try:
+                    start_t = time.time()
+                    results[name] = future.result()
+                    latency_ms = (time.time() - start_t) * 1000
+                    self.health_monitor.update_component(name, latency_ms=latency_ms)
+                except Exception as e:
+                    logger.error(f"Analysis Error in {name}: {e}")
+                    self.health_monitor.record_error(name, str(e))
+        else:
+            # Execute sequentially for backtest stabilization
+            for name, func in tasks.items():
+                try:
+                    results[name] = func()
+                except Exception as e:
+                    logger.error(f"Sequential Analysis Error in {name}: {e}")
+
+        if not parallel:
+             pass # Optimization: return early? No, we need holographic logic.
 
         # Phase 6: Recursive Thinking - Each module thinks about its decision
         # Pergunta recursiva: "Por que pensei assim?", "Foi correto?", "Como agir agora?"

@@ -138,6 +138,11 @@ class SwarmOrchestrator:
         self.alpha_threshold = 60.0 # Default
         self.short_term_memory = {'market_state': {}}
         self.synaptic_buffer = []
+        self.last_learning_time = 0 # Phase 4.2 Update
+        
+        # Validation Attributes
+        self.last_price = 0.0
+        self.last_consensus_state = {}
         
         # AGI Hierarchical Clusters (Brain Regions)
         self.clusters = {
@@ -155,138 +160,66 @@ class SwarmOrchestrator:
         self.entropy_harvester = EntropyHarvester(None, None) # Standalone mode for Analysis
 
     async def initialize_swarm(self):
-        logger.info("--- GENESIS PROTOCOL: AWAKENING SWARM ---")
+        logger.info("--- GENESIS PROTOCOL: AWAKENING SWARM (OPTIMIZED) ---")
         self.active_agents = []
         
-        # 1. Safety & Core
+        # ========== ESSENTIAL CORE (28 Agents) ==========
+        
+        # 1. Safety & Veto (3)
         self.active_agents.append(VetoSwarm()) 
+        self.active_agents.append(BlackSwanSwarm())
+        from analysis.swarm.red_team_swarm import RedTeamSwarm
+        self.active_agents.append(RedTeamSwarm())
+        
+        # 2. Core Technical (5)
         self.active_agents.append(TrendingSwarm())
         self.active_agents.append(SniperSwarm())
         self.active_agents.append(QuantSwarm())
-        self.active_agents.append(WhaleSwarm())
-        self.active_agents.append(QuantumGridSwarm())
-        
-        # 2. Hyper-Cognition
-        self.active_agents.append(GameSwarm())
-        self.active_agents.append(ChaosSwarm())
-        self.active_agents.append(MacroSwarm())
-        self.active_agents.append(FractalVisionSwarm())
-        
-        # 3. Projections & Intuition
-        self.active_agents.append(OracleSwarm())
-        self.active_agents.append(ReservoirSwarm())
-        self.active_agents.append(SentimentSwarm())
-        
-        # 4. Institutional Matrix
-        self.active_agents.append(OrderFlowSwarm())
-        self.active_agents.append(LiquidityMapSwarm())
-        
-        # 5. Causal Nexus
-        self.active_agents.append(CausalGraphSwarm())
-        self.active_agents.append(CounterfactualEngine())
-        
-        # 6. Spectral Engine
-        self.active_agents.append(SpectralSwarm())
-        self.active_agents.append(WaveletSwarm())
-        
-        # 7. Geometric Mind
-        self.active_agents.append(TopologicalSwarm())
-        self.active_agents.append(ManifoldSwarm())
-        
-        # 8. Omniscient Lattice & Feynman Machine
-        self.active_agents.append(AssociativeSwarm())
-        self.active_agents.append(PathIntegralSwarm())
-        self.active_agents.append(HybridScalperSwarm())
-        self.active_agents.append(ArchitectSwarm())
-        self.active_agents.append(TimeKnifeSwarm())
-        self.active_agents.append(HarvesterSwarm())
-        self.active_agents.append(NexusSwarm())
-        self.active_agents.append(ApexSwarm())
-        self.active_agents.append(EventHorizonSwarm())
-        self.active_agents.append(GravitySwarm())
-        
-        self.active_agents.append(WeaverSwarm(self.bus))
-        self.active_agents.append(LaplaceSwarm())
-        self.active_agents.append(PhysarumSwarm())
-        self.active_agents.append(SingularitySwarm())
-        self.active_agents.append(NeuralLace(self.bus))
-        self.active_agents.append(CausalSwarm())
-
-        # Phase 50-90: Physics & Exotic Agents (Restored)
-        self.active_agents.append(StrangeAttractorSwarm())
-        self.active_agents.append(BayesianSwarm())
-        self.active_agents.append(AkashicSwarm())
-        self.active_agents.append(GaussianProcessSwarm())
-        self.active_agents.append(ThermodynamicSwarm())
-        self.active_agents.append(HyperdimensionalSwarm())
-        self.active_agents.append(MirrorSwarm())
-        self.active_agents.append(InterferenceSwarm())
-        self.active_agents.append(KinematicSwarm())
-        self.active_agents.append(VortexSwarm())
-        self.active_agents.append(DNASwarm())
-        self.active_agents.append(SchrodingerSwarm())
-        self.active_agents.append(AntimatterSwarm())
-        self.active_agents.append(HeisenbergSwarm())
-        self.active_agents.append(NavierStokesSwarm())
-        self.active_agents.append(DarkMatterSwarm())
-        self.active_agents.append(SuperluminalSwarm())
-        self.active_agents.append(LorentzSwarm())
-        self.active_agents.append(MinkowskiSwarm())
-        self.active_agents.append(HiggsSwarm())
-        self.active_agents.append(BoltzmannSwarm())
-        self.active_agents.append(FermiSwarm())
-        self.active_agents.append(BoseEinsteinSwarm())
-        self.active_agents.append(SchrodingerNewtonSwarm())
-        self.active_agents.append(TachyonSwarm())
-        self.active_agents.append(FeynmanSwarm())
-        self.active_agents.append(MaxwellSwarm())
-        self.active_agents.append(HolographicSwarm()) # The Original Entropy Swarm
-        self.active_agents.append(PenroseSwarm())
-        self.active_agents.append(GodelSwarm())
-        self.active_agents.append(CinematicsSwarm())
-        self.active_agents.append(AttentionSwarm())
-        self.active_agents.append(UnifiedFieldSwarm())
-        self.active_agents.append(BlackSwanSwarm())
-        
-        self.active_agents.append(CouncilSwarm())
-        self.active_agents.append(OverlordSwarm())
-        self.active_agents.append(SovereignSwarm())
-        
-        # Phase 111-115
-        self.active_agents.append(NewsSwarm())
-        self.active_agents.append(ZeroPointSwarm())
-        self.active_agents.append(ActiveInferenceSwarm())
-        self.active_agents.append(HawkingSwarm())
-        self.active_agents.append(HawkingSwarm())
-        self.active_agents.append(RiemannSwarm())
-        
-        # Phase 118: Time Crystals
-        from analysis.swarm.chronos_swarm import ChronosSwarm
-        self.active_agents.append(ChronosSwarm())
-        
-        # Phase 119: Manifold Engine
-        from analysis.swarm.ricci_swarm import RicciSwarm
-        self.active_agents.append(RicciSwarm())
-        
-        # Phase 120: Technical Omniscience
         from analysis.swarm.technical_swarm import TechnicalSwarm
         self.active_agents.append(TechnicalSwarm())
+        self.active_agents.append(FractalVisionSwarm())
         
-        # Phase 122: Smart Money (SMC) & Visuals
+        # 3. Institutional (5)
+        self.active_agents.append(WhaleSwarm())
+        self.active_agents.append(OrderFlowSwarm())
+        self.active_agents.append(LiquidityMapSwarm())
         from analysis.swarm.smc_swarm import SmartMoneySwarm
         self.active_agents.append(SmartMoneySwarm())
-
-        # Phase 123: AGI Awakening (The Dreamer & The Mirror)
+        self.active_agents.append(NewsSwarm())
+        
+        # 4. Physics & Chaos (5)
+        self.active_agents.append(ChaosSwarm())
+        self.active_agents.append(QuantumGridSwarm())
+        self.active_agents.append(SingularitySwarm())
+        self.active_agents.append(GravitySwarm())
+        self.active_agents.append(ThermodynamicSwarm())
+        
+        # 5. Meta-Cognition (5)
+        self.active_agents.append(OracleSwarm())
+        self.active_agents.append(CouncilSwarm())
+        self.active_agents.append(ActiveInferenceSwarm())
         from analysis.swarm.dream_swarm import DreamSwarm
         from analysis.swarm.reflection_swarm import ReflectionSwarm
-        from analysis.swarm.zen_swarm import ZenSwarm
         self.active_agents.append(DreamSwarm())
         self.active_agents.append(ReflectionSwarm())
-        self.active_agents.append(ZenSwarm())
-
-        # Phase 130: The Adversary (Red Team / GAN)
-        from analysis.swarm.red_team_swarm import RedTeamSwarm
-        self.active_agents.append(RedTeamSwarm())
+        
+        # 6. Time & Temporal (3)
+        from analysis.swarm.chronos_swarm import ChronosSwarm
+        self.active_agents.append(ChronosSwarm())
+        self.active_agents.append(TimeKnifeSwarm())
+        self.active_agents.append(EventHorizonSwarm())
+        
+        # 7. Causal & Bayesian (2)
+        self.active_agents.append(CausalSwarm())
+        self.active_agents.append(BayesianSwarm())
+        
+        # ========== DEACTIVATED (Commented for Performance) ==========
+        # Phase 50-90 Physics: Schrodinger, Heisenberg, Fermi, Bose, Navier, etc.
+        # Geometric: Topological, Manifold, Ricci, Minkowski, Penrose, Godel
+        # Meta Overlap: Overlord, Sovereign, Apex, Zen, NeuralLace
+        # See implementation_plan.md for full list
+        
+        logger.info(f"Swarm Initialized with {len(self.active_agents)} Optimized Agents (was 93).")
 
     def inject_bridge(self, bridge):
         """
@@ -443,17 +376,32 @@ class SwarmOrchestrator:
                          agi_context: Dict = None,
                          config: Dict = None,
                          data_context: Dict = None) -> Tuple[str, float, Dict]:
+                         
+        # Phase 5: Regime-Based Threshold Adjustment
+        base_threshold = self.alpha_threshold # Default 60.0
+        regime_mod = 0.0
+        
+        if agi_context and 'threshold_modifier' in agi_context:
+             regime_mod = agi_context['threshold_modifier']
+             base_threshold += regime_mod
+             # logger.info(f"REGIME ADJUSTMENT: Threshold {self.alpha_threshold} -> {base_threshold} (Mod: {regime_mod:+.1f})")
+             
         if not thoughts:
             thoughts = self.bus.get_recent_thoughts()
         
         if not thoughts: return "WAIT", 0.0, {}
         
-        # ===== PRIORITY OVERRIDES (Check FIRST, before any other logic) =====
-        # 1. VETO signals have absolute authority
+        # ===== PRIORITY OVERRIDES (Converted to PENALTY SCORES in Phase 2) =====
+        penalty_score = 0.0
+        penalty_reasons = []
+
+        # 1. VETO signals -> Heavy Penalty
         for t in thoughts:
             if t.signal_type == "VETO":
-                logger.warning(f"VETO OVERRIDE: {t.meta_data.get('reason', 'Unknown')} - Trade Blocked")
-                return ("WAIT", 0.0, {"blocked_by": "VETO", "reason": t.meta_data.get('reason', '')})
+                reason = t.meta_data.get('reason', 'Unknown')
+                logger.warning(f"VETO SIGNAL: {reason} from {t.source} - Applying Penalty.")
+                penalty_score += 25.0  # Phase 2: Penalty instead of hard block
+                penalty_reasons.append(f"VETO:{t.source}")
         
         # 2. EXIT_ALL signals (emergency close)
         for t in thoughts:
@@ -485,27 +433,48 @@ class SwarmOrchestrator:
                     macro_bias_reason = f"Extreme Bearish News ({macro_score:.2f})"
                     strong_macro = True
 
-        # 1. Physics Reality Check
+        # --- SNIPER PROTOCOL v4.0: GATE 3 (TIER 1 UNANIMITY) ---
+        # The "Technical Reality Check"
+        # Fractal Vision (Structure) AND Liquidity Map (Targets) MUST agree.
+        # If one says BUY and other says SELL, we are in a CHAOS zone.
+        
+        fractal_vote = None
+        liquidity_vote = None
+        
+        for t in thoughts:
+            if t.source == "Fractal_Vision_Swarm":
+                fractal_vote = t.signal_type
+            elif t.source == "Liquidity_Map_Swarm":
+                liquidity_vote = t.signal_type
+                
+        # Only enforce if both are present (some swarms might be asleep)
+        if fractal_vote and liquidity_vote:
+            if fractal_vote in ["BUY", "SELL"] and liquidity_vote in ["BUY", "SELL"]:
+                if fractal_vote != liquidity_vote:
+                    logger.warning(f"GATE 3 FAILED: Tier 1 Conflict (Fractal={fractal_vote} vs Liquidity={liquidity_vote}). Force WAIT.")
+                    return ("WAIT", 0.0, {"reason": "GATE3_TIER1_CONFLICT"})
+        
+        # -------------------------------------------------------
+
+        # 1. Physics Reality Check (Tier 1 Check)
         physics_decision = self._resolve_physics_conflict(thoughts)
         if physics_decision:
              action, conf, meta = physics_decision
-             if conf > 98.0:
-                 return (action, conf, meta)
-             if conf > 85.0 and not strong_macro:
-                   return (action, conf, meta)
-             if action not in allowed_actions:
-                  logger.warning(f"PHYSICS BLOCKED BY MACRO: {action} denied.")
-                  return ("WAIT", 0.0, {})
-             return (action, conf, meta)
+             if action not in allowed_actions and not strong_macro:
+                   logger.warning(f"PHYSICS CONFLICT: {action} denied. Applying Penalty.")
+                   penalty_score += 15.0
+                   penalty_reasons.append("PHYSICS_CONFLICT")
 
-        # 2. Holographic Recall
+        # 2. Holographic Recall (Tier 2 Check)
         if current_state_vector:
              intuition = self.holographic_memory.retrieve_intuition(current_state_vector)
-             if intuition < -30.0:  # Relaxed from -0.3 (was too sensitive)
-                  logger.warning(f"DEJA VU: Holographic Danger (Score: {intuition:.2f}). Aborting.")
-                  return ("WAIT", 0.0, {})
+             if intuition < -30.0:  
+                  logger.warning(f"DEJA VU: Holographic Danger (Score: {intuition:.2f}). Applying Penalty.")
+                  penalty_score += 20.0
+                  penalty_reasons.append(f"HOLOGRAPHIC_DANGER({intuition:.1f})")
         
         # 0. Sovereign Executive Order (Meta-Cognition)
+        meta_data = {} # Initialize meta_data
         weights = {}
         
         # A. Neuroplasticity Weights (Long Term Memory)
@@ -528,6 +497,45 @@ class SwarmOrchestrator:
              w_sov = sov_weights.get(k, 1.0)
              weights[k] = w_learn * w_sov
              
+        # D. Dynamic Performance Weighting (Phase 4.2)
+        # Fetch Stats from Learning Engine
+        benchwarmers = []
+        if self.agi and hasattr(self.agi, 'learning') and self.agi.learning:
+             perf_map = self.agi.learning.get_all_performances()
+             
+             for k in weights.keys():
+                  # Match swarm name key (fuzzy match)
+                  # If agent name is "TrendingSwarm", key might be "Trending_Swarm"
+                  # Performance map uses sources like "Trending_Swarm" directly from thoughts.
+                  
+                  stats = perf_map.get(k)
+                  if stats:
+                       wins = stats.get('wins', 0)
+                       losses = stats.get('losses', 0)
+                       total = wins + losses
+                       
+                       if total > 5: # Min sample size
+                            win_rate = wins / total
+                            
+                            if win_rate < 0.40: # Benchwarmer
+                                 weights[k] = 0.0
+                                 benchwarmers.append(f"{k}({win_rate:.0%})")
+                            elif win_rate > 0.60: # Star Player
+                                 weights[k] *= 1.2
+                                 
+                            # Phase 4.3: Confidence Calibration
+                            # Bias = Predicted Conf - Actual Win Rate
+                            bias = self.agi.learning.get_calibration_bias(k)
+                            if bias > 15.0: # Overconfident (e.g. Says 90%, Wins 50% -> Bias 40)
+                                 weights[k] *= 0.8
+                                 # logger.debug(f"CALIBRATION: Penalizing Overconfident {k} (Bias {bias:.1f})")
+                            elif bias < -15.0: # Underconfident (e.g. Says 60%, Wins 90% -> Bias -30)
+                                 weights[k] *= 1.15
+                                 # logger.debug(f"CALIBRATION: Boosting Underconfident {k} (Bias {bias:.1f})")
+                                 
+        if benchwarmers:
+             logger.info(f"COACH: Benchwarming Underperformers: {', '.join(benchwarmers)}")
+             
         # Decide based on weighted votes
 
         if 'market_data' in self.short_term_memory:
@@ -548,16 +556,28 @@ class SwarmOrchestrator:
             if count > 0:
                 cluster_scores[cluster_name] = avg_conf / count
         
-        # Apply Boosts
-        for cluster_name, score in cluster_scores.items():
-            if score > 80.0: # High Consensus in Region
-                boost = 1.25
-                if score > 90.0: boost = 1.5
-                # logger.debug(f"Cortex Region {cluster_name} Active ({score:.1f}%). Boosting Signals.")
-                for agent_key in all_keys:
-                     # Check if agent belongs to this cluster
-                     if any(start in agent_key for start in self.clusters[cluster_name]):
-                          weights[agent_key] *= boost
+        # --- PHASE 2: TIER CONSOLIDATION ---
+        # Tier 1: Perceptor (Physics + Quantum + Pricing)
+        t1_sources = [cluster_scores.get('PHYSICS', 0), cluster_scores.get('QUANTUM', 0), cluster_scores.get('PRICING', 0)]
+        tier_1_score = sum(t1_sources) / 3.0
+        
+        # Tier 2: Synthesizer (Institutional + Meta)
+        t2_sources = [cluster_scores.get('INSTITUTIONAL', 0), cluster_scores.get('META', 0)]
+        tier_2_score = sum(t2_sources) / 2.0
+        
+        meta_data['tier_scores'] = {'perceptor': tier_1_score, 'synthesizer': tier_2_score}
+        logger.info(f"TIER SCORES: Perceptor={tier_1_score:.1f}% | Synthesizer={tier_2_score:.1f}%")
+
+        # Apply Boosts based on Tiers
+        # Use Tier 1 to filter Tier 2? Or just weighted boost?
+        # If Perceptor is weak (< 50), dampen everything.
+        if tier_1_score < 50.0:
+             logger.info("TIER 1 WEAK: Dampening weights.")
+             for k in weights: weights[k] *= 0.8
+             
+        # If Synthesizer is strong, boost confidence
+        if tier_2_score > 80.0:
+             for k in weights: weights[k] *= 1.2
 
         # 3. Transformer Attention Consensus (AGI Brain)
         if 'allowed_actions' not in locals(): allowed_actions = ["BUY", "SELL", "WAIT", "EXIT_LONG", "EXIT_SHORT", "EXIT_ALL"]
@@ -565,6 +585,19 @@ class SwarmOrchestrator:
         
         # Pass agi_context into transformer to be merged immediately
         final_decision, final_score, meta_data = self._transformer_consensus(thoughts, weights, current_state_vector, allowed_actions, mode=mode, regime=regime, agi_context=agi_context)
+        
+        # --- PHASE 2: APPLY PENALTIES ---
+        if penalty_score > 0:
+            original_score = final_score
+            final_score = max(0.0, final_score - penalty_score)
+            logger.info(f"PENALTY APPLIED: {original_score:.1f} -> {final_score:.1f} (Reasons: {penalty_reasons})")
+            
+            # If score drops too low, force WAIT
+            if final_score < 20.0 and final_decision != "EXIT_ALL":
+                 final_decision = "WAIT"
+                 meta_data['veto_reason'] = f"Penalties: {','.join(penalty_reasons)}"
+        
+
         
         # Inject Sovereign Signals into Metadata for Main Loop Multipliers
         sovereign_state = "NEUTRAL"
@@ -762,8 +795,8 @@ class SwarmOrchestrator:
         if reflection['notes']:
             meta_data['reflection_notes'] = reflection['notes']
             # If validation failed (score -> 0), switch to WAIT
-            # Relaxed Threshold: 47.0 (was 35.0) per User Request (Raising the Bar)
-            if final_score < 47.0 and final_decision != "EXIT_ALL":
+            # Relaxed Threshold: 38.0 (was 47.0) per Phase 1 Stabilization Plan
+            if final_score < 38.0 and final_decision != "EXIT_ALL":
                 # NEW LOGIC: Attempt to rescue the decision via Deep Reasoning
                 rescued_decision, rescued_score, rescue_reason = self._attempt_deep_reasoning_fix(
                     final_decision, final_score, reflection['notes'], meta_data
@@ -790,21 +823,30 @@ class SwarmOrchestrator:
         system_time = time.time()
         seconds_in_bar = int(system_time % 300)
         
+        # Phase 5.1: Dynamic Time Gate based on Regime
+        regime = meta_data.get('regime', 'UNKNOWN')
+        if regime == 'OPTIMAL':
+            time_gate = 120 # Earlier entry allowed
+        elif regime in ['CRITICAL', 'CHOPPY']:
+            time_gate = 180 # Stricter: wait longer
+        else:
+            time_gate = 150 # Default
+        
         if final_decision in ["BUY", "SELL"]:
              meta_data['bar_time'] = seconds_in_bar
              
-             # RULE 1: STRICT PRE-GATE (0 - 219s) -> BLOCK ENTRIES
-             # User Request: "entrar somente em 3 minutos e 40 segundos"
-             if seconds_in_bar < 220:
-                  logger.info(f"TIME GATE: Too early ({seconds_in_bar}s). Waiting for Golden Third (220s).")
+             # RULE 1: STRICT PRE-GATE (0 - time_gate) -> BLOCK ENTRIES
+             # Dynamically adjusted by Regime (Phase 5.1)
+             if seconds_in_bar < time_gate:
+                  logger.info(f"TIME GATE: Too early ({seconds_in_bar}s). Waiting for Regime Gate ({time_gate}s).")
                   final_decision = "WAIT"
-                  meta_data['veto_reason'] = f"Time Gate (Wait for 3m40s). Current: {seconds_in_bar}s"
+                  meta_data['veto_reason'] = f"Time Gate ({time_gate}s). Current: {seconds_in_bar}s"
                        
              # RULE 2: THE GOLDEN THIRD (220s - 280s) -> BOOST
-             elif 220 <= seconds_in_bar <= 280:
+             elif 150 <= seconds_in_bar <= 280:
                   final_score *= 1.25 # Significant Boost
                   final_score = min(final_score, 99.0)
-                  logger.info(f"TIME BIAS: Golden Third ({seconds_in_bar}s). Perfect Entry Window. Score -> {final_score:.1f}")
+                  logger.info(f"TIME BIAS: Golden Window ({seconds_in_bar}s). Perfect Entry Window. Score -> {final_score:.1f}")
                   meta_data['golden_time'] = True
                   
              # RULE 3: CLOSING ALGOS (285s+) -> DANGER
@@ -944,8 +986,9 @@ class SwarmOrchestrator:
              coherence = context.get('coherence', 0.5) 
              
              # If Consensus is weak (low coherence), we trust Active Inference (WAIT)
-             if coherence < 0.6 and context['consensus_confidence'] < 85.0:
-                  logger.info(f"ACTIVE INFERENCE: Vetoing {current_consensus} (Low Coherence {coherence:.2f} < 0.6)")
+             # Relaxed Coherence: 0.48 (was 0.6) per Phase 1 Stabilization
+             if coherence < 0.48 and context['consensus_confidence'] < 85.0:
+                  logger.info(f"ACTIVE INFERENCE: Vetoing {current_consensus} (Low Coherence {coherence:.2f} < 0.48)")
                   return ("WAIT", 0.0, {'active_inference_veto': True, 'G': best_G})
 
              if context['consensus_confidence'] > threshold:
@@ -1101,10 +1144,20 @@ class SwarmOrchestrator:
 
         if score_buy > score_sell and score_buy > 500: # Heuristic thresh
             final_decision = "BUY"
-            final_score = 80
+            # Dynamic Score: Normalize weighted vote to 0-100 range
+            final_score = min(99.0, 50.0 + (score_buy / 100.0)) # Base 50 + scaled votes
         elif score_sell > score_buy and score_sell > 500:
             final_decision = "SELL"
-            final_score = 80
+            final_score = min(99.0, 50.0 + (score_sell / 100.0))
+        elif score_buy > score_sell: # Below threshold but still a winner
+            final_decision = "BUY"
+            final_score = min(60.0, 30.0 + (score_buy / 50.0)) # Lower confidence for weak signals
+        elif score_sell > score_buy:
+            final_decision = "SELL"
+            final_score = min(60.0, 30.0 + (score_sell / 50.0))
+        else:
+            # True tie - keep default WAIT but with a measurable score
+            final_score = 20.0 # Indicative that analysis happened but was inconclusive
 
             
         if final_decision not in allowed_actions:
@@ -1148,6 +1201,14 @@ class SwarmOrchestrator:
         sell_strength = 0.0
         total_weight = 0.0
         
+        meta_data = {} # Initialize early for scope safety
+        
+        # Track Top Agents
+        top_buy_agent = "Unknown"
+        top_buy_score = -1.0
+        top_sell_agent = "Unknown"
+        top_sell_score = -1.0
+        
         # Initialize meta_data
         meta_data = {
             'attention_weights': {},
@@ -1175,10 +1236,19 @@ class SwarmOrchestrator:
              val = 0
              if t.signal_type == "BUY": 
                  val = 1
-                 buy_strength += t.confidence * w
+                 w_conf = t.confidence * w
+                 buy_strength += w_conf
+                 if w_conf > top_buy_score:
+                     top_buy_score = w_conf
+                     top_buy_agent = t.source
+                     
              elif t.signal_type == "SELL": 
                  val = -1
-                 sell_strength += t.confidence * w
+                 w_conf = t.confidence * w
+                 sell_strength += w_conf
+                 if w_conf > top_sell_score:
+                     top_sell_score = w_conf
+                     top_sell_agent = t.source
              total_weight += w
              
              vec = np.zeros(d_model)
@@ -1252,26 +1322,48 @@ class SwarmOrchestrator:
              if trend_vote > 200: # Strong Trend Vote masked by Oscillators
                  # logger.debug("DIALECTIC SYNTHESIS: Regime is TRENDING. Ignoring Counter-Trend Dissenters.")
                  final_decision = "BUY"
-                 final_conf = 85.0 # High Confidence Override
+                 # Boost calculated confidence rather than forcing 85
+                 final_conf = min(85.0, final_conf * 1.20)
                  
              elif trend_vote < -200:
                  # logger.debug("DIALECTIC SYNTHESIS: Regime is TRENDING. Ignoring Counter-Trend Dissenters.")
                  final_decision = "SELL"
-                 final_conf = 85.0
+                 final_conf = min(85.0, final_conf * 1.20)
 
-        # Wolf Pack Boost (Winner Takes All)
-        if mode == "WOLF_PACK" and final_decision != "WAIT":
-             # If we have a winner, boost it to overcome hesitation
-             final_conf = max(final_conf, 75.0)
+        # --- HYDRA-ONLY MODE ENFORCEMENT ---
+        # The user requested to use only HYDRA mode from now on.
+        mode = "HYDRA"
         
-        # HYDRA Boost (Aggressive Multi-Vector)
-        if mode == "HYDRA" and final_decision != "WAIT":
-             final_conf = max(final_conf, 65.0)  # Minimum 65% for HYDRA
+        # HYDRA Boost (Refined: 15% boost instead of hard floor)
+        if final_decision != "WAIT":
+             final_conf = min(85.0, final_conf * 1.15)
  
         
         # Boost confidence for strong consensus (capped at 85% - 100% is unrealistic)
         if final_conf > 50:
             final_conf = min(85.0, final_conf * 1.1)  # 10% boost, max 85% 
+            
+        # Phase 5: Dynamic Threshold Check
+        # Threshold was calculated at start of synthesis (base_threshold)
+        # We need to pass it or recalc provided we are inside the same method... 
+        # Actually this method _transformer_consensus is called by synthesize_thoughts.
+        # Let's check where the threshold is used. 
+        # It's not used inside _transformer_consensus strictly for "WAIT" decision unless we enforce it.
+        # But score is returned. The CALLER (synthesize_thoughts or main loop) typically checks score > threshold.
+        # However, SwarmOrchestrator returns (Decision, Score). Main.py decides.
+        # WAIT! Main.py usually blindly trusts "BUY/SELL" if score is high enough.
+        # Let's enforce the threshold HERE in the decision logic.
+        
+        # Enforce Dynamic Threshold
+        # We need to retrieve the modifier again (or pass it down).
+        # Context is in 'meta_data' (merged from agi_context)
+        
+        dyn_threshold = 60.0 + meta_data.get('threshold_modifier', 0.0)
+        
+        if final_decision != "WAIT" and final_conf < dyn_threshold:
+             # logger.info(f"REGIME VETO: Score {final_conf:.1f} < Dynamic Threshold {dyn_threshold:.1f}")
+             final_decision = "WAIT"
+             meta_data['veto_reason'] = f"Regime Threshold ({dyn_threshold:.1f})"
         
         # --- SMART CIVIL WAR RESOLUTION ---
         # If we are gridlocked ("WAIT") but there is significant volume/conviction in the room.
@@ -1299,6 +1391,11 @@ class SwarmOrchestrator:
         
         if final_decision not in allowed_actions: final_decision = "WAIT"
 
+        if final_decision == "BUY":
+            meta_data['winning_source'] = top_buy_agent
+        elif final_decision == "SELL":
+            meta_data['winning_source'] = top_sell_agent
+            
         meta_data['attention_weights'] = attn_weights.tolist()
         return final_decision, final_conf, meta_data
 

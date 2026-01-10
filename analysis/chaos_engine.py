@@ -31,27 +31,38 @@ class ChaosEngine:
             orbit.append(point)
         orbit = np.array(orbit)
         
-        # Find Nearest Neighbors (Euclidean distance)
-        # Optimization: We check a subset of points to keep it fast (Real-time constraint)
-        div_sum = 0
-        count = 0
-        
+        # Find Nearest Neighbors (Vectorized)
         # Check last 20 points against history
+        # Create mask for self.lag exclusion
+        indices = np.arange(M)
+        
         for i in range(M - 20, M - 1): 
-            # Find nearest neighbor for point i, excluding temporal neighbors (i-lag to i+lag)
-            min_dist = float('inf')
-            nearest_idx = -1
-            
             p_i = orbit[i]
             
-            for j in range(M - 25): # Look in past history
-                if abs(i - j) < self.lag: continue
-                
-                dist = np.linalg.norm(p_i - orbit[j])
-                if dist < min_dist and dist > 0:
-                    min_dist = dist
-                    nearest_idx = j
+            # Vectorized distance calculation
+            # Use only history (up to M-25)
+            history_orbit = orbit[:M-25]
+            if len(history_orbit) == 0: continue
+
+            dists = np.linalg.norm(history_orbit - p_i, axis=1)
             
+            # Mask out temporal neighbors (i-lag to i+lag)
+            # Since we iterate i in (M-20..M-1), and history is up to M-25,
+            # |i - j| is always > 5 > lag(2). So we technically don't need the check if lag is small.
+            # But to be safe and generic:
+            mask = np.abs(indices[:M-25] - i) > self.lag
+            
+            valid_dists = dists[mask]
+            valid_indices = indices[:M-25][mask]
+            
+            if len(valid_dists) > 0:
+                min_idx_in_valid = np.argmin(valid_dists)
+                min_dist = valid_dists[min_idx_in_valid]
+                nearest_idx = valid_indices[min_idx_in_valid]
+            else:
+                nearest_idx = -1
+                min_dist = 0
+
             if nearest_idx != -1 and min_dist > 0:
                 # Evolve both points by 'step' steps
                 step = 1 # 1 step forward divergence

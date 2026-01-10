@@ -28,6 +28,9 @@ class HistoryLearningEngine:
         self.losses = 0
         self.total_pnl = 0.0
         
+        # Phase 4.2: Win Rate by Module
+        self.source_performance = {} # {source_name: {'wins': 0, 'losses': 0, 'pnl': 0.0, 'consecutive_losses': 0}}
+        
     def dream_cycle(self, data: pd.DataFrame, batch_size: int = 1000):
         """
         Runs a Dream Cycle on historical data.
@@ -115,12 +118,9 @@ class HistoryLearningEngine:
         Receives live trade feedback (PnL, outcomes) and updates the internal model.
         Called by main.py after each tick.
         """
-        # For now, we just log it or store it if we want 'online learning'
-        # Ideally, this would update the Holographic Memory with short-term reinforcement
-        
-        # FIX: Handle List input (Active Trades Snapshot) vs Dict input (Trade Result)
+        # For now, we utilize this for aggregated tracking via snapshots
         if isinstance(trade_feedback, list):
-             # Just a snapshot of open trades, not a result.
+             # FUTURE: Compare snapshots to detect external closures (stop loss hits)
              return
 
         if trade_feedback.get('trade_executed'):
@@ -131,6 +131,58 @@ class HistoryLearningEngine:
              self.total_pnl += pnl
              if pnl > 0: self.wins += 1
              elif pnl < 0: self.losses += 1
+
+    def notify_trade_close(self, ticket: int, symbol: str, profit: float, reason: str, source: str = "UNKNOWN", confidence: float = 50.0):
+        """
+        Explicit callback from ExecutionEngine when a trade is closed.
+        Stores the lesson in Holographic Memory.
+        """
+        self.experiences_learned += 1
+        self.total_pnl += profit
+        if profit > 0: self.wins += 1
+        else: self.losses += 1
+        
+        # Phase 4.2/4.3: Update Source Metrics & Calibration
+        if source not in self.source_performance:
+            self.source_performance[source] = {
+                'wins': 0, 'losses': 0, 'pnl': 0.0, 
+                'consecutive_losses': 0,
+                'total_confidence': 0.0, 'trade_count': 0
+            }
+            
+        metrics = self.source_performance[source]
+        metrics['pnl'] += profit
+        metrics['total_confidence'] += confidence
+        metrics['trade_count'] += 1
+        
+        if profit > 0:
+            metrics['wins'] += 1
+            metrics['consecutive_losses'] = 0
+        else:
+            metrics['losses'] += 1
+            metrics['consecutive_losses'] += 1
+        
+        # Calculate Outcome Score (-1.0 to 1.0)
+        outcome_score = np.tanh(profit / 2.0) 
+        
+        # Construct Lesson Context
+        context = {
+            'symbol': symbol,
+            'reason': reason,
+            'source': source, # Track which swarm/logic generated this
+            'final_pnl': profit,
+            'timestamp': time.time()
+        }
+        
+        # Store in Memory
+        if self.memory:
+            self.memory.store_experience(
+                feature_vector=self.memory.construct_hologram(context), # We need to construct vector from context!
+                outcome=float(outcome_score),
+                meta={**context, 'category': "trade_result", 'temporal': "short_term"}
+            )
+            
+        logger.info(f"LEARNING: Trade {ticket} ({source}) Closed. Profit: ${profit:.2f}. Lesson Stored.")
 
     def analyze_patterns(self) -> Dict[str, Any]:
         """
@@ -149,3 +201,26 @@ class HistoryLearningEngine:
             'total_pnl': self.total_pnl,
             'experiences': self.experiences_learned
         }
+
+    def get_calibration_bias(self, source: str) -> float:
+        """
+        Calculates Confidence Bias (Avg Conf - Real Win Rate).
+        Positive = Overconfident. Negative = Underconfident.
+        """
+        stats = self.source_performance.get(source)
+        if not stats or stats.get('trade_count', 0) < 5: return 0.0
+        
+        avg_conf = stats['total_confidence'] / stats['trade_count']
+        win_rate = stats['wins'] / stats['trade_count']
+        
+        return avg_conf - (win_rate * 100.0)
+
+    def get_source_performance(self, source: str) -> Dict[str, Any]:
+        """
+        Returns performance metrics for a specific source.
+        """
+        return self.source_performance.get(source, {'wins': 0, 'losses': 0, 'pnl': 0.0, 'consecutive_losses': 0})
+        
+    def get_all_performances(self) -> Dict[str, Dict]:
+        """Returns the full performance map."""
+        return self.source_performance

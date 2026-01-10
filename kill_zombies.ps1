@@ -1,11 +1,11 @@
 
-# Script to Kill Zombie main.py Python Processes
-# Careful: This kills ALL python processes that have "main.py" in the command line.
+# Script to Kill Zombie backtest_engine.py Python Processes
+# Careful: This kills ALL python processes that have "backtest_engine.py" in the command line.
 
 Write-Host "HUNTING ZOMBIES..." -ForegroundColor Red
 
 # Find processes
-$zombies = Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like "*python*main.py*" }
+$zombies = Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like "*python*backtest_engine.py*" }
 
 if ($zombies) {
     foreach ($zombie in $zombies) {
@@ -13,6 +13,7 @@ if ($zombies) {
         Stop-Process -Id $zombie.ProcessId -Force -ErrorAction SilentlyContinue
     }
     Write-Host "All zombies neutralized." -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "No zombies found." -ForegroundColor Gray
 }

@@ -21,10 +21,11 @@ class FifthEye:
     def __init__(self):
         self.intermarket_data = {}
         self.last_sync = datetime.min
+        self.sync_enabled = True
         
     def sync_intermarket(self):
         """Fetches intermarket data once every 4 hours."""
-        if datetime.now() - self.last_sync < timedelta(hours=4):
+        if not self.sync_enabled or datetime.now() - self.last_sync < timedelta(hours=4):
             return
             
         logger.info("Syncing Intermarket Data (DXY, US10Y, SPX)...")

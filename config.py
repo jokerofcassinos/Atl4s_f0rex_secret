@@ -5,8 +5,18 @@
 import os
 
 # --- BROKER SETTINGS ---
-SYMBOL = "XAUUSD" # Gold
-TIMEFRAME = 5 # M5
+# MULTI-PAR STRATEGY v1.0
+SYMBOLS = [
+    "EURUSD",   # Major - High liquidity, tight spread
+    "GBPUSD",   # Major - Volatile, good trends
+    "USDJPY",   # Major - Strong trends
+    "USDCAD",   # Commodity-linked
+    "USDCHF",   # Safe haven correlation
+]
+PRIMARY_SYMBOL = "EURUSD"  # Default for single-run mode
+SYMBOL = PRIMARY_SYMBOL # Alias for legacy compatibility
+
+TIMEFRAME = 5 # M5 - All pairs use same TF
 MAGIC_NUMBER = 123456
 LEVERAGE = 3000 # UPGRADED: 1:3000 (Ultra High Leverage)
 
@@ -17,8 +27,21 @@ MAX_LOTS_PER_TRADE = 5.0 # Increased absolute Cap
 DYNAMIC_LOT_SCALING = True # Use Quantum Lot Sizing
 
 # --- OPERATION WINDOW ---
-START_HOUR = 10 # 10:00 (London/NY Overlap)
-END_HOUR = 16 # 16:00 (End of active session)
+# KILLZONES v2.0 - Multiple high-probability windows
+KILLZONES = {
+    'LONDON_OPEN': {'start': 8, 'end': 11, 'priority': 1},
+    'NY_OVERLAP': {'start': 13, 'end': 16, 'priority': 1},  # Best
+    'NY_CLOSE': {'start': 19, 'end': 21, 'priority': 2},    # Secondary
+    'ASIAN_OPEN': {'start': 0, 'end': 3, 'priority': 3},    # JPY pairs only
+}
+
+# Session-Symbol mapping (some pairs better in specific sessions)
+SESSION_PAIRS = {
+    'LONDON_OPEN': ['EURUSD', 'GBPUSD'],
+    'NY_OVERLAP': ['EURUSD', 'GBPUSD', 'USDCAD'],
+    'NY_CLOSE': ['USDCAD'],  # CAD news often late
+    'ASIAN_OPEN': ['USDJPY'],  # JPY session
+}
 
 # --- MODULE TOGGLES ---
 ENABLE_FIRST_EYE = True # Scalp Swarm (HFT)

@@ -56,7 +56,7 @@ class ThoughtTree:
     Cada módulo tem sua própria árvore que pode se interligar com outras.
     """
     
-    def __init__(self, module_name: str, max_depth: int = 10):
+    def __init__(self, module_name: str, max_depth: int = 5): # Phase 3 Optimization: Reduced from 10
         """
         Inicializa uma árvore de pensamento.
         

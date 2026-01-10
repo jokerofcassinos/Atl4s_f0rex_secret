@@ -6,6 +6,7 @@ import logging
 import config
 import time
 import random
+import asyncio
 from datetime import datetime, timedelta
 
 logger = logging.getLogger("Atl4s-Data")
@@ -84,10 +85,32 @@ class DataLoader:
         self.symbol = symbol
         self.timeframe = timeframe
         self.cache_file = os.path.join(config.CACHE_DIR, f"{symbol}_{timeframe}.parquet")
+        
+        # Phase 3: Lazy Evaluation - Only recalculate on candle change
+        self.last_candle_time = None
+        self.cached_indicators = {}
+        self.cached_data = None
 
-    def get_data(self, symbol=None, timeframe=None):
+    def check_candle_change(self, df: pd.DataFrame) -> bool:
         """
-        Orchestrates the data loading process.
+        Phase 3: Lazy Evaluation - Checks if candle has changed since last call.
+        Returns True if new candle detected (indicators need recalculation).
+        """
+        if df is None or df.empty:
+            return False
+            
+        current_candle_time = df.index[-1]
+        
+        if self.last_candle_time is None or current_candle_time != self.last_candle_time:
+            self.last_candle_time = current_candle_time
+            self.cached_indicators = {}  # Clear indicator cache on candle change
+            return True
+            
+        return False
+
+    async def get_data(self, symbol=None, timeframe=None):
+        """
+        Orchestrates the data loading process (Async & Concurrent).
         If symbol/timeframe provided, returns specific DataFrame.
         Otherwise returns dictionary map for default context.
         """
@@ -101,9 +124,9 @@ class DataLoader:
              if timeframe == "1h": yf_interval = "1h"
              
              cache_file = os.path.join(config.CACHE_DIR, f"{target_symbol}_{timeframe}.parquet")
-             return self._fetch_with_cache(target_symbol, yf_interval, cache_file)
+             return await asyncio.to_thread(self._fetch_with_cache, target_symbol, yf_interval, cache_file)
              
-        # Else Legacy Multi-TF Load
+        # Else Legacy Multi-TF Load using Concurrent Execution
         data_map = {}
         
         # Timeframes to fetch
@@ -117,11 +140,22 @@ class DataLoader:
             ("MN", "1mo", 7300)
         ]
         
+        # Launch concurrent fetches
+        tasks = []
         for tf_name, yf_interval, days_limit in timeframes:
             cache_file = os.path.join(config.CACHE_DIR, f"{target_symbol}_{tf_name}.parquet")
-            data_map[tf_name] = self._fetch_with_cache(target_symbol, yf_interval, cache_file, days_limit)
+            tasks.append(
+                asyncio.to_thread(self._fetch_with_cache, target_symbol, yf_interval, cache_file, days_limit)
+            )
+            
+        # Wait for all
+        results = await asyncio.gather(*tasks)
         
-        # Derived
+        # Map results back
+        for i, (tf_name, _, _) in enumerate(timeframes):
+            data_map[tf_name] = results[i]
+        
+        # Derived (CPU bound, fast enough to run in sync, or offload if needed)
         if 'H1' in data_map and data_map['H1'] is not None:
              data_map['H4'] = self.resample_to_tf(data_map['H1'], '4h')
         if 'D1' in data_map and data_map['D1'] is not None:
@@ -151,37 +185,56 @@ class DataLoader:
         is_weekend = False
         if pd.Timestamp.now().dayofweek >= 5: is_weekend = True
         
+        basket_tasks = []
+        basket_symbols = []
+
         for asset in candidates:
              # Skip Forex on weekends to avoid noise/stale data
              if is_weekend and asset in ["XAUUSD", "EURUSD", "USDJPY", "GBPUSD"]: continue
              
-             # Start date logic is inside fetch_single
              c_file = os.path.join(config.CACHE_DIR, f"{asset}_Apex.parquet")
              
-             # Fetch H1 for robust trend analysis
-             df = self._fetch_with_cache(asset, "1h", c_file, days=30)
-             if df is not None and not df.empty:
-                 global_basket[asset] = df
+             basket_symbols.append(asset)
+             basket_tasks.append(
+                 asyncio.to_thread(self._fetch_with_cache, asset, "1h", c_file, 30)
+             )
+
+        if basket_tasks:
+            basket_results = await asyncio.gather(*basket_tasks)
+            for i, df in enumerate(basket_results):
+                if df is not None and not df.empty:
+                    global_basket[basket_symbols[i]] = df
              
         data_map['global_basket'] = global_basket # Apex and Nexus both use this
         
         return data_map
 
-    def get_basket_data(self, symbols: list) -> dict:
+    async def get_basket_data(self, symbols: list) -> dict:
         """
-        Fetches M5 data for a list of symbols to build a Causal Basket.
+        Fetches M5 data for a list of symbols to build a Causal Basket (Async).
         Used by the Causal Nexus (Phase 105).
         """
         basket = {}
+        tasks = []
+        task_symbols = []
+        
         for sym in symbols:
             # We assume M5 is the heartbeat timeframe
             tf_name = "M5"
             yf_interval = "5m"
             c_file = os.path.join(config.CACHE_DIR, f"{sym}_{tf_name}.parquet")
             
-            df = self._fetch_with_cache(sym, yf_interval, c_file, days=5)
-            if df is not None and not df.empty:
-                basket[sym] = df
+            task_symbols.append(sym)
+            tasks.append(
+                asyncio.to_thread(self._fetch_with_cache, sym, yf_interval, c_file, 5)
+            )
+            
+        if tasks:
+            results = await asyncio.gather(*tasks)
+            for i, df in enumerate(results):
+                if df is not None and not df.empty:
+                    basket[task_symbols[i]] = df
+                    
         return basket
 
     def _get_yf_ticker(self, symbol):

@@ -85,10 +85,10 @@ class InfiniteWhyEngine:
 
     def __init__(
         self,
-        max_depth: int = 32,  # AGI Ultra: Expanded from 8 to 32 levels
-        max_branches: int = 128,  # AGI Ultra: Expanded from 64 to 128
-        vector_top_k: int = 512,  # AGI Ultra: Expanded from 256 to 512
-        parallel_workers: int = 8,  # AGI Ultra: Parallel counterfactual simulation
+        max_depth: int = 4,   # Phase 3 Optimization: Reduced from 32 (AGI Ultra) to 4
+        max_branches: int = 12, # Phase 3 Optimization: Reduced from 128 (AGI Ultra) to 12
+        vector_top_k: int = 20, # Phase 3 Optimization: Reduced from 512 to 20
+        parallel_workers: int = 2, # Phase 3 Optimization: Reduced from 8 to 2
         enable_meta_reasoning: bool = True,  # AGI Ultra: Meta-cognitive layer
         adaptive_depth: bool = True,  # AGI Ultra: Dynamic depth based on importance
     ):
@@ -521,7 +521,7 @@ class InfiniteWhyEngine:
         self,
         query_event: MemoryEvent,
         similar_events: List[Tuple[MemoryEvent, float]],
-        num_scenarios: int = 100,
+        num_scenarios: int = 5, # Phase 3 Optimization: Reduced from 100 to 5
     ) -> List[ScenarioBranch]:
         """
         AGI Ultra: Simulate 100+ counterfactual scenarios in parallel.

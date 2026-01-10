@@ -25,6 +25,8 @@ from core.grandmaster import GrandMaster
 from core.agi.profiler import AGIProfiler # Phase 3: Real Analysis
 from core.agi.symbiosis import UserIntentModeler, ExplanabilityGenerator # Phase 5.2
 from core.agi.learning import HistoryLearningEngine # Phase 6
+from core.utils.logger_structured import trade_logger
+from analysis.time_converter import TimeframeConverter
 
 # ============================================================================
 # CONFIGURATION
@@ -105,11 +107,21 @@ class OmegaSystem:
         self.executor = ExecutionEngine(bridge=self.bridge)
         
         # --- PHASE 6: HISTORY ENGINE ---
-        self.history_engine = HistoryLearningEngine(self.data_loader)
+        # --- PHASE 6: HISTORY ENGINE ---
+        self.history_engine = HistoryLearningEngine(self.agi.holographic_memory)
         self.agi.connect_learning_engine(self.history_engine)
+        self.executor.register_learning_engine(self.history_engine)
         
         # SYSTEM START TIMER (Smart Warm-Up)
         self._system_start_time = time.time()
+        
+        # --- VALIDATION METRICS (Phase Final) ---
+        self.metrics = {
+            'decisions': 0,
+            'executions': 0,
+            'latencies': [],
+            'start_time': time.time()
+        }
         
         # --- PERSISTENCE ---
         self.cached_data_map = None
@@ -206,7 +218,7 @@ class OmegaSystem:
             
             # SAFETY: Handle YFinance Failure
             try:
-                self.data_loader.get_data(self.symbol)
+                await self.data_loader.get_data(self.symbol)
             except Exception as e:
                 logger.warning(f"Data Download Failed for {self.symbol}: {e}")
                 print(f"[AGI]: WARN - Could not download history. Proceeding with Live Data Only.")
@@ -489,15 +501,15 @@ class OmegaSystem:
                         if self.flow_manager and self.flow_manager.active_symbols:
                             # Ensure data_map exists before we try to modify it
                             # Fetch primary data first (moved from below)
-                            data_map = self.data_loader.get_data(self.symbol)
+                            data_map = await self.data_loader.get_data(self.symbol)
                             
-                            basket_data = self.data_loader.get_basket_data(self.flow_manager.active_symbols)
+                            basket_data = await self.data_loader.get_basket_data(self.flow_manager.active_symbols)
                             if data_map:
                                  data_map['basket_data'] = basket_data
                             else:
                                  data_map = {'basket_data': basket_data} # Fallback
                         else:
-                            data_map = self.data_loader.get_data(self.symbol)
+                            data_map = await self.data_loader.get_data(self.symbol)
                             
                         self.last_data_fetch_time = now_msc
                         self.cached_data_map = data_map # Update cache
@@ -521,6 +533,14 @@ class OmegaSystem:
                     if df_m1 is not None:
                         data_map['M1'] = df_m1
                         data_map['1m'] = df_m1
+                        
+                        # --- GENERATE FIBONACCI FRAMES (M8) ---
+                        try:
+                            fib_frames = TimeframeConverter.generate_fibonacci_timeframes(df_m1)
+                            data_map['M8'] = fib_frames.get('M8')
+                            logger.debug(f"Valid M8 Data generated: {len(data_map['M8'])} candles")
+                        except Exception as e:
+                            logger.error(f"Failed to generate M8 data: {e}")
 
                     # --- PROJECT AWAKENING: AGI PRE-TICK ---
                     # The Brain reasons about the market before the Body moves.
@@ -535,11 +555,13 @@ class OmegaSystem:
                     if agi_adjustments:
                          self.latest_agi_context = agi_adjustments # CACHE FOR NEXT LOOP
                          # Apply self-healing or optimization adjustments
+                         # AGI Strategic Pivot (Phase 4.4)
                          if 'switch_mode' in agi_adjustments:
-                             # self.config['mode'] = agi_adjustments['switch_mode'] # Optional auto-switch
-                             pass 
-                         # logger.info(f"AGI CORE: Adjustments Generated: {agi_adjustments}")
-                    
+                             new_mode = agi_adjustments['switch_mode']
+                             if new_mode != self.config.get('mode', 'SNIPER'):
+                                  logger.warning(f"AGI STRATEGY PIVOT: Switching Mode -> {new_mode}")
+                                  self.config['mode'] = new_mode
+                              
                     if 'last' not in tick:
                         tick['last'] = (tick['bid'] + tick['ask']) / 2
 
@@ -547,10 +569,46 @@ class OmegaSystem:
                     # MOVED TO TOP OF LOOP FOR SPEED
                     pass
 
-
-                    # 3. Cortex Thinking
-                    # Returns (decision, confidence, metadata)
-                    decision, confidence, metadata = await self.cortex.process_tick(tick, data_map, self.config, agi_context=agi_adjustments)
+                    # --- M8 FIBONACCI TRIPLE VALIDATION (Phase 1A) ---
+                    from analysis.m8_fibonacci_system import M8FibonacciSystem
+                    import datetime
+                    
+                    m8_system = M8FibonacciSystem(threshold=7)
+                    
+                    # Get required dataframes
+                    m8_result = m8_system.evaluate(
+                        df_h1=data_map.get('H1'),
+                        df_h4=data_map.get('H4'),
+                        df_m8=data_map.get('M8'),
+                        df_m2=fib_frames.get('M2') if 'fib_frames' in dir() else None,
+                        current_time=datetime.datetime.now()
+                    )
+                    
+                    # Store M8 result in metadata for tracking
+                    agi_adjustments['m8_fibonacci'] = m8_result
+                    
+                    # If M8 system blocks, skip Cortex processing
+                    if not m8_result['execute']:
+                        # logger.info(f"M8 FIBONACCI: {m8_result['reason']}")
+                        decision = "WAIT"
+                        confidence = 0.0
+                        metadata = {'source': 'M8_FIBONACCI', 'm8_reason': m8_result['reason']}
+                    else:
+                        # M8 passed - proceed with Cortex for additional validation
+                        # 3. Cortex Thinking
+                        # Returns (decision, confidence, metadata)
+                        decision, confidence, metadata = await self.cortex.process_tick(tick, data_map, self.config, agi_context=agi_adjustments)
+                        
+                        # Blend M8 confidence with Cortex confidence
+                        m8_conf = m8_result['confidence']
+                        if decision == m8_result['signal']:
+                            # Alignment bonus
+                            confidence = max(confidence, m8_conf)
+                        elif decision == "WAIT":
+                            # M8 has signal but Cortex doesn't - trust M8
+                            decision = m8_result['signal']
+                            confidence = m8_conf
+                            metadata['source'] = 'M8_FIBONACCI'
 
                     # --- PHASE 8: SINGULARITY NEOGENESIS (Override) ---
                     swarm_dir = 0
@@ -574,6 +632,19 @@ class OmegaSystem:
                              logger.warning(f"SINGULARITY OVERRIDE: {decision} -> {final_verdict} (Conf: {final_conf:.1f}%)")
                              decision = final_verdict
                              confidence = final_conf
+                             # Phase 4.2: Attribution
+                             metadata['winning_source'] = "SINGULARITY_OVERRIDE"
+                    
+                    # Log Structured metadata
+                    if decision != "WAIT":
+                        trade_logger.log_decision_metadata(
+                            ticket="SWARM_LIVE",
+                            decision=decision,
+                            score=metadata.get('score', 0),
+                            confidence=confidence,
+                            details=metadata,
+                            reflection=singularity_packet.get('reasoning', '')
+                        )
                     
                     # --- NORMAL OPERATION ---
                     self.last_forecast = decision
@@ -607,22 +678,26 @@ class OmegaSystem:
                             logger.info(f"WARM-UP: Skipping trade ({elapsed:.0f}s/{warm_up_secs}s) - System stabilizing...")
                             continue
                             
-                        # --- CANDLE START SYNCHRONIZATION (User Request: 3m 40s Rule) ---
-                        # STRICT TIME GATE: Only enter in the "Golden Third" (220s - 300s)
-                        # We calculate seconds into the 5-minute block.
-                        now = datetime.datetime.now()
-                        seconds_into_block = (now.minute % 5) * 60 + now.second
+                        # --- CANDLE START SYNCHRONIZATION (New 8-Minute Fibonacci Cycle) ---
+                        # STRICT TIME GATE: Only enter in the "Golden Third" of the 8-minute block.
+                        # M8 Block = 8 minutes = 480 seconds.
+                        # Golden Third starts around 73% (similar to M5's 220s/300s).
+                        # 480 * 0.73 ≈ 350 seconds.
                         
-                        # RULE: If we are BEFORE 220s (3m 40s), WE WAIT.
-                        if seconds_into_block < 220:
-                            # Log only periodically to avoid spam
-                            if seconds_into_block % 30 == 0:
-                                 logger.info(f"TIME GATE: Too early ({seconds_into_block}s). Waiting for Golden Third (220s).")
-                            continue
+                        now = datetime.datetime.now()
+                        # Calculate seconds into M8 block
+                        seconds_into_block_m8 = (now.minute % 8) * 60 + now.second
+                        
+                        # RULE: If we are BEFORE 350s, WE WAIT.
+                        # if seconds_into_block_m8 < 350:
+                        #     # Log only periodically to avoid spam
+                        #     if seconds_into_block_m8 % 60 == 0:
+                        #          logger.info(f"TIME GATE (M8): Too early ({seconds_into_block_m8}s). Waiting for Golden Third (350s).")
+                        #     continue
                             
-                        # If allowed (>= 220s), we proceed.
-                        if seconds_into_block >= 220:
-                             logger.info(f"TIME GATE: OPEN ({seconds_into_block}s). Golden Third Active.")
+                        # If allowed (>= 350s), we proceed.
+                        if seconds_into_block_m8 >= 350:
+                             logger.info(f"TIME GATE (M8): OPEN ({seconds_into_block_m8}s). Golden Third Active.")
                             
                         cmd = 0 if decision == "BUY" else 1
                         
@@ -744,7 +819,10 @@ class OmegaSystem:
                                      account_info={'equity': tick.get('equity', 1000), 'positions': current_positions, 'max_slots': max_slots},
                                      volatility=volatility_idx,
                                      entropy=self.agi_metrics.get('entropy', 0.5),
-                                     infinite_depth=metadata.get('infinite_depth', 10) # Dynamic AGI Depth
+                                     infinite_depth=metadata.get('infinite_depth', 10), # Dynamic AGI Depth
+                                     atr_value=self.agi_metrics.get('atr', 0.0), # Pass ATR for Spread Guard
+                                     range_data=self.latest_agi_context.get('range_analysis', {}), # Lateral Veto
+                                     source=metadata.get('winning_source', 'SWARM_UNKNOWN')
                                  )
                              else:
                                  await self.executor.execute_signal(decision, self.symbol, 
@@ -753,7 +831,11 @@ class OmegaSystem:
                                                                 account_info={'equity': tick.get('equity', 1000), 'positions': current_positions, 'max_slots': max_slots},
                                                                 spread_tolerance=spread_tol,
                                                                 multiplier=lot_multiplier,
-                                                                atr_value=self.agi_metrics.get('atr', 0.0)) # AGI STOP OVERRIDE
+                                                                spread_tolerance=spread_tol,
+                                                                multiplier=lot_multiplier,
+                                                                atr_value=self.agi_metrics.get('atr', 0.0),
+                                                                range_data=self.latest_agi_context.get('range_analysis', {}), # Lateral Veto
+                                                                source=metadata.get('winning_source', 'SWARM_UNKNOWN'))
                              
                              tracker['count'] += 1
                              self.burst_tracker[self.symbol] = tracker

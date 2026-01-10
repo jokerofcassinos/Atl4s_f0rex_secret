@@ -12,8 +12,8 @@ class FractalTimeScaleIntegrator:
     Ensures coherence across M1, M5, H1, D1 execution frames.
     """
     def __init__(self):
-        self.timeframes = ['1m', '5m', '15m', '1h', '4h']
-        self.weights = {'1m': 0.1, '5m': 0.2, '15m': 0.2, '1h': 0.3, '4h': 0.2}
+        self.timeframes = ['M1', 'M5', 'M8', 'H1', 'H4']
+        self.weights = {'M1': 0.1, 'M5': 0.15, 'M8': 0.25, 'H1': 0.3, 'H4': 0.2}
 
     def calculate_fractal_coherence(self, market_data_map: Dict[str, Any]) -> float:
         """

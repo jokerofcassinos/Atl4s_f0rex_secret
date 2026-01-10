@@ -26,12 +26,26 @@ class GreatFilter:
         # Phase 12: Friction & Profitability
         from core.agi.execution.friction_model import FrictionEstimator
         self.friction_estimator = FrictionEstimator()
+        
+        # Penalty Box (Cool-Down after Rejection)
+        self.penalty_box = {}
 
     def validate_entry(self, signal: Dict[str, Any], market_state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Final Check before Opening.
-        Now includes Phase 12 Profitability Gate.
+        Now includes Phase 12 Profitability Gate & Penalty Box.
         """
+        import time as _time
+        symbol = signal.get("symbol")
+        
+        # 0. Penalty Box Check (Fast Fail)
+        if symbol and symbol in self.penalty_box:
+             expiry, reason = self.penalty_box[symbol]
+             if _time.time() < expiry:
+                  return {'allowed': False, 'decision_id': "PENALTY", 'reason': f"Penalty Box: {reason}"}
+             else:
+                  del self.penalty_box[symbol]
+        
         reasons = []
         allowed = True
 
@@ -40,10 +54,11 @@ class GreatFilter:
             reasons.append("Blocking BUY during crash phase")
             allowed = False
 
-        # 2. Reject Low Confidence Scalps (lowered from 75 to 50 for HYDRA mode)
+        # 2. Reject Low Confidence Scalps (Sync with Metacognition: 45%)
         confidence = float(signal.get("confidence", 0.0))
-        if confidence < 50.0:
+        if confidence < 45.0:
             reasons.append(f"Confidence {confidence:.1f} too low")
+            allowed = False
             
         # 3. Phase 12: Predictive Profitability Gate
         # "Can we afford the trip?"
@@ -54,6 +69,8 @@ class GreatFilter:
         if not self.friction_estimator.is_profitable_in_session(market_state, target_profit):
             reasons.append(f"UNPROFITABLE: Friction ({friction_cost:.5f}) eats Reward ({target_profit:.5f})")
             allowed = False
+            # Add to Penalty Box (20s Cool-Down)
+            if symbol: self.penalty_box[symbol] = (_time.time() + 20.0, "High Friction")
             
         # 3. Spread Check (Block if spread is excessive)
         spread = market_state.get("spread", 0.0)
@@ -66,6 +83,7 @@ class GreatFilter:
              if spread > max_spread:
                   reasons.append(f"Spread {spread:.5f} > 35% ATR ({max_spread:.5f}) - Impossible Scalp")
                   allowed = False
+                  if symbol: self.penalty_box[symbol] = (_time.time() + 30.0, "Ghost Spread")
         
         # B. Candle Context Guard (User Innovation)
         # "Observe where the candle is... spread is 3x above"
@@ -84,6 +102,33 @@ class GreatFilter:
         if spread > max_spread_hard and spread > 0.0008:
             reasons.append(f"Spread {spread:.5f} too wide (Hard Limit)")
             allowed = False
+            
+        # 4. Lateral Market PING-PONG (User Request V2)
+        # If market is RANGING, INVERT WRONG-SIDE signals to exploit the range.
+        # Buy at TOP of range -> INVERT to SELL
+        # Sell at BOTTOM of range -> INVERT to BUY
+        range_status = market_state.get("range_status", "TRENDING")
+        range_proximity = market_state.get("range_proximity", "MID")
+        trade_type = signal.get("type")
+        inverted_action = None
+        
+        if range_status == "RANGING":
+             if trade_type == "BUY" and range_proximity == "RANGE_HIGH":
+                  # Wrong Side! Invert to SELL.
+                  inverted_action = "SELL"
+                  reasons.append(f"PING-PONG: BUY at {range_proximity} INVERTED to SELL")
+                  logger.info(f"PING-PONG MODE: Inverting BUY -> SELL (At Range Top)")
+                  
+             elif trade_type == "SELL" and range_proximity == "RANGE_LOW":
+                  # Wrong Side! Invert to BUY.
+                  inverted_action = "BUY"
+                  reasons.append(f"PING-PONG: SELL at {range_proximity} INVERTED to BUY")
+                  logger.info(f"PING-PONG MODE: Inverting SELL -> BUY (At Range Bottom)")
+                  
+             # If we inverted, store it for execute_signal to use
+             if inverted_action:
+                  # Store in a special return key
+                  pass # We'll return this in the verdict
 
         if not reasons:
             reasons.append("Risk checks passed")
@@ -109,6 +154,7 @@ class GreatFilter:
             "allowed": allowed,
             "decision_id": decision_id,
             "reason": reason_str,
+            "inverted_action": inverted_action # Ping-Pong Mode
         }
 
     def update_entry_result(self, decision_id: str, result: str, pnl: Optional[float] = None) -> None:

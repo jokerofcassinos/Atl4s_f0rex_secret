@@ -195,13 +195,13 @@ class RecursiveReflection:
             # Legacy score was 0-100
             
             # PROPOSED FIX: Non-Linear Scaling
-            # Don't penalize "Good" reasoning (0.6+). Only penalize "Bad" (<0.5).
+            # Don't penalize "Good" reasoning (0.55+). Only penalize "Bad" (<0.45).
             if quality > 0.8:
                  scale = 1.15 # Boost for Excellent Reasoning
-            elif quality > 0.6:
-                 scale = 1.0  # Nuetral for Good Reasoning (Don't dampen)
-            elif quality > 0.5:
-                 scale = 0.9  # Slight penalty
+            elif quality > 0.55:
+                 scale = 1.0  # Neutral for Good Reasoning (Don't dampen)
+            elif quality > 0.45:
+                 scale = 0.85  # Slight penalty
             else:
                  scale = quality # Linear penalty for bad reasoning
                  
@@ -209,8 +209,8 @@ class RecursiveReflection:
             base_conf = internal_decision.get('confidence', 0.5) * 100.0
             adjusted_conf = float(base_conf * scale)
             
-            # Cap at 99.0
-            adjusted_conf = min(99.0, adjusted_conf)
+            # Cap at 95.0 (100% is unrealistic)
+            adjusted_conf = min(95.0, adjusted_conf)
             
             return {
                 'adjusted_confidence': adjusted_conf,
@@ -272,12 +272,12 @@ class RecursiveReflection:
         # Was the reasoning sound?
         avg_quality = np.mean([l.quality_score for l in prev_layers])
         
-        if avg_quality > 0.6:  # Relaxed from 0.7
+        if avg_quality > 0.55:  # Further relaxed from 0.6
             observation = "Reasoning appears sound based on multiple factors"
             quality = avg_quality
-        elif avg_quality > 0.47:  # Raised to 0.47 per User Request (Standard: 47%)
+        elif avg_quality > 0.45:  # Slightly lower from 0.47
             observation = "Moderate reasoning quality - acceptable for active modes"
-            quality = max(0.75, avg_quality) # Boost to 0.75 (Passing Grade)
+            quality = max(0.65, avg_quality * 1.1)  # Gentler boost
         else:
             observation = "Weak reasoning - potentially random"
             quality = avg_quality * 0.7
@@ -431,11 +431,13 @@ class RecursiveReflection:
                  blind_spots.append("Liquidity not analyzed")
         
         # 3. Spread (Critical for Scalping)
-        if 'spread_check' not in context:
-             # If spread is low (from tick data), maybe implicitly okay?
-             # For now, we enforce it but allow 'spread_ok' flag
+        if 'spread' not in context and 'spread_check' not in context:
              if not context.get('spread_ok', False):
                   blind_spots.append("Spread not verified")
+        else:
+             spread = context.get('spread', context.get('spread_check', {}).get('current_spread', 0))
+             if spread > 0.0008: # Hard limit for standard pairs, should be symbol-aware
+                  blind_spots.append(f"Excessive Spread ({spread:.5f})")
         
         if decision.get('confidence', 0) > 0.95:
             blind_spots.append("Potentially overconfident")

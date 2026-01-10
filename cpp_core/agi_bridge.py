@@ -9,6 +9,14 @@ import numpy as np
 from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass
 import threading
+import time
+
+# Phase 3.3: TTL Cache for Expensive Calculations
+_physics_cache = {
+    'fisher': {'value': 0.0, 'time': 0, 'ttl': 5.0},
+    'hurst': {'value': 0.5, 'time': 0, 'ttl': 10.0},
+    'lyapunov': {'value': 0.0, 'time': 0, 'ttl': 15.0},
+}
 
 
 # ============================================================================
@@ -421,13 +429,46 @@ class PhysicsBridge:
     # ... (other methods) ...
     
     def calculate_fisher(self, prices: np.ndarray, window: int = 10) -> float:
-        """Calculate Fisher Information Metric (Regime Change Speed)."""
-        if not self._lib:
-            return 0.0
+        """Calculate Fisher Information Metric (Regime Change Speed). Cached."""
+        # TTL Cache Check
+        cache = _physics_cache['fisher']
+        now = time.time()
+        if now - cache['time'] < cache['ttl']:
+            return cache['value']
             
-        prices_arr = np.ascontiguousarray(prices, dtype=np.float64)
-        ptr = prices_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-        return self._lib.calculate_fisher_information(ptr, len(prices_arr), window)
+        if self._lib:
+            prices_arr = np.ascontiguousarray(prices, dtype=np.float64)
+            ptr = prices_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            return self._lib.calculate_fisher_information(ptr, len(prices_arr), window)
+            
+        # Python Fallback: Ehlers Fisher Transform
+        try:
+            if len(prices) < window: return 0.0
+            
+            # Use last 'window' prices
+            data = prices[-window:]
+            
+            # Normalize to [-0.99, 0.99] roughly to avoid log(0)
+            mn, mx = np.min(data), np.max(data)
+            if mx == mn: return 0.0
+            
+            norm = 2 * ((data - mn) / (mx - mn)) - 1
+            norm = 0.99 * norm # Clip to avoid infinity
+            
+            # Fisher Transform on the latest point
+            # F = 0.5 * ln((1+x)/(1-x))
+            val = norm[-1]
+            fisher = 0.5 * np.log((1 + val) / (1 - val))
+            
+            # We assume "Fisher Metric" is the absolute value or magnitude of the signal
+            # Or the change in Fisher?
+            # OmniCortex expects > 2.0 for CHAOTIC.
+            # Std Fisher can go up to 2-3 easily.
+            result = abs(fisher)
+            _physics_cache['fisher'] = {'value': result, 'time': time.time(), 'ttl': 5.0}
+            return result
+        except:
+            return 0.0
     
     def simulate_trajectory(
         self,
@@ -467,22 +508,95 @@ class PhysicsBridge:
         return self._lib.calculate_sectional_curvature(ptr, len(prices_arr), window_size)
     
     def calculate_lyapunov(self, prices: np.ndarray) -> float:
-        """Calculate Lyapunov exponent (chaos measure)."""
-        if not self._lib:
+        # TTL Cache Check
+        cache = _physics_cache['lyapunov']
+        now = time.time()
+        if now - cache['time'] < cache['ttl']:
+            return cache['value']
+            
+        if self._lib:
+            prices_arr = np.ascontiguousarray(prices, dtype=np.float64)
+            ptr = prices_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            return self._lib.calculate_lyapunov_exponent(ptr, len(prices_arr))
+
+        # Python Fallback: Vectorized Lyapunov (Simplified Rosenstein)
+        try:
+            if len(prices) < 50: return 0.0
+            data = np.log(prices)
+            N = len(data)
+            lag = 2
+            embed = 3
+            M = N - (embed - 1) * lag
+            if M < 20: return 0.0
+            
+            orbit = np.array([data[i:i+embed*lag:lag] for i in range(M)])
+            
+            # Vectorized nearest neighbor (Last 20 points only for speed)
+            div_sum = 0
+            count = 0
+            indices = np.arange(M)
+            
+            for i in range(M - 20, M - 1):
+                 p_i = orbit[i]
+                 history = orbit[:M-25]
+                 if len(history) == 0: continue
+                 
+                 dists = np.linalg.norm(history - p_i, axis=1)
+                 mask = np.abs(indices[:M-25] - i) > lag
+                 valid_dists = dists[mask]
+                 
+                 if len(valid_dists) > 0:
+                      min_dist = np.min(valid_dists)
+                      nearest_idx = indices[:M-25][mask][np.argmin(valid_dists)]
+                      
+                      if min_dist > 0 and i+1 < M and nearest_idx+1 < M:
+                           dist_next = np.linalg.norm(orbit[i+1] - orbit[nearest_idx+1])
+                           if dist_next > 0:
+                                div_sum += np.log(dist_next / min_dist)
+                                count += 1
+            
+            result = div_sum / count if count > 0 else 0.0
+            _physics_cache['lyapunov'] = {'value': result, 'time': time.time(), 'ttl': 15.0}
+            return result
+        except:
             return 0.0
-        
-        prices_arr = np.ascontiguousarray(prices, dtype=np.float64)
-        ptr = prices_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-        return self._lib.calculate_lyapunov_exponent(ptr, len(prices_arr))
     
     def calculate_hurst(self, prices: np.ndarray) -> float:
-        """Calculate Hurst exponent (long-term memory)."""
-        if not self._lib:
+        # TTL Cache Check
+        cache = _physics_cache['hurst']
+        now = time.time()
+        if now - cache['time'] < cache['ttl']:
+            return cache['value']
+            
+        if self._lib:
+            prices_arr = np.ascontiguousarray(prices, dtype=np.float64)
+            ptr = prices_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
+            return self._lib.calculate_hurst_exponent(ptr, len(prices_arr))
+
+        # Python Fallback: Simplified Hurst (Std Deviation vs Lag)
+        try:
+            if len(prices) < 32: return 0.5
+            lags = range(2, 20)
+            tau = []
+            valid_lags = []
+            ts = np.array(prices)
+            
+            for lag in lags:
+                if len(ts) > lag:
+                   diff = ts[lag:] - ts[:-lag]
+                   std = np.std(diff)
+                   if std > 0:
+                       tau.append(std)
+                       valid_lags.append(lag)
+            
+            if len(tau) < 2: return 0.5
+            # log(std) ~ H * log(lag)
+            poly = np.polyfit(np.log(valid_lags), np.log(tau), 1)
+            result = poly[0]
+            _physics_cache['hurst'] = {'value': result, 'time': time.time(), 'ttl': 10.0}
+            return result
+        except:
             return 0.5
-        
-        prices_arr = np.ascontiguousarray(prices, dtype=np.float64)
-        ptr = prices_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_double))
-        return self._lib.calculate_hurst_exponent(ptr, len(prices_arr))
     
     def calculate_entropy(self, prices: np.ndarray, bins: int = 20) -> float:
         """Calculate market entropy."""

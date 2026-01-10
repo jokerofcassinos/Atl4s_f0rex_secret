@@ -432,7 +432,7 @@ class SelfHealingManager:
 from core.agi.infinite_why_engine import InfiniteWhyEngine
 
 from .simulation_system_agi import SimulationSystemAGI
-from .temporal import FractalTimeScaleIntegrator # Phase 7
+from .temporal import FractalTimeScaleIntegrator, ChronosPattern, QuarterlyCycle # Phase 7
 from .abstraction import AbstractPatternSynthesizer # Phase 7
 from .synergy import AlphaSynergySwarm # Phase 8
 from .quantum import QuantumProbabilityCollapser # Phase 9
@@ -450,7 +450,7 @@ from .conflict_resolution import SwarmConflictResolver # Phase 155 (System #9)
 # Verified AGI Modules
 from .logic import SymbolicReasoningModule # Phase 9
 from .plasticity import SelfModificationHeuristic # Phase 10
-from .metacognition import RecursiveReflectionLoop, ConfidenceCalibrator # Phase 10
+from .metacognition import ConfidenceCalibrator # Phase 10
 
 # Phase 150+: Session & Liquidity Fusion
 from analysis.session_liquidity_fusion import (
@@ -460,6 +460,7 @@ from analysis.session_liquidity_fusion import (
 from .learning.ssl_engine import SelfSupervisedLearningEngine
 from .metacognition.ontological_nuance_processor import OntologicalNuanceProcessor
 from .symbiosis.neural_resonance_bridge import NeuralResonanceBridge
+from .metacognition.regime_detector import RegimeDetector # Phase 5
 
 # Core Dependencies
 from core.mcts_planner import MCTSPlanner
@@ -499,10 +500,14 @@ class OmegaAGICore:
     """
     Núcleo Central da AGI (Omega Protocol v5.0 - Symbiotic)
     """
-    def __init__(self, infinite_why_engine, simulation_system):
+    def __init__(self, infinite_why_engine=None, simulation_system=None, memory_file: str = None):
         self.infinite_why_engine = infinite_why_engine
         self.simulation_system = simulation_system
+        self.memory_file = memory_file # Store override
         self.meta_loop = MetaExecutionLoop()
+        
+        # Core Memory & Vector Engines (Required for Generative Model)
+        self.holographic_memory = HolographicMemory(memory_file=memory_file) if memory_file else HolographicMemory()
         self.scheduler = AdaptiveScheduler()
         self.state_machine = AdvancedStateMachine()
         self.monitor = PerformanceMonitor()
@@ -547,7 +552,7 @@ class OmegaAGICore:
             enable_meta_reasoning=True
         )
         self.simulation = SimulationSystemAGI()
-        from core.agi.temporal import FractalTimeScaleIntegrator, ChronosPattern, QuarterlyCycle
+        # from core.agi.temporal import FractalTimeScaleIntegrator, ChronosPattern, QuarterlyCycle (Moved to top)
         self.temporal = FractalTimeScaleIntegrator()
         self.chronos = ChronosPattern(utc_offset_hours=2) 
         self.quarterly = QuarterlyCycle(utc_offset_hours=2)
@@ -559,8 +564,7 @@ class OmegaAGICore:
 
         # ... (rest of method)
         
-        # Core Memory & Vector Engines (Required for Generative Model)
-        self.holographic_memory = HolographicMemory()
+
         self.hyper_dimensional = HyperDimensionalEngine()
 
         # Phase 130+ Upgrades
@@ -568,10 +572,10 @@ class OmegaAGICore:
         self.causal_nexus = CausalNexus()
         self.metacognition = RecursiveReflectionLoop()
         # Pass dependencies to Generative Model
-        self.metacognition = RecursiveReflectionLoop()
+
         # self.generative_model already initialized above
         self.resonance = ResonanceEngine()
-        self.resonance = ResonanceEngine()
+
         self.voice = NeuroLinguisticDriver()
         self.zero_shot = ZeroShotAnalyst()
         
@@ -597,6 +601,7 @@ class OmegaAGICore:
         self.ssl_engine = SelfSupervisedLearningEngine()
         self.ontology_nuance = OntologicalNuanceProcessor()
         self.resonance_bridge = NeuralResonanceBridge()
+        self.regime_detector = RegimeDetector() # Phase 5
         
         self.quarterly_cycle = QuarterlyCycle()
         self.correlation = CorrelationSynapse()
@@ -612,12 +617,28 @@ class OmegaAGICore:
         logger.info("OmegaAGI Core v5.0 (Symbiotic) Initialized.")
         
         logger.info("OmegaAGICore initialized with InfiniteWhyEngine & SimulationSystem")
+        self.last_state = None
+        self.learning = None # HistoryLearningEngine reference
+        self.resonance_bridge = None # NeuralResonanceBridge reference (Phase 150)
 
     def connect_learning_engine(self, engine):
-        """Phase 6: Connect Empirical Learning Engine."""
+        """
+        Connects the HistoryLearningEngine to the AGI Core.
+        """
         self.learning = engine
-        logger.info("OmegaAGI connected to HistoryLearningEngine.")
-    
+        logger.info("AGI Core connected to HistoryLearningEngine.")
+
+    def post_tick(self, decision: str, feedback: Dict[str, Any]):
+        """
+        Called after decision execution to update learning.
+        """
+        # Update Meta-Execution Loop
+        self.meta_loop.update(feedback)
+        
+        # Update History Learning
+        if self.learning:
+            self.learning.update_active_trades(feedback)
+            
     def pre_tick(self, tick: Dict, config: Dict, market_data_map: Dict = None) -> Dict[str, Any]:
         """Pre-tick AGI processing."""
         context = ExecutionContext(
@@ -656,6 +677,28 @@ class OmegaAGICore:
              range_data = self.range_scanner.analyze(market_data_map['M5'])
              adjustments['range_analysis'] = range_data
              
+             # --- SNIPER PROTOCOL v4.0: GATE 4 (REGIME CHECK) ---
+             # Detect DANGEROUS_CHOP to prevent trading in noise.
+             # 1. Candles pequenos (Dojis)
+             # 2. Alternância de cores (Indecisão)
+             df_m5 = market_data_map['M5']
+             if len(df_m5) >= 10:
+                  last_5 = df_m5.iloc[-5:]
+                  bodies = abs(last_5['close'] - last_5['open'])
+                  ranges = last_5['high'] - last_5['low']
+                  avg_body_ratio = (bodies / ranges.replace(0, 0.0001)).mean()
+                  
+                  colors = (last_5['close'] > last_5['open']).astype(int)
+                  alternations = abs(colors.diff()).sum()
+                  
+                  # Relaxed Thresholds v4.1
+                  # Body ratio < 0.25 (was 0.35) -> Only block Extreme/Micro Dojis
+                  # Alternations >= 4 (was 3) -> Require almost perfect alternating colors
+                  if avg_body_ratio < 0.25 and alternations >= 4:
+                       logger.warning("AGI REGIME: DANGEROUS_CHOP Detected. Blocking Trades.")
+                       adjustments['regime_block'] = True
+                       adjustments['regime_reason'] = "DANGEROUS_CHOP"
+
              if range_data['status'] == 'RANGING':
                   logger.info(f"RANGE SCANNER: Market is RANGING (Str: {range_data['strength']:.2f}). Bias: {range_data['proximity']}")
                   # Add Ping Pong Bias to adjustments
@@ -710,17 +753,7 @@ class OmegaAGICore:
              adjustments['causal_root'] = causa['root_cause']
              adjustments['causal_chain'] = causa['causal_chain']
              adjustments['ontological_nuance'] = ontological_narrative
-        sentiment_score = 0.5; high_impact_prob = 0.0
-        causal_events = {'sentiment_score': sentiment_score, 'impact': high_impact_prob}
-        if hasattr(self, 'causal_inference'):
-             causa = self.causal_inference.infer_cause(tick, causal_events, chronos_context=chronos_context)
-             ontological_narrative = causa.get('ontological_layer', 'STANDARD')
-             if ontological_narrative != "STANDARD_MECHANICS":
-                  logger.info(f"AGI DEEP THOUGHT: [{ontological_narrative}] -> {causa['confidence']:.2f}")
 
-             adjustments['causal_root'] = causa['root_cause']
-             adjustments['causal_chain'] = causa['causal_chain']
-             adjustments['ontological_nuance'] = ontological_narrative
 
         # 1. Microstructure Analysis
         heatmap_metrics = self.flux_heatmap.update(tick)
@@ -835,7 +868,12 @@ class OmegaAGICore:
             stats = self.learning.analyze_patterns()
             if stats['win_rate'] < 0.25 and stats['total_trades'] > 20:
                  adjustments['risk_mode'] = 'CONSERVATIVE'
-                 logger.warning(f"AGI HISTORY WARNING: Critical Low Win Rate ({stats['win_rate']:.2f}). Enforcing CONSERVATIVE mode.")
+                 adjustments['switch_mode'] = 'CONSERVATIVE' # Pivot to safety
+                 logger.warning(f"AGI HISTORY WARNING: Critical Low Win Rate ({stats['win_rate']:.2f}). Pivot -> CONSERVATIVE.")
+                 
+            elif stats['win_rate'] > 0.70 and stats['total_trades'] > 15:
+                 adjustments['switch_mode'] = 'WOLF_PACK' # Reward high performance
+                 logger.info(f"AGI HISTORY: High Win Rate ({stats['win_rate']:.2f}). Pivot -> WOLF_PACK.")
 
         # --- AGI DREAMER: MENTAL SIMULATION ---
         # "Imagine the next 10 minutes..."
@@ -940,7 +978,7 @@ class OmegaAGICore:
                 'swarm_votes': inputs.get('swarm_votes', {}),
                 'market_state': inputs.get('market_state', {}),
                 'trend_info': trend_info,
-                'spread_ok': True 
+                'spread_ok': agi_context.get('spread_check', {}).get('is_tight', True) if agi_context else True
         }
         
         if agi_context:
@@ -1117,10 +1155,29 @@ class OmegaAGICore:
 
         # 3. History
         if self.learning:
-             stats = self.learning.analyze_patterns()
-             if stats['win_rate'] > 0.6:
+             learning_stats = self.learning.analyze_patterns()
+             # Placeholder for atr, entropy, trend_strength - these would come from market_data_map or other analysis
+             atr = 0.0 # Example value
+             entropy = 0.0 # Example value
+             
+             perf_metrics = {
+                 'win_rate_10': learning_stats.get('win_rate', 0.5),
+                 'drawdown': self.monitor.metrics.max_drawdown # Assuming monitor has max_drawdown
+             }
+             
+             # Phase 5: Regime Detection
+             regime_data = self.regime_detector.detect_regime(
+                 market_metrics={'atr': atr, 'entropy': entropy, 'trend_strength': 50.0}, # Trend TBD
+                 performance_metrics=perf_metrics
+             )
+             adjustments.update(regime_data) # Inject 'regime' and 'threshold_modifier'
+             
+             if regime_data['regime'] == "CRITICAL" and config.get('mode') != 'CONSERVATIVE': # Use config from pre_tick args
+                  logger.critical("REGIME: Switching to CONSERVATIVE due to Critical State.")
+                  adjustments['switch_mode'] = 'CONSERVATIVE'
+             if learning_stats['win_rate'] > 0.6:
                  inputs['history_bias'] = {'direction': 1, 'confidence': 0.8}
-             elif stats['win_rate'] < 0.4:
+             elif learning_stats['win_rate'] < 0.4:
                  inputs['history_bias'] = {'direction': -1, 'confidence': 0.8}
 
         decision_packet = self.synergy.synthesize_singularity_vector(inputs)

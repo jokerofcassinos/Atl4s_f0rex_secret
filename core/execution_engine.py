@@ -3,10 +3,12 @@ import logging
 import asyncio
 import time
 from typing import Dict, Any, Optional, List
+from collections import deque
 
 from risk.dynamic_leverage import DynamicLeverage
 from risk.great_filter import GreatFilter
 from core.risk.event_horizon import EventHorizonRisk
+from core.utils.logger_structured import trade_logger
 
 logger = logging.getLogger("ExecutionEngine")
 
@@ -27,6 +29,16 @@ class ExecutionEngine:
         self.close_attempts = {}    # {ticket: timestamp_msc} - Retry mechanism
         self.trade_start_times = {} # {ticket: local_timestamp_sec} - For accurate age tracking
         self.closed_tickets_cache = set() # Phase 98: Anti-Ghosting Cache
+        self.history_engine = None # Phase 4: Feedback Loop
+        
+        # Phase 4.2: Win Rate per Module
+        self.trade_sources = {} # {ticket: source_id}
+        self.pending_sources = deque(maxlen=50) # Queue of {'symbol', 'time', 'source'}
+
+    def register_learning_engine(self, engine):
+        """Connects the History/Learning Engine for outcome tracking."""
+        self.history_engine = engine
+        logger.info("ExecutionEngine connected to HistoryLearningEngine.")
 
 
     def set_config(self, config: Dict):
@@ -44,6 +56,31 @@ class ExecutionEngine:
         
         trades = tick.get('trades_json', [])
         if not trades: return
+        
+        # Phase 4.2: Map new trades to pending sources
+        for trade in trades:
+            ticket = trade.get('ticket')
+            symbol = trade.get('symbol')
+            if ticket not in self.trade_sources and ticket not in self.closed_tickets_cache:
+                # New Trade Detected - Find Source
+                found_data = {'source': "UNKNOWN", 'confidence': 50.0}
+                
+                # Check pending queue (FIFO)
+                now = time.time()
+                matcher = None
+                
+                for i, p in enumerate(self.pending_sources):
+                    if p['symbol'] == symbol and (now - p['time'] < 30): # 30s match window
+                        matcher = i
+                        found_data = {'source': p['source'], 'confidence': p.get('confidence', 50.0)}
+                        break
+                
+                if matcher is not None:
+                    # Remove from pending (consumed)
+                    del self.pending_sources[matcher]
+                    
+                self.trade_sources[ticket] = found_data
+                # logger.info(f"TRADE SOURCE MAPPED: Ticket {ticket} -> {found_source}")
         
         # 1. Config Thresholds
         v_tp = self.config.get('virtual_tp', 2.0)
@@ -171,7 +208,9 @@ class ExecutionEngine:
         multiplier: float = 1.0,
         atr_value: Optional[float] = None, # Phase 3: AGI ATR Override
         hydra_multiplier: float = 1.0, # Phase 11: Hydra Burst Scaling
-        volatility: float = 50.0 # Phase 11: Swarm Volatility
+        volatility: float = 50.0, # Phase 11: Swarm Volatility
+        range_data: Optional[Dict] = None, # Phase 17: Range Scanner Context
+        source: str = "UNKNOWN" # Phase 4.2: Source Attribution
     ):
         """
         Converts a Cortex Command into a Physical Order.
@@ -182,17 +221,25 @@ class ExecutionEngine:
         """
         # 1. Great Filter Check (Phase 10 - AGI Risk Core)
         if self.risk_filter:
-            risk_signal = {"type": command, "confidence": confidence}
+            risk_signal = {"type": command, "confidence": confidence, "symbol": symbol}
             # spread in raw price units; for Gold it's "points"
             market_state = {
                 "spread": (ask - bid),
-                "typical_price": (ask + bid) / 2,  # For relative spread calculation
-                "is_crash": False,  # placeholder, could be wired to macro modules
+                "typical_price": (ask + bid) / 2,
+                "is_crash": False,
+                "range_status": range_data.get('status', 'TRENDING') if range_data else 'TRENDING',
+                "range_proximity": range_data.get('proximity', 'MID') if range_data else 'MID',
             }
             verdict = self.risk_filter.validate_entry(risk_signal, market_state)
             if not verdict.get("allowed", False):
                 logger.info("EXECUTION BLOCKED by GreatFilter: %s", verdict.get("reason"))
                 return None
+            
+            # Ping-Pong Mode: If GreatFilter inverted the signal, use the new command
+            if verdict.get("inverted_action"):
+                 original_command = command
+                 command = verdict["inverted_action"]
+                 logger.info(f"PING-PONG INVERSION: Changing {original_command} -> {command} (Lateral Market)")
 
         # 2. Dynamic Lots Calculation
         equity = account_info.get('equity', 1000.0) if account_info else 1000.0
@@ -232,16 +279,32 @@ class ExecutionEngine:
         # Format: symbol, cmd_type, volume, sl, tp, confidence
         # EA expects: parts[1]=symbol, parts[2]=cmd, parts[3]=vol, parts[4]=sl, parts[5]=tp, parts[6]=conf
         
-        # FIXED: Disable MQL5/Broker SL (Send 0.0) to prevent premature Price Closures.
-        # We rely 100% on Python's Dollar Guard (check_individual_guards) which is now Volume-Scaled.
         # We KEEP VTP to allow Predictive Exits (The Magnet) to function.
         params = [symbol, cmd_type, lots, "0.00000", f"{vtp:.5f}", confidence]
+
+        # Phase 4.2: Track Source for when trade appears
+        self.pending_sources.append({
+             'symbol': symbol,
+             'time': time.time(),
+             'source': source,
+             'confidence': confidence # Phase 4.3
+        })
 
         if self.bridge:
             logger.info(f"TRANSMITTING ORDER: {command} {symbol} @ {price:.5f} | Lots: {lots} | Conf: {confidence:.1f}%")
             logger.info(f"DYNAMIC GEOMETRY (INTERNAL): VSL={vsl:.5f} (DISABLED in MQL5), VTP={vtp:.5f}")
             self.bridge.send_command("OPEN_TRADE", params)
             logger.info(f"ORDER SENT TO MT5: {params}")
+            
+            # Structured Log
+            trade_logger.log_trade_event("TRADE_OPEN", {
+                "symbol": symbol,
+                "type": command,
+                "lots": lots,
+                "price": price,
+                "vtp": vtp,
+                "confidence": confidence
+            })
         else:
             logger.warning("NO BRIDGE - Order not sent!")
              
@@ -258,13 +321,15 @@ class ExecutionEngine:
         volatility: float = 50.0,
         entropy: float = 0.5,
         infinite_depth: int = 0,
-        atr_value: float = None # Added for GreatFilter Spread Guard
+        atr_value: float = None, # Added for GreatFilter Spread Guard
+        range_data: Dict = None, # Phase 17: Range Scanner Context
+        source: str = "HYDRA" # Default source
     ):
         """
         PHASE 11: HYDRA PROTOCOL (AGI Multi-Vector Execution).
         Dynamically multiplies execution vectors based on conviction (Confidence + Depth).
         """
-        logger.info(f"HYDRA PROTOCOL: Initiating Burst Sequence for {symbol} ({command})")
+        logger.info(f"HYDRA PROTOCOL: Initiating Burst Sequence for {symbol} ({command}) [Source: {source}]")
         
         # 1. Determine Hydra Heads (Number of Orders)
         # Base: 1 order.
@@ -328,9 +393,10 @@ class ExecutionEngine:
                 confidence=confidence,
                 account_info=account_info,
                 volatility=volatility,
-                volatility=volatility,
                 hydra_multiplier=scaling_factor, # Pass scaling
-                atr_value=atr_value # Pass ATR for Spread Guard
+                atr_value=atr_value, # Pass ATR for Spread Guard
+                range_data=range_data, # Pass Range Context for Lateral Veto
+                source=f"{source}_HEAD_{i+1}" # Unique sub-source
             )
             
             # Micro-sleep to prevent sequence errors in MT5
@@ -480,7 +546,7 @@ class ExecutionEngine:
         # Close immediately when profit >= $2.00 (Reference)
         if profit >= 2.0:
              logger.info(f"VTP: {symbol} reached ${profit:.2f}. Closing immediately.")
-             self.close_trade(ticket, symbol)
+             self.close_trade(ticket, symbol, profit=profit, reason="VTP_HIT")
              return True
              
         # 3. Dynamic "Smart Greed" (Difficulty Analysis) (User Request)
@@ -522,24 +588,45 @@ class ExecutionEngine:
              # C. Threshold Logic
              # High Profit (> 1.20) -> Low Difficulty needed to close (Secure 60% of target)
              if profit > 1.20 and difficulty_score >= 20.0:
-                  logger.info(f"SMART GREED: Closing {ticket} at ${profit:.2f}. Difficulty: {difficulty_score} ({reason})")
-                  self.close_trade(ticket, symbol)
-                  return True
+                   logger.info(f"SMART GREED: Closing {ticket} at ${profit:.2f}. Difficulty: {difficulty_score} ({reason})")
+                   self.close_trade(ticket, symbol, profit=profit, reason=f"SMART_GREED:{reason}")
+                   return True
                   
              # Medium Profit (> 0.50) -> High Difficulty needed to close (Bail out)
              if profit > 0.50 and difficulty_score >= 50.0:
-                  logger.info(f"SMART BAILOUT: Closing {ticket} at ${profit:.2f}. High Difficulty: {difficulty_score} ({reason})")
-                  self.close_trade(ticket, symbol)
-                  return True
+                   logger.info(f"SMART BAILOUT: Closing {ticket} at ${profit:.2f}. High Difficulty: {difficulty_score} ({reason})")
+                   self.close_trade(ticket, symbol, profit=profit, reason=f"SMART_BAILOUT:{reason}")
+                   return True
         
         return False
 
-    def close_trade(self, ticket: int, symbol: str):
-        logger.info(f"EXECUTION: Closing Trade {ticket} ({symbol})")
+    def close_trade(self, ticket: int, symbol: str, profit: float = 0.0, reason: str = "MANUAL"):
+        logger.info(f"EXECUTION: Closing Trade {ticket} ({symbol}) Reason: {reason}")
         if self.bridge:
             # FIX: Must include symbol for ZmqBridge routing
             self.bridge.send_command("CLOSE_TRADE", [str(ticket), symbol])
             self.closed_tickets_cache.add(ticket) # Mark as dead to ExecutionEngine
+            
+            # Structured Log
+            trade_logger.log_trade_event("TRADE_CLOSE", {
+                "ticket": ticket,
+                "symbol": symbol,
+                "reason": reason,
+                "profit": profit
+            })
+            
+            # Phase 4: Feedback Loop
+            perf_data = self.trade_sources.get(ticket, {'source': "UNKNOWN", 'confidence': 50.0})
+            if isinstance(perf_data, str): perf_data = {'source': perf_data, 'confidence': 50.0} # Legacy safety
+            
+            if self.history_engine:
+                 self.history_engine.notify_trade_close(ticket, symbol, profit, reason, 
+                                                        source=perf_data['source'], 
+                                                        confidence=perf_data.get('confidence', 50.0))
+            
+            # Cleanup
+            if ticket in self.trade_sources:
+                del self.trade_sources[ticket]
 
     def close_all(self, symbol: str):
         """Emergency Exit / Strategic Close"""
@@ -690,7 +777,7 @@ class ExecutionEngine:
                      continue # HOLD THE LINE
 
                 logger.info(f"INDIVIDUAL GUARD: Pruning Ticket {ticket} ({symbol}) | Profit ${profit:.2f} <= ${limit:.2f} (Age: {age_seconds:.0f}s)")
-                self.close_trade(ticket, symbol)
+                self.close_trade(ticket, symbol, profit=profit, reason="INDIVIDUAL_GUARD_VSL")
                 self.close_attempts[ticket] = current_time  # Mark attempt
                 continue
 
@@ -836,9 +923,9 @@ class ExecutionEngine:
         # Logic 1: Stagnation (Smart Threshold)
         if age_seconds > base_threshold: 
              if profit >= 0.50:
-                  logger.info(f"STALEMATE: Ticket {ticket} ({symbol}) old ({age_seconds/60:.1f}m > {base_threshold/60:.0f}m) & green (${profit:.2f}). Bias: {trend_bias}. Closing.")
-                  self.close_trade(ticket, symbol)
-                  return True
+                   logger.info(f"STALEMATE: Ticket {ticket} ({symbol}) old ({age_seconds/60:.1f}m > {base_threshold/60:.0f}m) & green (${profit:.2f}). Bias: {trend_bias}. Closing.")
+                   self.close_trade(ticket, symbol, profit=profit, reason="STALEMATE_GREEN")
+                   return True
                   
         # Logic 2: Ancient Decay (Hard Cleanup - 120m cap or 90m default)
         # If aligned, we might wait up to 120m. Unaligned 90m.
@@ -846,9 +933,9 @@ class ExecutionEngine:
         
         if age_seconds > final_cap: 
              if profit >= 0.10: # Just get out green
-                  logger.info(f"DECAY: Ticket {ticket} is ancient ({age_seconds/60:.1f}m). Closing at ${profit:.2f}.")
-                  self.close_trade(ticket, symbol)
-                  return True
+                   logger.info(f"DECAY: Ticket {ticket} is ancient ({age_seconds/60:.1f}m). Closing at ${profit:.2f}.")
+                   self.close_trade(ticket, symbol, profit=profit, reason="ANCIENT_DECAY")
+                   return True
                   
         return False
 

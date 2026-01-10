@@ -53,10 +53,10 @@ class BlackSwanAdversary:
             
         survival_prob = survivals / num_sims
         
-        # Safety Threshold: Must survive 85% of 'reasonable' Black Swans
-        # NOTE: Reduced from 0.95 because the simulation introduces a 10% chance of a massive jump 
-        # which almost always hits SL, capping the theoretical max survival at ~90%.
-        is_safe = survival_prob > 0.85
+        # Safety Threshold: Must survive 28% of 'reasonable' Black Swans (Phase 1 Relaxed)
+        # NOTE: Reduced from 0.85 (was 0.95) to 0.28.
+        # This acts as a "Catastrophe Guard" rather than a strict filter.
+        is_safe = survival_prob > 0.28
         
         return is_safe, survival_prob
 
