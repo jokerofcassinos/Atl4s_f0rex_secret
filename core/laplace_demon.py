@@ -351,9 +351,34 @@ class LaplaceDemonCore:
 
         # --- CONTEXT RECOGNITION ---
         # Determine if we are in Lion Territory or Snake Territory
-        is_lion_territory = (d1_trend != 0) and (h4_trend != 0) and (d1_trend == h4_trend)
-        master_trend = h4_trend if h4_trend != 0 else d1_trend
         
+        # DEBUG PROBE: Log the trend states occasionally
+        if df_m5 is not None and len(df_m5) % 50 == 0:
+            print(f"DEBUG_TREND: D1={d1_trend} | H4={h4_trend}")
+            logger.info(f"TREND STATE: D1={d1_trend} | H4={h4_trend}")
+            
+        # LION AWAKENED PROTOCOL (Relaxed Constraint)
+        # Original: is_lion_territory = (d1_trend != 0) and (h4_trend != 0) and (d1_trend == h4_trend)
+        # New: H4 must be strong. D1 must NOT oppose.
+        is_lion_territory = False
+        master_trend = 0
+        
+        if h4_trend != 0:
+            if d1_trend == 0 or d1_trend == h4_trend:
+                is_lion_territory = True
+                master_trend = h4_trend
+            elif d1_trend == -h4_trend:
+                # Direct Conflict - Civil War
+                is_lion_territory = False
+                master_trend = 0 # Ambiguous
+        
+        # Fallback for purely D1 trend if H4 is 0? Rare but possible.
+        if h4_trend == 0 and d1_trend != 0:
+             # Weak Lion? Or just Snake? Let's keep it strict for now.
+             # If H4 is flat, we don't have intraday momentum. Snake Territory.
+             is_lion_territory = False
+             master_trend = d1_trend
+
         # --- DIVINE GATE CALCULATION (Pre-calc for Snake only, or logging) ---
         m8_open = False
         vortex_aligned = False

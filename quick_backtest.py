@@ -34,8 +34,8 @@ async def run_quick_backtest():
     
     df_m5 = pd.read_parquet(m5_path)
     
-    # Limit to last 2 weeks (~2000 candles on M5)
-    df_m5 = df_m5.iloc[-2000:]
+    # Limit to last 10000 candles (~35 days) - Essential for H4 Trend Calc
+    df_m5 = df_m5.iloc[-10000:]
     
     # Normalize columns
     if hasattr(df_m5.columns, 'droplevel'):
