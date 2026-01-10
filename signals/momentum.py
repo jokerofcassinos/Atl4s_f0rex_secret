@@ -40,25 +40,53 @@ class MomentumAnalyzer:
         self.macd_signal = 9
         self.stoch_k = 14
         self.stoch_d = 3
+        # AGI COMPONENT: Toxic Flow Detector
+        self.flow_detector = ToxicFlowDetector()
     
     def analyze(self, df: pd.DataFrame) -> Dict:
         """
         Full momentum analysis.
+        Now integrates TOXIC FLOW Perception (AGI).
         """
-        if df is None or len(df) < 50:
-            return {'error': 'Insufficient data'}
-        
-        result = {
-            'rsi': self._calculate_rsi_analysis(df),
-            'macd': self._calculate_macd_analysis(df),
-            'stochastic': self._calculate_stochastic(df),
-            'composite': None
-        }
-        
-        # Calculate composite signal
-        result['composite'] = self._composite_signal(result)
-        
-        return result
+        try:
+            if df is None or len(df) < 50:
+                return {'error': 'Insufficient data'}
+            
+            # 1. Standard Indicators (Lagging / Confirmation)
+            rsi_data = self._calculate_rsi_analysis(df)
+            macd_data = self._calculate_macd_analysis(df)
+            stoch_data = self._calculate_stochastic(df)
+            
+            # 2. Flow Perception (Leading / Context)
+            compression = self.flow_detector.detect_compression(df)
+            expansion = self.flow_detector.detect_expansion(df)
+            vector = self.flow_detector.detect_exhaustion(df) # New exhaustion logic
+            
+            result = {
+                'rsi': rsi_data,
+                'macd': macd_data,
+                'stochastic': stoch_data,
+                'flow': {
+                    'compression': compression,
+                    'expansion': expansion,
+                    'exhaustion': vector
+                },
+                'composite': None
+            }
+            
+            # Calculate composite signal with Flow Weighting
+            result['composite'] = self._composite_signal(result)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"MOMENTUM CRASH: {e}")
+            return {
+                'rsi': {'signal': 'NEUTRAL', 'value': 50, 'divergence': None},
+                'macd': {'direction': 'NEUTRAL'},
+                'flow': {'compression':{'detected':False}, 'expansion':{'detected':False}, 'exhaustion':{'detected':False}},
+                'composite': {'direction': 'NEUTRAL', 'strength': 0, 'confidence': 0, 'agreement': False}
+            }
     
     def _calculate_rsi_analysis(self, df: pd.DataFrame) -> Dict:
         """Calculate RSI with divergence detection."""
@@ -188,25 +216,50 @@ class MomentumAnalyzer:
         }
     
     def _composite_signal(self, analysis: Dict) -> Dict:
-        """Combine all momentum signals."""
+        """
+        Combine all momentum signals with AGI Context Weighting.
+        Flow > Indicators.
+        """
         signals = []
-        strengths = []
+        scores = []
         
+        # 1. Flow Signals (Primary)
+        flow = analysis['flow']
+        
+        # Compression = Potential Explosion (Warning)
+        if flow['compression']['detected']:
+            # If compressing, we ignore RSI overbought/sold. We wait for breakout.
+            return {
+                'direction': 'NEUTRAL',
+                'strength': 0,
+                'confidence': 0,
+                'context': 'COMPRESSION_TRAP_BUILDING',
+                'recommendation': 'WAIT_FOR_EXPANSION'
+            }
+            
+        # Expansion = Momentum Injection
+        if flow['expansion']['detected']:
+            direction = flow['expansion']['direction'] # UP/DOWN
+            signals.append('BUY' if direction == "UP" else 'SELL')
+            scores.append(90) # High conviction
+            
+        # Exhaustion = Reversal
+        if flow['exhaustion']['detected']:
+            # Vector candle exhaustion
+            rev_dir = "SELL" if flow['exhaustion']['direction'] == "UP" else "BUY"
+            signals.append(rev_dir)
+            scores.append(85)
+        
+        # 2. Indicator Signals (Secondary)
         # RSI signal
         if analysis['rsi']['signal'] != 'NEUTRAL':
             signals.append(analysis['rsi']['signal'])
-            strengths.append(70 if analysis['rsi']['divergence'] else 50)
+            scores.append(70 if analysis['rsi']['divergence'] else 40) # Lower weight for raw RSI
         
         # MACD signal
         if analysis['macd']['direction'] != 'NEUTRAL':
             signals.append(analysis['macd']['direction'])
-            str_val = 80 if analysis['macd']['cross'] else 60
-            strengths.append(str_val)
-        
-        # Stochastic signal
-        if analysis['stochastic']['signal'] != 'NEUTRAL':
-            signals.append(analysis['stochastic']['signal'])
-            strengths.append(50)
+            scores.append(60 if analysis['macd']['cross'] else 40)
         
         if not signals:
             return {
@@ -216,21 +269,30 @@ class MomentumAnalyzer:
                 'agreement': False
             }
         
-        buy_count = signals.count('BUY')
-        sell_count = signals.count('SELL')
+        # Consensus Logic
+        buy_score = sum(s for sig, s in zip(signals, scores) if sig == 'BUY')
+        sell_score = sum(s for sig, s in zip(signals, scores) if sig == 'SELL')
         
-        if buy_count > sell_count:
+        total_score = buy_score + sell_score
+        
+        if buy_score > sell_score:
             direction = 'BUY'
-        elif sell_count > buy_count:
+            final_conf = (buy_score / total_score) * 100 if total_score > 0 else 0
+        elif sell_score > buy_score:
             direction = 'SELL'
+            final_conf = (sell_score / total_score) * 100 if total_score > 0 else 0
         else:
             direction = 'NEUTRAL'
+            final_conf = 0
+            
+        # Normalize confidence to 0-100
+        final_conf = min(100, final_conf)
         
         return {
             'direction': direction,
-            'strength': np.mean(strengths) if strengths else 0,
-            'confidence': max(buy_count, sell_count) / len(signals) * 100,
-            'agreement': buy_count == len(signals) or sell_count == len(signals)
+            'strength': max(buy_score, sell_score), # Raw score
+            'confidence': final_conf,
+            'agreement': len(set(signals)) == 1 or (buy_score > 0 and sell_score == 0) or (sell_score > 0 and buy_score == 0)
         }
 
 
@@ -328,5 +390,43 @@ class ToxicFlowDetector:
                 'action': f'EXPANSION {direction}: Trade continuation in this direction',
                 'momentum': 'HIGH'
             }
+            
+        return {'detected': False}
         
+    def detect_exhaustion(self, df: pd.DataFrame) -> Dict:
+        """
+        [AGI PERCEPTION] Exhaustion Vector Detection.
+        
+        Detects "Parabolic Moves" that are unsustainable.
+        Logic: 3+ Consecutive candles of same color, increasing in size.
+        """
+        if df is None or len(df) < 5:
+             return {'detected': False}
+             
+        recent = df.iloc[-5:]
+        closes = recent['close'].values
+        opens = recent['open'].values
+        
+        # Check last 3
+        c1, c2, c3 = abs(closes[-3]-opens[-3]), abs(closes[-2]-opens[-2]), abs(closes[-1]-opens[-1])
+        
+        # Increasing volatility? (Acceleration)
+        acceleration = c3 > c2 > c1
+        
+        # Same direction?
+        dir3 = closes[-3] > opens[-3]
+        dir2 = closes[-2] > opens[-2]
+        dir1 = closes[-1] > opens[-1]
+        
+        same_dir = (dir3 == dir2 == dir1)
+        
+        if acceleration and same_dir:
+             direction = "UP" if dir1 else "DOWN"
+             return {
+                 'detected': True,
+                 'direction': direction,
+                 'type': 'PARABOLIC_EXHAUSTION',
+                 'action': f'Prepare to FADE {direction}'
+             }
+             
         return {'detected': False}

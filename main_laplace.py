@@ -16,6 +16,8 @@ import logging
 import datetime
 import time
 import pandas as pd
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 from typing import Optional, Dict, Any
 
 # Core Components

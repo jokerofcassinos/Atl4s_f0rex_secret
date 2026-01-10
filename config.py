@@ -1,81 +1,110 @@
 
-# Configuration for Atl4s-Forex Bot V2.0
-# "Deep Awakening"
+# ══════════════════════════════════════════════════════════════════════════════
+# LAPLACE DEMON CONFIGURATION v2.0
+# "The Deterministic Trading Intelligence"
+# ══════════════════════════════════════════════════════════════════════════════
 
 import os
 
+# --- SYSTEM MODE ---
+# LAPLACE = Full Laplace Demon system (recommended)
+# LEGACY = Old swarm/AGI system 
+TRADING_MODE = "LAPLACE"
+
 # --- BROKER SETTINGS ---
-# MULTI-PAR STRATEGY v1.0
 SYMBOLS = [
+    "GBPUSD",   # Primary - Best for esoteric theories
     "EURUSD",   # Major - High liquidity, tight spread
-    "GBPUSD",   # Major - Volatile, good trends
     "USDJPY",   # Major - Strong trends
     "USDCAD",   # Commodity-linked
     "USDCHF",   # Safe haven correlation
 ]
-PRIMARY_SYMBOL = "EURUSD"  # Default for single-run mode
-SYMBOL = PRIMARY_SYMBOL # Alias for legacy compatibility
+PRIMARY_SYMBOL = "GBPUSD"  # Laplace Demon optimized for GBP
+SYMBOL = PRIMARY_SYMBOL  # Alias for legacy compatibility
 
-TIMEFRAME = 5 # M5 - All pairs use same TF
+TIMEFRAME = 5  # M5 - Primary decision timeframe
 MAGIC_NUMBER = 123456
-LEVERAGE = 3000 # UPGRADED: 1:3000 (Ultra High Leverage)
+LEVERAGE = 3000  # 1:3000 (Unlimited)
+
+# --- SPREAD LIMITS (pips) ---
+# Used to filter out high-spread periods
+SPREAD_LIMITS = {
+    'GBPUSD': 0.00030,  # 3 pips max
+    'EURUSD': 0.00020,  # 2 pips max
+    'USDJPY': 0.00030,  # 3 pips max
+    'USDCAD': 0.00035,  # 3.5 pips max
+    'USDCHF': 0.00030,  # 3 pips max
+    'XAUUSD': 0.50,     # 50 cents max for gold
+}
 
 # --- RISK MANAGEMENT ---
-INITIAL_CAPITAL = 30.0 # Default fallback
-RISK_PER_TRADE = 0.02 # 2% per trade (Standard)
-MAX_LOTS_PER_TRADE = 5.0 # Increased absolute Cap
-DYNAMIC_LOT_SCALING = True # Use Quantum Lot Sizing
+INITIAL_CAPITAL = 30.0  # Starting capital
+RISK_PER_TRADE = 2.0    # 2% risk per trade
+MAX_LOTS_PER_TRADE = 5.0
+DYNAMIC_LOT_SCALING = True
 
-# --- OPERATION WINDOW ---
-# KILLZONES v2.0 - Multiple high-probability windows
+# --- LAPLACE DEMON PARAMETERS ---
+LAPLACE = {
+    'min_confidence': 60,        # Minimum confidence to trade
+    'min_confluence': 2,         # Minimum number of aligned signals
+    'sl_atr_multiplier': 1.5,    # SL = ATR * this value
+    'tp_rr_ratio': 2.0,          # TP = SL * this value (2:1 R:R)
+    'max_concurrent_trades': 3,
+    'signal_cooldown_seconds': 60,
+}
+
+# --- OPERATION WINDOWS (KILLZONES) ---
 KILLZONES = {
     'LONDON_OPEN': {'start': 8, 'end': 11, 'priority': 1},
     'NY_OVERLAP': {'start': 13, 'end': 16, 'priority': 1},  # Best
-    'NY_CLOSE': {'start': 19, 'end': 21, 'priority': 2},    # Secondary
-    'ASIAN_OPEN': {'start': 0, 'end': 3, 'priority': 3},    # JPY pairs only
+    'NY_CLOSE': {'start': 19, 'end': 21, 'priority': 2},
+    'ASIAN_OPEN': {'start': 0, 'end': 3, 'priority': 3},
 }
 
-# Session-Symbol mapping (some pairs better in specific sessions)
+# Session-Symbol recommendations
 SESSION_PAIRS = {
-    'LONDON_OPEN': ['EURUSD', 'GBPUSD'],
-    'NY_OVERLAP': ['EURUSD', 'GBPUSD', 'USDCAD'],
-    'NY_CLOSE': ['USDCAD'],  # CAD news often late
-    'ASIAN_OPEN': ['USDJPY'],  # JPY session
+    'LONDON_OPEN': ['GBPUSD', 'EURUSD'],
+    'NY_OVERLAP': ['GBPUSD', 'EURUSD', 'USDCAD'],
+    'NY_CLOSE': ['USDCAD'],
+    'ASIAN_OPEN': ['USDJPY'],
 }
 
-# --- MODULE TOGGLES ---
-ENABLE_FIRST_EYE = True # Scalp Swarm (HFT)
-ENABLE_SECOND_EYE = True # The Sniper (FVG)
-ENABLE_FOURTH_EYE = True # The Whale (Consensus)
+# --- VIRTUAL STOPS (Broker-invisible) ---
+VIRTUAL_SL_DOLLARS = 20.0  # Close if loss exceeds $20
+VIRTUAL_TP_DOLLARS = 40.0  # Close if profit exceeds $40
 
-# --- SCALPING PARAMETERS (XAUUSD) ---
-SCALP_TP = 2.00 # $2.00 Gold Move (200 points)
-SCALP_SL = 1.50 # $1.50 Gold Move (150 points) - Tighter Stop
+# --- TRAILING STOPS ---
 TRAILING_STOP = True
-TRAILING_START = 1.00 # Start trailing after $1 profit
+TRAILING_START = 1.00  # Start after $1 profit
 TRAILING_STEP = 0.50
 
 # --- DATA PATHS ---
 DATA_DIR = "data"
 CACHE_DIR = os.path.join(DATA_DIR, "cache")
+REPORTS_DIR = "reports"
 
 # --- NETWORK ---
-ZMQ_PORT = 5555
+ZMQ_PORT = 5558
 
-# --- SWARM & SCALPING ---
-SWARM_MAX_TRADES = 50       # Restored: Max active swarm trades
-SWARM_THRESHOLD = 0.15      # Reduced from 0.30 (Tachyon Mode: Hyper-Sensitive)
-SWARM_COOLDOWN = 3          # Reduced from 10s (Machine Gun Mode)
+# --- LEGACY MODULE TOGGLES (for old system) ---
+ENABLE_FIRST_EYE = True   # Scalp Swarm
+ENABLE_SECOND_EYE = True  # The Sniper
+ENABLE_FOURTH_EYE = True  # The Whale
 
-# --- 13th EYE (QUANTUM GRID) ---
-GRID_LAYERS = 3             # 3 Layers for "Spray"
-GRID_SPACING = 30           # 30 pts spacing (Tight Grid)
+# --- LEGACY SWARM PARAMETERS ---
+SWARM_MAX_TRADES = 50
+SWARM_THRESHOLD = 0.15
+SWARM_COOLDOWN = 3
 
-# --- LEGACY / ADVANCED ANALYSIS ---
-INVERT_TECHNICALS = False # For Contrarian Testing
+# --- LEGACY GRID PARAMETERS ---
+GRID_LAYERS = 3
+GRID_SPACING = 30
+
+# --- INTERMARKET SYMBOLS ---
 INTERMARKET_SYMBOLS = {
     'DXY': 'DX-Y.NYB',
     'US10Y': '^TNX',
     'SPX': '^GSPC',
-    'OIL': 'CL=F'
+    'OIL': 'CL=F',
+    'EUR_INDEX': 'EURUSD=X',  # For SMT divergence
 }

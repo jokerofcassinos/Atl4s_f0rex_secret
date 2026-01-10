@@ -369,51 +369,131 @@ async def main():
     print("\n  Target: 70% Win Rate | $30 Capital | GBPUSD\n")
     
     # Initialize runner
+    symbol = "GBPUSD"
     runner = LaplaceBacktestRunner(
         initial_capital=30.0,
         risk_per_trade=2.0,
-        symbol="GBPUSD",
+        symbol=symbol,
         spread_pips=1.5
     )
     
-    # Find data file
-    data_paths = [
-        "data/GBPUSD_M1.csv",
-        "data/EURUSD_M1.csv",
-        "cache/GBPUSD=X_M1.parquet",  # From DataLoader
-    ]
+    # Try to load data using DataLoader
+    print("📊 Loading data via DataLoader (yfinance)...")
     
-    data_path = None
-    for path in data_paths:
-        if os.path.exists(path):
-            data_path = path
-            break
+    try:
+        from data_loader import DataLoader
+        
+        loader = DataLoader(symbol=symbol)
+        data_map = await loader.get_data(symbol=symbol)
+        
+        if data_map:
+            # Use M5 as base (most reliable)
+            if 'M5' in data_map and data_map['M5'] is not None and len(data_map['M5']) > 100:
+                runner.df_m5 = data_map['M5']
+                logger.info(f"Loaded M5 data: {len(runner.df_m5)} candles")
+            
+            if 'M1' in data_map and data_map['M1'] is not None and len(data_map['M1']) > 100:
+                runner.df_m1 = data_map['M1']
+                logger.info(f"Loaded M1 data: {len(runner.df_m1)} candles")
+            
+            if 'H1' in data_map and data_map['H1'] is not None:
+                runner.df_h1 = data_map['H1']
+                logger.info(f"Loaded H1 data: {len(runner.df_h1)} candles")
+            
+            if 'H4' in data_map and data_map['H4'] is not None:
+                runner.df_h4 = data_map['H4']
+                logger.info(f"Loaded H4 data: {len(runner.df_h4)} candles")
+            elif runner.df_h1 is not None:
+                # Resample H1 to H4
+                agg = {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'}
+                runner.df_h4 = runner.df_h1.resample('4h').agg(agg).dropna()
+                logger.info(f"Resampled H4 data: {len(runner.df_h4)} candles")
+            
+            if 'D1' in data_map and data_map['D1'] is not None:
+                runner.df_d1 = data_map['D1']
+                logger.info(f"Loaded D1 data: {len(runner.df_d1)} candles")
+        else:
+            logger.warning("DataLoader returned empty data map")
+            
+    except Exception as e:
+        logger.warning(f"DataLoader failed: {e}")
+        logger.info("Falling back to local files...")
     
-    if data_path is None:
-        logger.error("No data file found. Please add M1 data to data/ folder.")
-        logger.info("Expected format: CSV with columns: time, open, high, low, close, volume")
+    # Fallback to local files if DataLoader failed
+    if runner.df_m5 is None:
+        data_paths = [
+            f"data/cache/GBPUSD_M5_60days.parquet",  # Extended data
+            "data/GBPUSD_M1.csv",
+            "data/EURUSD_M1.csv",
+            f"data/cache/{symbol}=X_M5.parquet",
+            f"data/cache/GBPUSD=X_M5.parquet",
+        ]
+        
+        data_path = None
+        for path in data_paths:
+            if os.path.exists(path):
+                data_path = path
+                break
+        
+        if data_path is None:
+            logger.error("No data found. DataLoader failed and no local files available.")
+            logger.info("The DataLoader tried to fetch from yfinance but may have failed.")
+            logger.info("Please ensure you have internet connection or add local data files.")
+            return
+        
+        logger.info(f"Loading from local file: {data_path}")
+        
+        if data_path.endswith('.parquet'):
+            runner.df_m5 = pd.read_parquet(data_path)
+            agg = {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'}
+            
+            # Try to load H1 from separate file for more history
+            h1_path = "data/cache/GBPUSD_H1_2years.parquet"
+            if os.path.exists(h1_path):
+                runner.df_h1 = pd.read_parquet(h1_path)
+                logger.info(f"Loaded separate H1 file: {len(runner.df_h1)} candles")
+            else:
+                runner.df_h1 = runner.df_m5.resample('1h').agg(agg).dropna()
+            
+            runner.df_h4 = runner.df_h1.resample('4h').agg(agg).dropna() if runner.df_h1 is not None else None
+            
+            # Try to load D1 from separate file
+            d1_path = "data/cache/GBPUSD_D1_10years.parquet"
+            if os.path.exists(d1_path):
+                runner.df_d1 = pd.read_parquet(d1_path)
+                logger.info(f"Loaded separate D1 file: {len(runner.df_d1)} candles")
+            else:
+                runner.df_d1 = runner.df_m5.resample('1D').agg(agg).dropna()
+        else:
+            if not runner.load_data(data_path):
+                return
+    
+    # Verify we have enough data
+    if runner.df_m5 is None or len(runner.df_m5) < 300:
+        logger.error(f"Insufficient M5 data. Need at least 300 candles, got: {len(runner.df_m5) if runner.df_m5 is not None else 0}")
         return
     
-    # Load data
-    if data_path.endswith('.parquet'):
-        import pandas as pd
-        runner.df_m1 = pd.read_parquet(data_path)
-        # Resample
-        agg = {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'}
-        runner.df_m5 = runner.df_m1.resample('5min').agg(agg).dropna()
-        runner.df_h1 = runner.df_m1.resample('1h').agg(agg).dropna()
-        runner.df_h4 = runner.df_m1.resample('4h').agg(agg).dropna()
-        runner.df_d1 = runner.df_m1.resample('1D').agg(agg).dropna()
-    else:
-        if not runner.load_data(data_path):
-            return
+    print(f"\n✅ Data loaded successfully!")
+    print(f"   M5: {len(runner.df_m5)} candles")
+    print(f"   H1: {len(runner.df_h1) if runner.df_h1 is not None else 0} candles")
+    print(f"   H4: {len(runner.df_h4) if runner.df_h4 is not None else 0} candles")
+    print(f"   Date Range: {runner.df_m5.index[0]} to {runner.df_m5.index[-1]}")
+    print()
+    
+    # Filter for last 30 days for validation
+    if runner.df_m5 is not None and len(runner.df_m5) > 0:
+        end_date = runner.df_m5.index[-1]
+        start_date = end_date - timedelta(days=30)
+        mask = runner.df_m5.index >= start_date
+        runner.df_m5 = runner.df_m5.loc[mask]
+        print(f"📉 Filtered data to last 30 days: {len(runner.df_m5)} candles ({runner.df_m5.index[0]} to {runner.df_m5.index[-1]})")
     
     # Run backtest
     result = runner.run_backtest(use_m5=True)
     
     if result:
         # Generate report
-        runner.generate_report(result, "laplace_gbpusd")
+        runner.generate_report(result, f"laplace_{symbol.lower()}")
         
         print("\n✅ Backtest complete! Check 'reports/' folder for charts.")
     else:
@@ -422,3 +502,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+

@@ -103,81 +103,145 @@ class SMCAnalyzer:
         if df is None or len(df) < 20:
             return {'error': 'Insufficient data'}
         
+        # Normalize columns in case of MultiIndex (yfinance)
+        try:
+            if isinstance(df.columns, pd.MultiIndex):
+                df = df.droplevel(1, axis=1)
+            df.columns = [str(c).lower() for c in df.columns]
+        except:
+            pass
+        
         if current_price is None:
-            current_price = df['close'].iloc[-1]
+            current_price = float(df['close'].iloc[-1])
         
-        # Detect components
-        self._detect_order_blocks(df)
-        self._detect_fvgs(df)
-        self._detect_liquidity_pools(df)
-        self._determine_structure(df)
-        
-        # Validate existing components
-        self._validate_order_blocks(current_price)
-        self._update_fvg_fill(current_price)
-        
-        # Find entry opportunities
-        entry = self._find_entry_signal(df, current_price)
-        
-        return {
-            'trend': self.structure_trend.value,
-            'active_order_blocks': [ob for ob in self.order_blocks if not ob.invalidated][-5:],
-            'active_fvgs': [f for f in self.fvgs if f.filled_pct < 100][-5:],
-            'liquidity_pools': self.liquidity_pools[-5:],
-            'entry_signal': entry
-        }
+        try:
+            # Detect components
+            self._detect_order_blocks(df)
+            self._detect_fvgs(df)
+            self._detect_liquidity_pools(df)
+            self._determine_structure(df)
+            
+            # Validate existing components
+            self._validate_order_blocks(current_price)
+            self._update_fvg_fill(current_price)
+            
+            # Find entry opportunities
+            entry = self._find_entry_signal(df, current_price)
+            
+            return {
+                'trend': self.structure_trend.value,
+                'active_order_blocks': [ob for ob in self.order_blocks if not ob.invalidated][-5:],
+                'active_fvgs': [f for f in self.fvgs if f.filled_pct < 100][-5:],
+                'liquidity_pools': self.liquidity_pools[-5:],
+                'entry_signal': entry
+            }
+        except Exception as e:
+            logger.error(f"STRUCTURE CRASH: {e}")
+            return {
+                'trend': 'RANGING',
+                'active_order_blocks': [],
+                'active_fvgs': [],
+                'entry_signal': {'direction': None, 'confidence': 0, 'reason': 'Error'}
+            }
     
     def _detect_order_blocks(self, df: pd.DataFrame):
         """
-        Detect Order Blocks.
+        [AGI PERCEPTION] Validated Order Block Detection.
         
-        Bullish OB: Last down candle before a strong up move
-        Bearish OB: Last up candle before a strong down move
+        A raw candle pattern is NOT an Order Block. 
+        It only becomes one if it causes a Break of Structure (BOS).
         """
-        if len(df) < 5:
-            return
+        if len(df) < 20: return
+        self.order_blocks = []
         
-        for i in range(3, len(df) - 1):
-            candle = df.iloc[i]
-            next_candle = df.iloc[i + 1]
-            
-            body = abs(candle['close'] - candle['open'])
-            next_body = abs(next_candle['close'] - next_candle['open'])
-            
-            # Bullish OB: Bearish candle followed by bullish displacement
-            if candle['close'] < candle['open']:  # Bearish
-                if next_candle['close'] > next_candle['open']:  # Bullish
-                    if next_body > body * 1.5:  # Displacement
-                        ob = OrderBlock(
-                            type="BULLISH",
-                            top=candle['open'],
-                            bottom=candle['low'],
-                            midpoint=(candle['open'] + candle['low']) / 2,
-                            timestamp=candle.name if hasattr(candle, 'name') else datetime.now(),
-                            strength=min(100, (next_body / body) * 50)
-                        )
-                        self.order_blocks.append(ob)
-            
-            # Bearish OB: Bullish candle followed by bearish displacement
-            elif candle['close'] > candle['open']:  # Bullish
-                if next_candle['close'] < next_candle['open']:  # Bearish
-                    if next_body > body * 1.5:  # Displacement
-                        ob = OrderBlock(
-                            type="BEARISH",
-                            top=candle['high'],
-                            bottom=candle['open'],
-                            midpoint=(candle['high'] + candle['open']) / 2,
-                            timestamp=candle.name if hasattr(candle, 'name') else datetime.now(),
-                            strength=min(100, (next_body / body) * 50)
-                        )
-                        self.order_blocks.append(ob)
+        # We scan for Swing Points first to define structure
+        highs = df['high']
+        lows = df['low']
+        closes = df['close']
+        opens = df['open']
         
-        # Keep only recent OBs
-        self.order_blocks = self.order_blocks[-20:]
+        # 1. Identify Candidate Blocks (Pattern Recognition)
+        # Bullish: Down-candle before Up-move
+        # Bearish: Up-candle before Down-move
+        
+        for i in range(len(df) - 10, 5, -1): # Scan backwards from recent
+            # Check Bullish OB Candidate
+            if closes.iloc[i] < opens.iloc[i]: # Bearish candle
+                # Check for Displacement relative to this candle
+                # We need to see price break the HIGH of this candle + structure
+                
+                # Search forward for BOS (Break of local swing high)
+                local_high = highs.iloc[i-3:i].max() # Immediate pre-structure
+                
+                caused_bos = False
+                displacement_strength = 0.0
+                
+                for j in range(i+1, min(i+10, len(df))):
+                    # Displacement Check
+                    body_ratio = abs(closes.iloc[j] - opens.iloc[j]) / (abs(closes.iloc[i] - opens.iloc[i]) + 0.00001)
+                    if body_ratio > 3.0: # Huge expansion
+                         displacement_strength = 100.0
+                    
+                    # BOS Check
+                    if closes.iloc[j] > local_high:
+                        caused_bos = True
+                        break
+                    
+                    # Invalidated if we go lower before breaking up
+                    if lows.iloc[j] < lows.iloc[i]:
+                        break
+                
+                if caused_bos:
+                    ob = OrderBlock(
+                        type="BULLISH",
+                        top=highs.iloc[i],
+                        bottom=lows.iloc[i], 
+                        midpoint=(highs.iloc[i] + lows.iloc[i])/2,
+                        timestamp=df.index[i],
+                        strength=80.0 if displacement_strength > 0 else 50.0 # Validated
+                    )
+                    self.order_blocks.append(ob)
+
+            # Check Bearish OB Candidate
+            elif closes.iloc[i] > opens.iloc[i]: # Bullish candle
+                # Check for Displacement DOWN
+                local_low = lows.iloc[i-3:i].min()
+                
+                caused_bos = False
+                displacement_strength = 0.0
+                
+                for j in range(i+1, min(i+10, len(df))):
+                    # Displacement Check
+                    body_ratio = abs(closes.iloc[j] - opens.iloc[j]) / (abs(closes.iloc[i] - opens.iloc[i]) + 0.00001)
+                    if body_ratio > 3.0: 
+                         displacement_strength = 100.0
+                    
+                    # BOS Check
+                    if closes.iloc[j] < local_low:
+                        caused_bos = True
+                        break
+                    
+                    if highs.iloc[j] > highs.iloc[i]:
+                        break
+                
+                if caused_bos:
+                    ob = OrderBlock(
+                        type="BEARISH",
+                        top=highs.iloc[i],
+                        bottom=lows.iloc[i],
+                        midpoint=(highs.iloc[i] + lows.iloc[i])/2,
+                        timestamp=df.index[i],
+                        strength=80.0 if displacement_strength > 0 else 50.0
+                    )
+                    self.order_blocks.append(ob)
+                    
+        # Sort and prune
+        self.order_blocks.sort(key=lambda x: x.timestamp)
+        self.order_blocks = self.order_blocks[-5:] # Only Keep Fresh Context
     
     def _detect_fvgs(self, df: pd.DataFrame):
         """
-        Detect Fair Value Gaps (imbalances).
+        Detect Fair Value Gaps (imbalances) - Vectorized.
         
         Bullish FVG: Gap between candle[i] high and candle[i+2] low
         Bearish FVG: Gap between candle[i] low and candle[i+2] high
@@ -185,81 +249,143 @@ class SMCAnalyzer:
         if len(df) < 3:
             return
         
-        for i in range(len(df) - 2):
-            c1 = df.iloc[i]
-            c2 = df.iloc[i + 1]
-            c3 = df.iloc[i + 2]
-            
-            # Bullish FVG
-            if c3['low'] > c1['high']:
-                gap_size = c3['low'] - c1['high']
-                if gap_size > 0:
-                    fvg = FairValueGap(
-                        type="BULLISH",
-                        top=c3['low'],
-                        bottom=c1['high'],
-                        midpoint=(c3['low'] + c1['high']) / 2,
-                        timestamp=c2.name if hasattr(c2, 'name') else datetime.now()
-                    )
-                    self.fvgs.append(fvg)
-            
-            # Bearish FVG
-            if c3['high'] < c1['low']:
-                gap_size = c1['low'] - c3['high']
-                if gap_size > 0:
-                    fvg = FairValueGap(
-                        type="BEARISH",
-                        top=c1['low'],
-                        bottom=c3['high'],
-                        midpoint=(c1['low'] + c3['high']) / 2,
-                        timestamp=c2.name if hasattr(c2, 'name') else datetime.now()
-                    )
-                    self.fvgs.append(fvg)
+        # Reset list to avoid duplicates if re-running
+        self.fvgs = []
         
-        self.fvgs = self.fvgs[-30:]
+        high = df['high']
+        low = df['low']
+        
+        # Calculate shifts
+        # c1 = i, c2 = i+1, c3 = i+2
+        c1_high = high
+        c1_low = low
+        c3_high = high.shift(-2)
+        c3_low = low.shift(-2)
+        
+        # Bullish identification
+        # c3.low > c1.high
+        bullish_gaps = c3_low - c1_high
+        bullish_mask = bullish_gaps > 0
+        
+        # Bearish identification
+        # c3.high < c1.low
+        bearish_gaps = c1_low - c3_high
+        bearish_mask = bearish_gaps > 0
+        
+        # Only process the last 30 detected gaps to save memory/time
+        # Get indices where gaps exist
+        bull_indices = np.where(bullish_mask)[0]
+        bear_indices = np.where(bearish_mask)[0]
+        
+        # Limit to recent ones if list is huge, but usually we iterate small checks in real-time
+        # For backtest optimization, we only really care about the most recent ones for interaction
+        
+        # Add Bullish FVGs (Take last 15)
+        for i in bull_indices[-15:]:
+            if i + 2 >= len(df): continue
+            gap_size = bullish_gaps.iloc[i]
+            c2_time = df.index[i+1]
+            
+            fvg = FairValueGap(
+                type="BULLISH",
+                top=float(c3_low.iloc[i]),
+                bottom=float(c1_high.iloc[i]),
+                midpoint=float((c3_low.iloc[i] + c1_high.iloc[i]) / 2),
+                timestamp=c2_time
+            )
+            self.fvgs.append(fvg)
+            
+        # Add Bearish FVGs (Take last 15)
+        for i in bear_indices[-15:]:
+            if i + 2 >= len(df): continue
+            gap_size = bearish_gaps.iloc[i]
+            c2_time = df.index[i+1]
+            
+            fvg = FairValueGap(
+                type="BEARISH",
+                top=float(c1_low.iloc[i]),
+                bottom=float(c3_high.iloc[i]),
+                midpoint=float((c1_low.iloc[i] + c3_high.iloc[i]) / 2),
+                timestamp=c2_time
+            )
+            self.fvgs.append(fvg)
+        
+        # Sort by timestamp
+        self.fvgs.sort(key=lambda x: x.timestamp)
     
-    def _detect_liquidity_pools(self, df: pd.DataFrame, lookback: int = 20):
+    def _detect_liquidity_pools(self, df: pd.DataFrame, lookback: int = 50):
         """
-        Detect liquidity pools (equal highs/lows).
-        
-        Multiple tests of the same level = liquidity building
+        [AGI PERCEPTION] Fractal Liquidity Scanner.
+        Detects specific swing points that the algorithm targets.
         """
-        if len(df) < lookback:
-            return
+        if len(df) < lookback: return
+        self.liquidity_pools = []
         
-        recent = df.iloc[-lookback:]
-        tolerance = (recent['high'].max() - recent['low'].min()) * 0.001  # 0.1% tolerance
+        # Define Swings: High surrounded by 2 lower highs
+        # Fractal Period 5
         
-        # Find equal highs
-        highs = recent['high'].values
-        for i, h in enumerate(highs):
-            touches = sum(1 for x in highs if abs(x - h) < tolerance)
-            if touches >= 2:
+        highs = df['high']
+        lows = df['low']
+        
+        for i in range(5, len(df)-5):
+            # Fractal High
+            if highs.iloc[i] > highs.iloc[i-1] and highs.iloc[i] > highs.iloc[i-2] and \
+               highs.iloc[i] > highs.iloc[i+1] and highs.iloc[i] > highs.iloc[i+2]:
+                
+                # Check if it was swept later?
+                # For now, just mark it as a pool
                 pool = LiquidityPool(
-                    level=h,
+                    level=highs.iloc[i],
                     type="HIGH",
-                    strength=touches,
-                    timestamp=recent.index[i] if hasattr(recent, 'index') else datetime.now()
+                    strength=50, # Baseline
+                    timestamp=df.index[i]
                 )
-                # Avoid duplicates
-                if not any(abs(p.level - pool.level) < tolerance for p in self.liquidity_pools):
-                    self.liquidity_pools.append(pool)
-        
-        # Find equal lows
-        lows = recent['low'].values
-        for i, l in enumerate(lows):
-            touches = sum(1 for x in lows if abs(x - l) < tolerance)
-            if touches >= 2:
+                self.liquidity_pools.append(pool)
+                
+            # Fractal Low
+            if lows.iloc[i] < lows.iloc[i-1] and lows.iloc[i] < lows.iloc[i-2] and \
+               lows.iloc[i] < lows.iloc[i+1] and lows.iloc[i] < lows.iloc[i+2]:
+                
                 pool = LiquidityPool(
-                    level=l,
+                    level=lows.iloc[i],
                     type="LOW",
-                    strength=touches,
-                    timestamp=recent.index[i] if hasattr(recent, 'index') else datetime.now()
+                    strength=50,
+                    timestamp=df.index[i]
                 )
-                if not any(abs(p.level - pool.level) < tolerance for p in self.liquidity_pools):
-                    self.liquidity_pools.append(pool)
+                self.liquidity_pools.append(pool)
+                
+        # Filter: Only keep pools that haven't been massively violated (> 20 pips)
+        # But we WANT them to be swept by < 5 pips (Turtle Soup).
         
-        self.liquidity_pools = self.liquidity_pools[-20:]
+        current_price = df['close'].iloc[-1]
+        
+        active_pools = []
+        for pool in self.liquidity_pools:
+            # Check interaction with recent price (last 10 candles)
+            recent_high = highs.iloc[-10:].max()
+            recent_low = lows.iloc[-10:].min()
+            
+            # TURTLE SOUP LOGIC (AGI)
+            # If High Pool was breached by 0.1 to 5.0 pips, mark as SWEPT (Reversal Signal)
+            if pool.type == "HIGH":
+                diff = recent_high - pool.level
+                if 0.00001 < diff < 0.0005: # Swept
+                     pool.swept = True
+                     pool.strength = 100 # Maximum Interest
+                elif diff > 0.0010: # Broken (Trend)
+                     continue # Ignore broken pools
+            
+            if pool.type == "LOW":
+                diff = pool.level - recent_low
+                if 0.00001 < diff < 0.0005: # Swept
+                     pool.swept = True
+                     pool.strength = 100
+                elif diff > 0.0010: # Broken
+                     continue
+            
+            active_pools.append(pool)
+            
+        self.liquidity_pools = active_pools[-5:] # Keep closest/freshest
     
     def _determine_structure(self, df: pd.DataFrame):
         """Determine market structure (bullish/bearish/ranging)."""

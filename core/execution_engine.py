@@ -241,19 +241,69 @@ class ExecutionEngine:
                  command = verdict["inverted_action"]
                  logger.info(f"PING-PONG INVERSION: Changing {original_command} -> {command} (Lateral Market)")
 
-        # 2. Dynamic Lots Calculation
+        # ═══════════════════════════════════════════════════════════
+        # PROTOCOL 70% RISK SENTINEL (AGI-ENHANCED)
+        # ═══════════════════════════════════════════════════════════
         equity = account_info.get('equity', 1000.0) if account_info else 1000.0
+        balance = account_info.get('balance', 1000.0) if account_info else 1000.0
+        
+        # 1. SPREAD FILTER (Ultra-Strict)
+        # 1.5 pips = 0.00015 for Forex pairs like GBPUSD
+        current_spread = ask - bid
+        MAX_SPREAD = 0.00015 # 15 points/1.5 pips
+        
+        if current_spread > MAX_SPREAD:
+             logger.warning(f"PROTOCOL 70% VETO: Spread {current_spread:.5f} > {MAX_SPREAD:.5f} (Too Expensive)")
+             return "BLOCKED_SPREAD"
+
+        # 1.5. TIME GATING (KILLZONES ONLY)
+        import datetime
+        now_utc = datetime.datetime.utcnow()
+        allowed_hours = [2, 6, 7, 8, 9, 13, 14, 15] # London/NY Killzones
+        
+        if now_utc.hour not in allowed_hours:
+             logger.warning(f"TIME GATE: Hour {now_utc.hour} not in Killzones {allowed_hours}. Trade Blocked.")
+             return "BLOCKED_TIME_GATE"
+
+        # 1.6. FRIDAY BAN
+        if now_utc.weekday() == 4 and now_utc.hour >= 15:
+             logger.warning(f"FRIDAY BAN: Trading disabled after 15:00 UTC on Fridays.")
+             return "BLOCKED_FRIDAY"
+
+        # 2. SURVIVAL MODE (Micro-Account Geometry)
+        forced_lots = None
+        if equity < 100.0:
+             forced_lots = 0.01
+             logger.info("PROTOCOL 70% SURVIVAL: Equity < $100 -> Forcing 0.01 Lots")
+             
+        # 3. CIRCUIT BREAKER (drawdown > 5%)
+        # Heuristic: If Equity is < 95% of Balance (assuming Balance ~ HighMark)
+        if equity < (balance * 0.95):
+             logger.critical("PROTOCOL 70% CIRCUIT BREAKER: Equity has dropped > 5% below Balance. HALTING TRADING.")
+             return "BLOCKED_CIRCUIT_BREAKER"
+
+
+        # 2. Dynamic Lots Calculation
         # Volatility passed from Swarm/Hydra (or default 50.0)
         # volatility = 50.0 (Removed hardcoding) 
         
-        lots = self.leverage_manager.calculate_lots(
-            equity=equity,
-            confidence=confidence,
-            market_volatility=volatility
-        )
+        if forced_lots:
+            lots = forced_lots
+        else:
+            lots = self.leverage_manager.calculate_lots(
+                equity=equity,
+                confidence=confidence,
+                market_volatility=volatility
+            )
         
         # Apply Logic Multiplier (Sovereign/Singularity)
-        lots = round(lots * multiplier * hydra_multiplier, 2)
+        if not forced_lots:
+             lots = round(lots * multiplier * hydra_multiplier, 2)
+             
+        # Final Safety Clamp for Micro-Accounts
+        if equity < 100.0 and lots > 0.01:
+             lots = 0.01
+             logger.warning("AGI SAFETY CLAMP: Reducing lots to 0.01 (Equity < 100)")
         
         # 3. Dynamic Geometry (Phase 14)
         # Replacing 0.0/0.0 with intelligent stops

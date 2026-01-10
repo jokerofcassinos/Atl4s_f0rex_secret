@@ -11,7 +11,7 @@ if (-not (Test-Path ".git")) {
 }
 
 # 2. Checkout Branch
-$branch = "agi-alpha-v0.8"
+$branch = "laplace-v0.1"
 Write-Host "Checking out branch: $branch"
 git checkout -b $branch 2>$null
 if ($LASTEXITCODE -ne 0) {

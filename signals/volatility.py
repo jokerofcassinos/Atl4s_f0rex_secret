@@ -56,45 +56,47 @@ class VolatilityAnalyzer:
         return result
     
     def _calculate_atr_analysis(self, df: pd.DataFrame) -> Dict:
-        """Calculate ATR with historical context."""
-        high = df['high'].values
-        low = df['low'].values
-        close = df['close'].values
+        """Calculate ATR with historical context (Vectorized)."""
+        high = df['high']
+        low = df['low']
+        close = df['close']
         
         # True Range
-        tr1 = high[1:] - low[1:]
-        tr2 = np.abs(high[1:] - close[:-1])
-        tr3 = np.abs(low[1:] - close[:-1])
-        tr = np.maximum(tr1, np.maximum(tr2, tr3))
+        tr1 = high - low
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
         
         # Current ATR
-        current_atr = np.mean(tr[-self.atr_period:])
+        atr_series = tr.rolling(window=self.atr_period).mean()
+        current_atr = atr_series.iloc[-1]
         
-        # Historical percentile
-        historical_atr = []
-        for i in range(self.atr_period, len(tr)):
-            historical_atr.append(np.mean(tr[i-self.atr_period:i]))
-        
-        if historical_atr:
-            percentile = (sum(1 for h in historical_atr if h < current_atr) / len(historical_atr)) * 100
+        # Historical percentile (Vectorized)
+        if len(atr_series) > self.atr_period:
+            valid_atr = atr_series.dropna()
+            percentile = (valid_atr < current_atr).mean() * 100
         else:
             percentile = 50.0
         
         # Trend
-        prev_atr = np.mean(tr[-self.atr_period*2:-self.atr_period]) if len(tr) > self.atr_period*2 else current_atr
+        if len(atr_series) > self.atr_period * 2:
+            prev_atr = atr_series.iloc[-self.atr_period-1] # Approx previous period
+        else:
+            prev_atr = current_atr
+            
         expanding = current_atr > prev_atr * 1.1
         contracting = current_atr < prev_atr * 0.9
         
         return {
-            'value': round(current_atr, 6),
-            'value_pips': round(current_atr * 10000, 1),  # For GBPUSD
-            'percentile': round(percentile, 1),
-            'expanding': expanding,
-            'contracting': contracting
+            'value': float(round(current_atr, 6)),
+            'value_pips': float(round(current_atr * 10000, 1)),
+            'percentile': float(round(percentile, 1)),
+            'expanding': bool(expanding),
+            'contracting': bool(contracting)
         }
     
     def _calculate_bollinger(self, df: pd.DataFrame) -> Dict:
-        """Calculate Bollinger Bands with squeeze detection."""
+        """Calculate Bollinger Bands with squeeze detection (Vectorized)."""
         close = df['close']
         
         # Bands
@@ -108,18 +110,16 @@ class VolatilityAnalyzer:
         current_lower = lower.iloc[-1]
         current_middle = middle.iloc[-1]
         
-        # Band width (squeeze detection)
-        band_width = (current_upper - current_lower) / current_middle * 100
+        # Band width (Vectorized)
+        bandwidth_series = (upper - lower) / middle * 100
+        current_bandwidth = bandwidth_series.iloc[-1]
         
-        # Historical band width for squeeze detection
-        historical_bw = []
-        for i in range(self.bb_period, len(upper)):
-            bw = (upper.iloc[i] - lower.iloc[i]) / middle.iloc[i] * 100
-            historical_bw.append(bw)
-        
-        percentile = 50.0
-        if historical_bw:
-            percentile = (sum(1 for h in historical_bw if h < band_width) / len(historical_bw)) * 100
+        # Squeeze detection (Vectorized)
+        if len(bandwidth_series) > self.bb_period:
+            valid_bw = bandwidth_series.dropna()
+            percentile = (valid_bw < current_bandwidth).mean() * 100
+        else:
+            percentile = 50.0
         
         squeeze = percentile < 20  # Bands in bottom 20%
         
@@ -138,11 +138,11 @@ class VolatilityAnalyzer:
             signal = 'BEARISH'
         
         return {
-            'upper': round(current_upper, 5),
-            'middle': round(current_middle, 5),
-            'lower': round(current_lower, 5),
-            'band_width': round(band_width, 2),
-            'squeeze': squeeze,
+            'upper': float(round(current_upper, 5)),
+            'middle': float(round(current_middle, 5)),
+            'lower': float(round(current_lower, 5)),
+            'band_width': float(round(current_bandwidth, 2)),
+            'squeeze': bool(squeeze),
             'position': position,
             'signal': signal
         }

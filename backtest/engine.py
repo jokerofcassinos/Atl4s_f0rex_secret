@@ -242,10 +242,34 @@ class BacktestEngine:
                    confidence: float = 0.0) -> Optional[Trade]:
         """
         Opens a new trade with proper risk management.
+        Includes Anti-Ruin protection.
         """
-        # Check concurrent trades limit
+        # ═══════════════════════════════════════════════════════════
+        # ANTI-RUIN CHECKS
+        # ═══════════════════════════════════════════════════════════
+        
+        # 1. FreeMargin Check - Don't trade if margin is too low
+        MIN_FREE_MARGIN = 15.0  # Block new trades if FreeMargin < $15
+        free_margin = self.balance  # Simplified: FreeMargin ≈ Balance for spot forex
+        if free_margin < MIN_FREE_MARGIN:
+            logger.debug(f"BLOCKED: FreeMargin ${free_margin:.2f} < ${MIN_FREE_MARGIN}")
+            return None
+        
+        # 2. Check concurrent trades limit
         if len(self.active_trades) >= self.config.max_concurrent_trades:
             return None
+        
+        # 3. Check if SL would cost more than 5% of account
+        MAX_RISK_PCT = 5.0  # $1.50 on $30 account
+        max_risk_dollars = self.balance * (MAX_RISK_PCT / 100)
+        potential_loss = sl_pips * self.config.pip_value * 0.01  # For 0.01 lot
+        
+        if potential_loss > max_risk_dollars:
+            # Reduce trade size or skip
+            logger.debug(f"RISK TOO HIGH: ${potential_loss:.2f} > ${max_risk_dollars:.2f}")
+            # Adjust risk_per_trade to fit within limits
+            adjusted_risk = MAX_RISK_PCT * 0.5  # Use half the max
+            self.config.risk_per_trade_pct = adjusted_risk
         
         # Apply spread and slippage
         entry_price = self.apply_spread(current_price, direction)
@@ -261,8 +285,12 @@ class BacktestEngine:
             sl_price = entry_price + (sl_pips * pip_size)
             tp_price = entry_price - (tp_pips * pip_size)
         
-        # Calculate position size
+        # Calculate position size with Anti-Ruin limits
         lots = self.calculate_position_size(sl_pips)
+        
+        # For small accounts (<$100), use fixed minimum lot
+        if self.balance < 100:
+            lots = 0.01  # Fixed minimum lot for small accounts
         
         if lots < 0.01:
             return None  # Can't afford the trade
