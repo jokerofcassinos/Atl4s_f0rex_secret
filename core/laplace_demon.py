@@ -280,20 +280,12 @@ class LaplaceDemonCore:
 
     def _synthesize_agi_decision(self, structure: Dict, momentum: Dict, timing: Any, current_price: float) -> Dict:
         """
-        [AGI METACOGNITION]
-        Synthesizes disparate sensory inputs into a coherent trade idea.
+        [AGI METACOGNITION] v2.0 - ALPHA CORRECTED
         
-        We look for specific CAUSAL CHAINS (Setups):
-        
-        1. TURTLE SOUP (Reversal):
-           - Condition: Liquidity Sweep (Fractal)
-           - Trigger: Structure Break (BOS) or Exhaustion Vector
-           - Validation: Flow Divergence or Overextension
-           
-        2. CONTINUATION (Trend):
-           - Condition: Valid BOS + Order Block
-           - Trigger: Price in OB + Momentum Expansion
-           - Validation: Flow Alignment
+        Refined Logic Gates:
+        1. TREND FILTER: Don't short a Bull Market (Trend > Reversal).
+        2. SFP CONFIRMATION: Validates specific structure breaks.
+        3. CONFIDENCE SCALING: 60% (Base) -> 75% (Trend) -> 90% (Perfect).
         """
         decision = {
             'execute': False,
@@ -303,65 +295,89 @@ class LaplaceDemonCore:
             'setup_type': 'None'
         }
         
+        # 0. Global Trend Context (Hierarchical Veto)
+        # We assume structure['trend'] tells us the M5/H1 structure.
+        # Ideally we'd look at H4, but for now we use the SMC Text.
+        market_trend = structure.get('trend', 'RANGING')
+        
         # 1. Analyze Flow State (The River)
         flow = momentum.get('flow')
-        if not flow: return decision # Safety: No flow perception
-
+        if not flow: return decision
+        
+        # COMPRESSION TRAP
         if flow['compression']['detected']:
-             # TRAP: Market is compressing. DO NOT TRADE REVERSALS.
-             # Only trade BREAKOUTS (Expansion).
              if flow['expansion']['detected']:
                   decision['execute'] = True
-                  decision['direction'] = "BUY" if flow['expansion']['direction'] == "UP" else "SELL"
-                  decision['confidence'] = 85
+                  direction = "BUY" if flow['expansion']['direction'] == "UP" else "SELL"
+                  decision['direction'] = direction
+                  decision['confidence'] = 75 # Breakouts are good, but fakeouts exist
                   decision['setup_type'] = "COMPRESSION_BREAKOUT"
-                  decision['reasons'].append(f"Toxic Compression -> {decision['direction']} Expansion")
+                  decision['reasons'].append(f"Compression -> {direction} Expansion")
                   return decision
              else:
-                  return decision # Wait for the break
+                  return decision
         
-        # 2. Check Liquidity Sweeps (Turtle Soup)
-        # Did we just sweep a fractal pool?
+        # 2. Check Liquidity Sweeps (Turtle Soup SFP)
         swept_pools = [p for p in structure['liquidity_pools'] if p.swept]
         if swept_pools:
-             last_sweep = swept_pools[-1] # Most recent
+             last_sweep = swept_pools[-1]
              sweep_dir = "SELL" if last_sweep.type == "HIGH" else "BUY"
              
-             # CAUSAL CHECK: Did momentum confirm the sweep? (Exhaustion or Divergence)
-             # We need a reason to believe the sweep isn't just a breakout.
+             # TREND FILTER
+             is_counter_trend = False
+             if market_trend == "BULLISH" and sweep_dir == "SELL": is_counter_trend = True
+             if market_trend == "BEARISH" and sweep_dir == "BUY": is_counter_trend = True
              
+             # BASE CONFIDENCE
+             base_conf = 60
+             
+             # Context Boosters
              is_exhausted = flow['exhaustion']['detected'] and flow['exhaustion']['direction'] != sweep_dir
              has_divergence = momentum['rsi']['divergence'] is not None
              
+             if not is_counter_trend:
+                 base_conf += 15 # With Trend = 75%
+             
              if is_exhausted or has_divergence:
-                  decision['execute'] = True
-                  decision['direction'] = sweep_dir
-                  decision['confidence'] = 90
-                  decision['setup_type'] = "TURTLE_SOUP_AGI"
-                  decision['reasons'].append(f"Fractal Sweep of {last_sweep.level} + Momentum Confirmation")
-                  return decision
+                 base_conf += 15 # Confirmation = +15%
+             
+             # Killzone Booster (Simple Time Check proxy)
+             # (Real check is in Gate 0, but we boost score here)
+             # Assuming we are in a valid time if we got here (Gate 0 passed)
+             
+             # DECISION
+             # We only trade Counter-Trend if we have Div/Exhaustion (Score >= 75)
+             if is_counter_trend and base_conf < 75:
+                 decision['warnings'] = ["VETO: Counter-trend SFP without divergence"]
+                 pass 
+             else:
+                 decision['execute'] = True
+                 decision['direction'] = sweep_dir
+                 decision['confidence'] = min(95, base_conf)
+                 decision['setup_type'] = "TURTLE_SOUP_AGI"
+                 decision['reasons'].append(f"Valid SFP of {last_sweep.level} (Trend: {market_trend})")
+                 return decision
         
         # 3. Check Order Block Continuation (Trend)
-        # If no sweep, are we retracing to an OB?
         entry = structure.get('entry_signal', {})
         if entry.get('direction'):
-             # CAUSAL CHECK: Is momentum aligned?
-             # If buying OB, we want RSI NOT overbought (room to grow)
-             # And better yet, Momentum Expansion in our direction.
-             
              ob_dir = entry['direction']
-             momentum_aligned = True
              
-             # Sanity Check
+             # Strict Trend Alignment for OBs
+             if market_trend == "BULLISH" and ob_dir == "SELL": return decision
+             if market_trend == "BEARISH" and ob_dir == "BUY": return decision
+             
+             # Momentum Alignment
+             momentum_aligned = True
              if ob_dir == "BUY" and momentum['rsi']['overbought']: momentum_aligned = False
              if ob_dir == "SELL" and momentum['rsi']['oversold']: momentum_aligned = False
              
              if momentum_aligned:
                   decision['execute'] = True
                   decision['direction'] = ob_dir
-                  decision['confidence'] = entry.get('confidence', 70)
+                  decision['confidence'] = 75 # Trend following is solid
                   decision['setup_type'] = "ORDER_BLOCK_FLOW"
-                  decision['reasons'].append(f"Structure Retest: {entry['reason']}")
+                  decision['reasons'].append(f"Trend Continuation: {entry['reason']}")
                   return decision
                   
         return decision

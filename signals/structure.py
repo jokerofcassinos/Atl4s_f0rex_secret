@@ -365,21 +365,41 @@ class SMCAnalyzer:
             recent_high = highs.iloc[-10:].max()
             recent_low = lows.iloc[-10:].min()
             
-            # TURTLE SOUP LOGIC (AGI)
-            # If High Pool was breached by 0.1 to 5.0 pips, mark as SWEPT (Reversal Signal)
+            # TURTLE SOUP LOGIC (AGI) v2.0 - STRICT SFP
+            # Rule: Price must Sweep (Wick) but Close INSIDE the level (Rejection).
+            # Simply breaking the level is NOT a signal (it's often a breakout).
+            
+            current_close = df['close'].iloc[-1]
+            
             if pool.type == "HIGH":
+                # SFP Requirement: High > Pool BUT Close < Pool
                 diff = recent_high - pool.level
-                if 0.00001 < diff < 0.0005: # Swept
-                     pool.swept = True
-                     pool.strength = 100 # Maximum Interest
-                elif diff > 0.0010: # Broken (Trend)
+                
+                # We check if we swept it by a small margin (Hunt)
+                if 0.00001 < diff < 0.0010: 
+                     # CRITICAL: Did we close back below?
+                     if current_close < pool.level:
+                         pool.swept = True
+                         pool.strength = 80 # Validated SFP
+                     else:
+                         # We are closing ABOVE the pool. This is likely a Breakout/Continuation.
+                         # DO NOT FADE.
+                         pass
+                         
+                elif diff > 0.0010: # Broken by a lot
                      continue # Ignore broken pools
             
             if pool.type == "LOW":
+                # SFP Requirement: Low < Pool BUT Close > Pool
                 diff = pool.level - recent_low
-                if 0.00001 < diff < 0.0005: # Swept
-                     pool.swept = True
-                     pool.strength = 100
+                
+                if 0.00001 < diff < 0.0010:
+                     if current_close > pool.level:
+                         pool.swept = True
+                         pool.strength = 80
+                     else:
+                         pass # Closing below = Breakout
+                         
                 elif diff > 0.0010: # Broken
                      continue
             

@@ -241,14 +241,14 @@ class MomentumAnalyzer:
         if flow['expansion']['detected']:
             direction = flow['expansion']['direction'] # UP/DOWN
             signals.append('BUY' if direction == "UP" else 'SELL')
-            scores.append(90) # High conviction
+            scores.append(65) # Reduced from 90 (Needs context)
             
         # Exhaustion = Reversal
         if flow['exhaustion']['detected']:
             # Vector candle exhaustion
             rev_dir = "SELL" if flow['exhaustion']['direction'] == "UP" else "BUY"
             signals.append(rev_dir)
-            scores.append(85)
+            scores.append(60) # Reduced from 85 (Reversals are risky)
         
         # 2. Indicator Signals (Secondary)
         # RSI signal
