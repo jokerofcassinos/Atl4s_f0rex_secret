@@ -7,6 +7,7 @@ import ta
 from core.agi.module_thought_adapter import AGIModuleAdapter, ModuleThoughtResult
 
 logger = logging.getLogger("Atl4s-Trend")
+logger.setLevel(logging.WARNING)
 
 
 class TrendArchitect:
@@ -16,9 +17,9 @@ class TrendArchitect:
         # Camada AGI: conecta este módulo ao InfiniteWhyEngine
         self.agi_adapter = AGIModuleAdapter(module_name="TrendArchitect")
 
-    def analyze(self, df_m5, df_h1: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+    def analyze(self, df_m5, df_h1: Optional[pd.DataFrame] = None, df_h4: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
         """
-        Analyzes Trend using Multi-Timeframe Context (The River) and ADX Regime.
+        Analyzes Trend using Multi-Timeframe Context (River=H1, Ocean=H4).
         """
         df = df_m5.copy()
         score = 0
@@ -73,6 +74,29 @@ class TrendArchitect:
             except Exception as e:
                 logger.error(f"Error calculating H1 River: {e}")
 
+        # --- 2.5. Determine The Ocean (H4 Context) - SNIPER FILTER ---
+        ocean_dir = 0
+        if df_h4 is not None and len(df_h4) > 50:
+            try:
+                # Use simple Price Structure (High/Low) + EMA alignment
+                ema50_h4 = ta.trend.EMAIndicator(df_h4['close'], window=50).ema_indicator().iloc[-1]
+                current_price_h4 = df_h4['close'].iloc[-1]
+                
+                # Check recent structure (last 5 candles)
+                last_5_h4 = df_h4.iloc[-6:-1]
+                making_higher_highs = last_5_h4['high'].is_monotonic_increasing
+                making_lower_lows = last_5_h4['low'].is_monotonic_decreasing
+                
+                if current_price_h4 > ema50_h4:
+                    ocean_dir = 1
+                elif current_price_h4 < ema50_h4:
+                    ocean_dir = -1
+                
+                logger.info(f"The Ocean (H4 Trend): {'BULLISH' if ocean_dir == 1 else 'BEARISH' if ocean_dir == -1 else 'NEUTRAL'}")
+            except Exception as e:
+                logger.error(f"Error calculating H4 Ocean: {e}")
+
+
         # --- 3. M5 Trend Analysis (Micro Structure) ---
         # EMA 20 vs 50
         ema20 = ta.trend.EMAIndicator(df['close'], window=20).ema_indicator().iloc[-1]
@@ -117,6 +141,7 @@ class TrendArchitect:
             "direction": direction,
             "regime": regime,
             "river": river_dir,
+            "ocean": ocean_dir,
         }
 
         # --- 5. Camada de Pensamento Recursivo (Fase 8) ---

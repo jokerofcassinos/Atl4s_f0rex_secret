@@ -36,6 +36,8 @@ from signals.structure import (
     SMCAnalyzer, InstitutionalLevels, BlackRockPatterns,
     VectorCandleTheory, GannGeometry, TeslaVortex
 )
+from analysis.trend_architect import TrendArchitect  # New import
+
 from signals.correlation import (
     SMTDivergence, PowerOfOne, InversionFVG, 
     MeanThreshold, AMDPowerOfThree
@@ -171,6 +173,7 @@ class LaplaceDemonCore:
         self.time_macro = TimeMacroFilter()
         self.initial_balance = InitialBalanceFilter()
         
+        self.trend_architect = TrendArchitect(symbol=symbol) # Phase 3 (Sniper)
         self.smc = SMCAnalyzer()
         self.institutional = InstitutionalLevels()
         self.blackrock = BlackRockPatterns()
@@ -238,6 +241,11 @@ class LaplaceDemonCore:
         # 1. Structure Perception (The Map)
         structure_data = self.smc.analyze(df_m5, current_price)
         
+        # 1.5 Trend Architecture (The Context) - Phase 3
+        # h4_trend needs df_h4
+        trend_context = self.trend_architect.analyze(df_m5, df_h1, df_h4)
+        h4_ocean = trend_context.get('ocean', 0)
+        
         # 2. Momentum Perception (The Flow)
         momentum_data = self.momentum.analyze(df_m5)
         
@@ -253,7 +261,8 @@ class LaplaceDemonCore:
             structure=structure_data,
             momentum=momentum_data,
             timing=quarterly,
-            current_price=current_price
+            current_price=current_price,
+            h4_trend=h4_ocean  # Pass H4 Trend
         )
         
         # ═══════════════════════════════════════════════════════════
@@ -278,14 +287,15 @@ class LaplaceDemonCore:
         self.last_prediction = prediction
         return prediction
 
-    def _synthesize_agi_decision(self, structure: Dict, momentum: Dict, timing: Any, current_price: float) -> Dict:
+    def _synthesize_agi_decision(self, structure: Dict, momentum: Dict, timing: Any, current_price: float, h4_trend: int = 0) -> Dict:
         """
-        [AGI METACOGNITION] v2.0 - ALPHA CORRECTED
+        [AGI METACOGNITION] v3.0 - SNIPER PROTOCOL
         
         Refined Logic Gates:
-        1. TREND FILTER: Don't short a Bull Market (Trend > Reversal).
+        1. H4 TREND LOCK: Dictatorship of the Trend.
         2. SFP CONFIRMATION: Validates specific structure breaks.
-        3. CONFIDENCE SCALING: 60% (Base) -> 75% (Trend) -> 90% (Perfect).
+        3. SPREAD KILLER: Minimum 10 pips potential profit.
+        4. CONFIDENCE: 95% ONLY for Perfect Confluence.
         """
         decision = {
             'execute': False,
@@ -295,22 +305,26 @@ class LaplaceDemonCore:
             'setup_type': 'None'
         }
         
-        # 0. Global Trend Context (Hierarchical Veto)
-        # We assume structure['trend'] tells us the M5/H1 structure.
-        # Ideally we'd look at H4, but for now we use the SMC Text.
-        market_trend = structure.get('trend', 'RANGING')
+        # 0. H4 TREND LOCK (The Dictator)
+        # h4_trend: 1 (Bull), -1 (Bear), 0 (Neutral)
+        # We allow Neutral trading, but if Trend is Strong, we obey.
         
-        # 1. Analyze Flow State (The River)
+        # 1. Analyze Flow State
         flow = momentum.get('flow')
         if not flow: return decision
         
         # COMPRESSION TRAP
         if flow['compression']['detected']:
              if flow['expansion']['detected']:
-                  decision['execute'] = True
                   direction = "BUY" if flow['expansion']['direction'] == "UP" else "SELL"
+                  
+                  # VETO: Counter-Trend
+                  if h4_trend == 1 and direction == "SELL": return decision
+                  if h4_trend == -1 and direction == "BUY": return decision
+                  
+                  decision['execute'] = True
                   decision['direction'] = direction
-                  decision['confidence'] = 75 # Breakouts are good, but fakeouts exist
+                  decision['confidence'] = 80
                   decision['setup_type'] = "COMPRESSION_BREAKOUT"
                   decision['reasons'].append(f"Compression -> {direction} Expansion")
                   return decision
@@ -323,10 +337,28 @@ class LaplaceDemonCore:
              last_sweep = swept_pools[-1]
              sweep_dir = "SELL" if last_sweep.type == "HIGH" else "BUY"
              
-             # TREND FILTER
-             is_counter_trend = False
-             if market_trend == "BULLISH" and sweep_dir == "SELL": is_counter_trend = True
-             if market_trend == "BEARISH" and sweep_dir == "BUY": is_counter_trend = True
+             # H4 TREND LOCK VETO
+             if h4_trend == 1 and sweep_dir == "SELL":
+                 decision['warnings'] = ["VETO: Selling in H4 Bull Market forbidden"]
+                 return decision # Silent Fail
+             if h4_trend == -1 and sweep_dir == "BUY":
+                 decision['warnings'] = ["VETO: Buying in H4 Bear Market forbidden"]
+                 return decision
+             
+             # SPREAD KILLER (Minimum viable move)
+             # Target: Opposing Pool or 20 pips default
+             # We estimate potential profit based on nearest opposing pool
+             potential_profit = 20.0 # Default fallback
+             opposing_pools = [p for p in structure['liquidity_pools'] if p.type != last_sweep.type]
+             if opposing_pools:
+                 nearest_target = min(opposing_pools, key=lambda p: abs(p.level - current_price))
+                 potential_profit = abs(nearest_target.level - current_price) * 10000 # Convert to pipettes/points approx? No, price diff.
+                 # Assuming price is e.g. 1.2000. Diff 0.0010 = 10 pips.
+                 potential_profit = abs(nearest_target.level - current_price) / 0.0001
+                 
+             if potential_profit < 10.0:
+                  decision['warnings'] = [f"VETO: Potential Profit {potential_profit:.1f} < 10.0 pips (Spread Killer)"]
+                  return decision
              
              # BASE CONFIDENCE
              base_conf = 60
@@ -334,28 +366,29 @@ class LaplaceDemonCore:
              # Context Boosters
              is_exhausted = flow['exhaustion']['detected'] and flow['exhaustion']['direction'] != sweep_dir
              has_divergence = momentum['rsi']['divergence'] is not None
+             with_trend = (h4_trend == 1 and sweep_dir == "BUY") or (h4_trend == -1 and sweep_dir == "SELL")
              
-             if not is_counter_trend:
-                 base_conf += 15 # With Trend = 75%
+             if with_trend:
+                 base_conf += 20 # With H4 Trend = 80%
              
              if is_exhausted or has_divergence:
                  base_conf += 15 # Confirmation = +15%
              
-             # Killzone Booster (Simple Time Check proxy)
-             # (Real check is in Gate 0, but we boost score here)
-             # Assuming we are in a valid time if we got here (Gate 0 passed)
-             
-             # DECISION
-             # We only trade Counter-Trend if we have Div/Exhaustion (Score >= 75)
-             if is_counter_trend and base_conf < 75:
-                 decision['warnings'] = ["VETO: Counter-trend SFP without divergence"]
-                 pass 
-             else:
+             # Killzone Booster (Simple Tie Breaker)
+             if base_conf >= 95:
                  decision['execute'] = True
                  decision['direction'] = sweep_dir
-                 decision['confidence'] = min(95, base_conf)
+                 decision['confidence'] = 95 # DIVINE SIGNAL
+                 decision['setup_type'] = "TURTLE_SOUP_SNIPER"
+                 decision['reasons'].append(f"Divine SFP: Trend + Momentum + Structure")
+                 return decision
+             
+             elif base_conf >= 75:
+                 decision['execute'] = True
+                 decision['direction'] = sweep_dir
+                 decision['confidence'] = base_conf
                  decision['setup_type'] = "TURTLE_SOUP_AGI"
-                 decision['reasons'].append(f"Valid SFP of {last_sweep.level} (Trend: {market_trend})")
+                 decision['reasons'].append(f"Valid SFP (Trend: {h4_trend})")
                  return decision
         
         # 3. Check Order Block Continuation (Trend)
@@ -363,9 +396,9 @@ class LaplaceDemonCore:
         if entry.get('direction'):
              ob_dir = entry['direction']
              
-             # Strict Trend Alignment for OBs
-             if market_trend == "BULLISH" and ob_dir == "SELL": return decision
-             if market_trend == "BEARISH" and ob_dir == "BUY": return decision
+             # H4 TREND LOCK VETO
+             if h4_trend == 1 and ob_dir == "SELL": return decision
+             if h4_trend == -1 and ob_dir == "BUY": return decision
              
              # Momentum Alignment
              momentum_aligned = True
@@ -375,7 +408,7 @@ class LaplaceDemonCore:
              if momentum_aligned:
                   decision['execute'] = True
                   decision['direction'] = ob_dir
-                  decision['confidence'] = 75 # Trend following is solid
+                  decision['confidence'] = 80 # Trend is King
                   decision['setup_type'] = "ORDER_BLOCK_FLOW"
                   decision['reasons'].append(f"Trend Continuation: {entry['reason']}")
                   return decision
