@@ -17,11 +17,20 @@ class TrendArchitect:
         # Camada AGI: conecta este módulo ao InfiniteWhyEngine
         self.agi_adapter = AGIModuleAdapter(module_name="TrendArchitect")
 
-    def analyze(self, df_m5, df_h1: Optional[pd.DataFrame] = None, df_h4: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+    def analyze(self, df_m5, df_h1: Optional[pd.DataFrame] = None, df_h4: Optional[pd.DataFrame] = None, df_d1: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
         """
-        Analyzes Trend using Multi-Timeframe Context (River=H1, Ocean=H4).
+        Analyzes Trend using Multi-Timeframe Context (River=H1, Ocean=H4, Galaxy=D1).
+        OPTIMIZED: Slices data to last 500 candles to prevent slow TA calc.
         """
-        df = df_m5.copy()
+        # OPTIMIZATION: Slice input dataframes to constant size (O(1))
+        limit = 500
+        df = df_m5.iloc[-limit:].copy()
+        
+        # Overwrite arguments with slices
+        if df_h1 is not None: df_h1 = df_h1.iloc[-limit:]
+        if df_h4 is not None: df_h4 = df_h4.iloc[-limit:]
+        if df_d1 is not None: df_d1 = df_d1.iloc[-limit:]
+        
         score = 0
         direction = 0
         
@@ -96,6 +105,22 @@ class TrendArchitect:
             except Exception as e:
                 logger.error(f"Error calculating H4 Ocean: {e}")
 
+        # --- 2.8. Determine The Galaxy (D1 Context) - FORTRESS FILTER ---
+        galaxy_dir = 0
+        if df_d1 is not None and len(df_d1) > 20:
+            try:
+                # D1 is slow, so we check EMA 20 for mid-term bias
+                ema20_d1 = ta.trend.EMAIndicator(df_d1['close'], window=20).ema_indicator().iloc[-1]
+                current_price_d1 = df_d1['close'].iloc[-1]
+                
+                if current_price_d1 > ema20_d1:
+                    galaxy_dir = 1
+                elif current_price_d1 < ema20_d1:
+                    galaxy_dir = -1
+                    
+                logger.info(f"The Galaxy (D1 Trend): {'BULLISH' if galaxy_dir == 1 else 'BEARISH' if galaxy_dir == -1 else 'NEUTRAL'}")
+            except Exception as e:
+                logger.error(f"Error calculating D1 Galaxy: {e}")
 
         # --- 3. M5 Trend Analysis (Micro Structure) ---
         # EMA 20 vs 50
@@ -107,7 +132,7 @@ class TrendArchitect:
         span_a = ichimoku.ichimoku_a().iloc[-1]
         span_b = ichimoku.ichimoku_b().iloc[-1]
         close = df['close'].iloc[-1]
-
+ 
         # Scoring Logic
         if ema20 > ema50:
             score += 30
@@ -122,7 +147,7 @@ class TrendArchitect:
         elif close < span_a and close < span_b:
             score += 20
             if direction == -1: score += 10 # Confluence
-
+ 
         # --- 4. Final Synthesis ---
         # If Regime is TRENDING, we heavily penalize fighting the River
         if regime == "TRENDING" and river_dir != 0:
@@ -133,15 +158,16 @@ class TrendArchitect:
             else:
                 score += 20 # Boost for aligning with River
         
-        # If Regime is RANGING, we ignore the River and trust the M5 Reversals (handled by Quant mostly)
+        # If Regime is RANGING, we ignore the River and trust the M5 Reversals ( handled by Quant mostly)
         # But Trend Architect just reports what it sees on M5.
-
+ 
         raw_output: Dict[str, Any] = {
             "score": min(score, 100),
             "direction": direction,
             "regime": regime,
             "river": river_dir,
             "ocean": ocean_dir,
+            "galaxy": galaxy_dir
         }
 
         # --- 5. Camada de Pensamento Recursivo (Fase 8) ---
