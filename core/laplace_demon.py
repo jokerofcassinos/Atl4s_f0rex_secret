@@ -47,6 +47,10 @@ from signals.volatility import VolatilityAnalyzer, DisplacementCandle, Volatilit
 from analysis.m8_fibonacci_system import M8FibonacciSystem
 from analysis.swarm.vortex_swarm import VortexSwarm
 
+# OMNI-CORTEX: Advanced AGI Modules
+from core.agi.big_beluga.snr_matrix import SNRMatrix
+from core.agi.microstructure.flux_heatmap import FluxHeatmap
+
 logger = logging.getLogger("LaplaceDemon")
 
 
@@ -207,7 +211,12 @@ class LaplaceDemonCore:
         self.last_prediction: Optional[LaplacePrediction] = None
         self.trade_history: List[Dict] = []
         
+        # OMNI-CORTEX: Advanced AGI Modules
+        self.snr_matrix = SNRMatrix()    # Structural Nexus Resonance (S/R Filter)
+        self.heatmap = FluxHeatmap()     # Microstructure Liquidity Radar
+        
         logger.info("LAPLACE DEMON INITIALIZED - Deterministic Intelligence Active")
+        logger.info("OMNI-CORTEX: SNRMatrix & FluxHeatmap Online.")
     
     def analyze(self,
                 df_m1: pd.DataFrame,
@@ -332,7 +341,8 @@ class LaplaceDemonCore:
                  current_price=current_price, 
                  atr_pips=atr_pips, 
                  structure_result=structure_data,
-                 setup_type=decision['setup_type']  # CRÍTICO: Passamos o tipo
+                 setup_type=decision['setup_type'],
+                 df_m5=df_m5  # OMNI-CORTEX: Para SNRMatrix scan
              )
              prediction.sl_pips = sl_tp['sl_pips']
              prediction.tp_pips = sl_tp['tp_pips']
@@ -772,63 +782,76 @@ class LaplaceDemonCore:
                          current_price: float,
                          atr_pips: float,
                          structure_result: Dict,
-                         setup_type: str = "NORMAL") -> Dict:
+                         setup_type: str = "NORMAL",
+                         magnetic_target: float = None,
+                         df_m5: pd.DataFrame = None) -> Dict:
         """
-        [PROTOCOLO AEGIS] - DYNAMIC GEOMETRY
+        [PROTOCOLO AEGIS + OMNI-CORTEX] - DYNAMIC GEOMETRY
         
-        SL baseado em Market Structure (Swing Points) ao invés de pips fixos.
-        Isso evita o "Efeito Gaiola" onde oscilações normais destroem trades bons.
+        SL baseado em Market Structure (Swing Points + SNRMatrix).
+        TP baseado em Asymmetric R:R ou magnetic_target do Heatmap.
         """
         pip_size = 0.0001
         sl_pips = 0.0
         
-        # --- 1. SMART STOP LOSS (STRUCTURAL DEFENSE) ---
-        # Tenta encontrar um Swing Point (Liquidity Pool) para proteger
+        # --- OMNI-CORTEX: SCAN SNR LEVELS ---
+        snr_support = 0.0
+        snr_resistance = 0.0
+        try:
+            if df_m5 is not None and len(df_m5) > 50:
+                self.snr_matrix.scan_structure(df_m5)
+                snr_levels = self.snr_matrix.get_nearest_levels(current_price)
+                snr_support = snr_levels.get('nearest_support', 0.0)
+                snr_resistance = snr_levels.get('nearest_resistance', 999999.0)
+        except Exception as e:
+            logger.debug(f"SNR Scan Error: {e}")
+        
+        # --- 1. SMART STOP LOSS (STRUCTURAL DEFENSE + SNR) ---
         pools = structure_result.get('liquidity_pools', [])
         structure_sl_price = None
         
         if direction == 'BUY':
-            # Para compra, queremos o Swing Low mais recente ABAIXO do preço
+            # Prioridade: SNR Support > Liquidity Pool
             valid_lows = [p.level for p in pools if hasattr(p, 'type') and p.type == 'LOW' and p.level < current_price]
-            if valid_lows:
-                # O mais alto dos baixos (fundo mais recente)
-                structure_sl_price = max(valid_lows) - (5 * pip_size)  # 5 pips de folga
+            if snr_support > 0 and snr_support < current_price:
+                structure_sl_price = snr_support - (3 * pip_size)  # 3 pips below SNR
+            elif valid_lows:
+                structure_sl_price = max(valid_lows) - (5 * pip_size)
         else:
-            # Para venda, queremos o Swing High mais recente ACIMA do preço
+            # Prioridade: SNR Resistance > Liquidity Pool
             valid_highs = [p.level for p in pools if hasattr(p, 'type') and p.type == 'HIGH' and p.level > current_price]
-            if valid_highs:
-                # O mais baixo dos altos (topo mais recente)
-                structure_sl_price = min(valid_highs) + (5 * pip_size)  # 5 pips de folga
+            if snr_resistance < 999999 and snr_resistance > current_price:
+                structure_sl_price = snr_resistance + (3 * pip_size)  # 3 pips above SNR
+            elif valid_highs:
+                structure_sl_price = min(valid_highs) + (5 * pip_size)
 
         # Lógica de Decisão do SL
         if structure_sl_price:
             dist = abs(current_price - structure_sl_price) / pip_size
-            
-            # FILTRO DE SANIDADE:
-            # Se SL estrutural > 50 pips, é muito risco. Use ATR.
-            # Se SL estrutural < 10 pips, é ruído. Use ATR.
             if 10 < dist < 50:
                 sl_pips = dist
             else:
-                sl_pips = max(20, atr_pips * 2.0)  # Fallback ATR largo
+                sl_pips = max(20, atr_pips * 2.0)
         else:
-            # Sem estrutura clara? Use Volatilidade pura (ATR Wide)
-            sl_pips = max(20, atr_pips * 2.0)  # 2.0x ATR = aprox 25-30 pips
+            sl_pips = max(20, atr_pips * 2.0)
 
-        # --- 2. DYNAMIC TAKE PROFIT (ASYMMETRIC HORIZON) ---
+        # --- 2. DYNAMIC TAKE PROFIT (ASYMMETRIC + MAGNETIC TARGET) ---
         tp_pips = 0.0
         
-        if "LION" in setup_type:
-            # LION: Risco aumentou (20-30 pips), alvo tem que aumentar
-            # Alvo: 4x a 5x o risco estrutural (80-150 pips)
-            tp_pips = max(80, sl_pips * 5.0)
-            
-        elif "SNAKE" in setup_type:
-            # SNAKE: Precisão cirúrgica
-            tp_pips = max(25, sl_pips * 2.0)
-            
-        else:
-            tp_pips = sl_pips * 2.5
+        # Se temos um alvo magnético do Heatmap, use-o!
+        if magnetic_target and magnetic_target > 0:
+            mag_dist = abs(magnetic_target - current_price) / pip_size
+            if 20 < mag_dist < 200:  # Sanity check
+                tp_pips = mag_dist - 5  # 5 pips antes do magnet
+        
+        # Fallback para lógica assimétrica
+        if tp_pips == 0:
+            if "LION" in setup_type:
+                tp_pips = max(80, sl_pips * 5.0)
+            elif "SNAKE" in setup_type:
+                tp_pips = max(25, sl_pips * 2.0)
+            else:
+                tp_pips = sl_pips * 2.5
 
         # Preços Finais
         if direction == 'BUY':
