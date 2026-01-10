@@ -95,13 +95,19 @@ class SMCAnalyzer:
         
     def analyze(self, df: pd.DataFrame, current_price: float = None) -> Dict:
         """
-        Full SMC analysis on price data.
-        
-        Returns:
-            Dict with order_blocks, fvgs, trend, and entry signals
+        Robust SMC Analysis. Returns SAFE defaults on error.
         """
-        if df is None or len(df) < 20:
-            return {'error': 'Insufficient data'}
+        # SAFE DEFAULT RETURN
+        empty_result = {
+            'trend': 'RANGING',
+            'active_order_blocks': [],
+            'active_fvgs': [],
+            'liquidity_pools': [],
+            'entry_signal': {'direction': None, 'confidence': 0, 'reason': 'Insufficient Data'}
+        }
+
+        if df is None or df.empty or len(df) < 50:
+            return empty_result
         
         # Normalize columns in case of MultiIndex (yfinance)
         try:
@@ -115,34 +121,35 @@ class SMCAnalyzer:
             current_price = float(df['close'].iloc[-1])
         
         try:
-            # Detect components
-            self._detect_order_blocks(df)
-            self._detect_fvgs(df)
+            # 1. Detect Liquidity Pools (Critical for Snake)
             self._detect_liquidity_pools(df)
+            
+            # 2. Detect Order Blocks (Critical for Lion)
+            self._detect_order_blocks(df)
+            
+            # 3. Detect FVGs
+            self._detect_fvgs(df)
+            
+            # 4. Determine Structure
             self._determine_structure(df)
             
-            # Validate existing components
+            # 5. Validate existing components
             self._validate_order_blocks(current_price)
             self._update_fvg_fill(current_price)
             
-            # Find entry opportunities
+            # 6. Find Entry
             entry = self._find_entry_signal(df, current_price)
             
             return {
-                'trend': self.structure_trend.value,
-                'active_order_blocks': [ob for ob in self.order_blocks if not ob.invalidated][-5:],
-                'active_fvgs': [f for f in self.fvgs if f.filled_pct < 100][-5:],
-                'liquidity_pools': self.liquidity_pools[-5:],
+                'trend': self.structure_trend.value if self.structure_trend else 'RANGING',
+                'active_order_blocks': [ob for ob in self.order_blocks if not ob.invalidated][-3:],
+                'active_fvgs': [f for f in self.fvgs if f.filled_pct < 100][-3:],
+                'liquidity_pools': self.liquidity_pools[-3:],
                 'entry_signal': entry
             }
         except Exception as e:
-            logger.error(f"STRUCTURE CRASH: {e}")
-            return {
-                'trend': 'RANGING',
-                'active_order_blocks': [],
-                'active_fvgs': [],
-                'entry_signal': {'direction': None, 'confidence': 0, 'reason': 'Error'}
-            }
+            logger.error(f"SMC ERROR: {e}")
+            return empty_result
     
     def _detect_order_blocks(self, df: pd.DataFrame):
         """

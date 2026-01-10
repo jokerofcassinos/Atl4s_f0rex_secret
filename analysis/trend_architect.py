@@ -84,23 +84,28 @@ class TrendArchitect:
                 logger.error(f"Error calculating H1 River: {e}")
 
         # --- 2.5. Determine The Ocean (H4 Context) - SNIPER FILTER ---
+        # PROTOCOL LION UPDATE: Never return 0 if Price Action is clear.
         ocean_dir = 0
-        if df_h4 is not None and len(df_h4) > 50:
+        if df_h4 is not None and len(df_h4) > 20:
             try:
-                # Use simple Price Structure (High/Low) + EMA alignment
-                ema50_h4 = ta.trend.EMAIndicator(df_h4['close'], window=50).ema_indicator().iloc[-1]
-                current_price_h4 = df_h4['close'].iloc[-1]
+                # Prioritize PRICE ACTION over EMA
+                current_price = df_h4['close'].iloc[-1]
+                ema50 = ta.trend.EMAIndicator(df_h4['close'], window=50).ema_indicator().iloc[-1]
                 
-                # Check recent structure (last 5 candles)
-                last_5_h4 = df_h4.iloc[-6:-1]
-                making_higher_highs = last_5_h4['high'].is_monotonic_increasing
-                making_lower_lows = last_5_h4['low'].is_monotonic_decreasing
+                # Check Last 3 Candles for Direction
+                c1 = df_h4.iloc[-1]['close']
+                c3 = df_h4.iloc[-3]['close']
                 
-                if current_price_h4 > ema50_h4:
+                if current_price > ema50:
                     ocean_dir = 1
-                elif current_price_h4 < ema50_h4:
+                elif current_price < ema50:
                     ocean_dir = -1
                 
+                # Fallback: If EMA is flat, look at displacement
+                if abs(current_price - ema50) / current_price < 0.0005: # Very close
+                    if c1 > c3: ocean_dir = 1
+                    else: ocean_dir = -1
+                    
                 logger.info(f"The Ocean (H4 Trend): {'BULLISH' if ocean_dir == 1 else 'BEARISH' if ocean_dir == -1 else 'NEUTRAL'}")
             except Exception as e:
                 logger.error(f"Error calculating H4 Ocean: {e}")

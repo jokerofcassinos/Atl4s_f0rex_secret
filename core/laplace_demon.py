@@ -294,7 +294,7 @@ class LaplaceDemonCore:
         )
         
         # ═══════════════════════════════════════════════════════════
-        # PHASE 3: REFLEXIVE SAFETY (The Spinal Cord)
+        # PHASE 3: REFLEXIVE SAFETY + HYDRA PROTOCOL (Risk Injection)
         # ═══════════════════════════════════════════════════════════
         
         if decision['execute']:
@@ -306,28 +306,56 @@ class LaplaceDemonCore:
              prediction.reasons = decision['reasons']
              prediction.primary_signal = decision['setup_type']
              
-             # Dynamic Stop Loss based on Structure (Mental Stop)
-             sl_tp = self._calculate_sl_tp(prediction.direction, current_price, 15, structure_data)
+             # --- HYDRA PROTOCOL: RISK INJECTION ---
+             # Em contas micro ($30), precisamos de volatilidade positiva de saldo
+             if prediction.confidence >= 90:
+                 prediction.risk_pct = 10.0  # ALL-IN CONTROLADO (High conviction)
+                 prediction.strength = SignalStrength.DIVINE
+             elif prediction.confidence >= 80:
+                 prediction.risk_pct = 5.0   # Agressivo Padrão
+                 prediction.strength = SignalStrength.EXTREME
+             else:
+                 prediction.risk_pct = 2.0   # Conservador
+                 prediction.strength = SignalStrength.STRONG
+             
+             # --- ASYMMETRIC TARGETING ---
+             # Get real ATR from Volatility module
+             vol_data = self.volatility.analyze(df_m5)
+             vol_regime = vol_data.get('regime')
+             atr_pips = 15.0  # Default
+             if vol_regime and hasattr(vol_regime, 'atr'):
+                 atr_pips = vol_regime.atr * 10000  # Normalizado para pips
+             if atr_pips < 5: atr_pips = 10  # Mínimo de segurança
+             
+             sl_tp = self._calculate_sl_tp(
+                 direction=prediction.direction, 
+                 current_price=current_price, 
+                 atr_pips=atr_pips, 
+                 structure_result=structure_data,
+                 setup_type=decision['setup_type']  # CRÍTICO: Passamos o tipo
+             )
              prediction.sl_pips = sl_tp['sl_pips']
              prediction.tp_pips = sl_tp['tp_pips']
+             prediction.sl_price = sl_tp['sl']
+             prediction.tp_price = sl_tp['tp']
              
-             # Log the epiphany
-             logger.info(f"AGI DECISION: {prediction.direction} | Conf: {prediction.confidence}% | Type: {decision['setup_type']}")
+             # Log HYDRA decision
+             logger.info(f"HYDRA: {prediction.direction} | Type: {decision['setup_type']} | Risk: {prediction.risk_pct}% | TP: {prediction.tp_pips} pips")
              
         self.last_prediction = prediction
         return prediction
 
     def _synthesize_agi_decision(self, structure: Dict, momentum: Dict, timing: Any, current_price: float, h4_trend: int = 0, d1_trend: int = 0, df_m5: pd.DataFrame = None, df_m8: pd.DataFrame = None, df_h1: pd.DataFrame = None, df_h4: pd.DataFrame = None, current_time: datetime = None) -> Dict:
         """
-        [AGI METACOGNITION] v7.0 - PROTOCOL CHIMERA (THE LION & THE SNAKE)
+        [AGI METACOGNITION] v7.1 - PROTOCOL CHIMERA (THE LION & THE SNAKE)
         
         Decoupled Logic:
         1. THE LION (Trend Follower): 
-           - Condition: D1 == H4 (Strong Trend)
+           - Condition: H4 is Strong AND D1 is NOT opposing.
            - Filters: Minimal (Spread Gate Only). Ignites Volume.
            
         2. THE SNAKE (Reversal Sniper):
-           - Condition: D1 != H4 (Neutral/Conflict)
+           - Condition: Market is Neutral or H4/D1 Conflict.
            - Filters: MAXIMUM (Divine Gate: M8 or Vortex). Ignites Precision.
         """
         decision = {
@@ -338,131 +366,119 @@ class LaplaceDemonCore:
             'setup_type': 'None'
         }
         
-        # 0. VOLATILITY GATE (Common Shield)
-        # Check size of the last closed candle
+        # 0. VOLATILITY GATE (Safety Shield)
+        # Prevents trading in dead markets (Spread > Movement)
         if df_m5 is not None and not df_m5.empty:
-            last_candle = df_m5.iloc[-1]
-            params_spread = 0.00015
-            min_body_size = 3 * params_spread
-            body_size = abs(last_candle['close'] - last_candle['open'])
-            if body_size < min_body_size:
-                # decision['warnings'] = ["VETO: Anemic Candle"]
-                return decision
+            try:
+                last_candle = df_m5.iloc[-1]
+                body_size = abs(last_candle['close'] - last_candle['open'])
+                # Hardcoded safety: 2.0 pips min body size
+                if body_size < 0.00020: 
+                    return decision
+            except:
+                pass
 
-        # --- CONTEXT RECOGNITION ---
-        # Determine if we are in Lion Territory or Snake Territory
+        # --- CONTEXT RECOGNITION (LION vs SNAKE) ---
         
-        # DEBUG PROBE: Log the trend states occasionally
-        if df_m5 is not None and len(df_m5) % 50 == 0:
-            print(f"DEBUG_TREND: D1={d1_trend} | H4={h4_trend}")
-            logger.info(f"TREND STATE: D1={d1_trend} | H4={h4_trend}")
-            
         # LION AWAKENED PROTOCOL (Relaxed Constraint)
-        # Original: is_lion_territory = (d1_trend != 0) and (h4_trend != 0) and (d1_trend == h4_trend)
-        # New: H4 must be strong. D1 must NOT oppose.
+        # We trade trend if H4 says so, unless D1 explicitly forbids it.
         is_lion_territory = False
         master_trend = 0
         
-        if h4_trend != 0:
-            if d1_trend == 0 or d1_trend == h4_trend:
+        if h4_trend == 1: # H4 Bullish
+            if d1_trend >= 0: # D1 Bullish or Neutral (Allowed)
                 is_lion_territory = True
-                master_trend = h4_trend
-            elif d1_trend == -h4_trend:
-                # Direct Conflict - Civil War
-                is_lion_territory = False
-                master_trend = 0 # Ambiguous
+                master_trend = 1
+        elif h4_trend == -1: # H4 Bearish
+            if d1_trend <= 0: # D1 Bearish or Neutral (Allowed)
+                is_lion_territory = True
+                master_trend = -1
         
-        # Fallback for purely D1 trend if H4 is 0? Rare but possible.
-        if h4_trend == 0 and d1_trend != 0:
-             # Weak Lion? Or just Snake? Let's keep it strict for now.
-             # If H4 is flat, we don't have intraday momentum. Snake Territory.
-             is_lion_territory = False
-             master_trend = d1_trend
-
-        # --- DIVINE GATE CALCULATION (Pre-calc for Snake only, or logging) ---
-        m8_open = False
-        vortex_aligned = False
-        vortex_signal = self.vortex.process({'df_m5': df_m5, 'tick': {'bid': current_price, 'ask': current_price}})
-        
-        if df_m8 is not None and df_h1 is not None and df_h4 is not None:
-            m8_eval = self.m8_fib.evaluate(df_h1, df_h4, df_m8, None, current_time)
-            m8_open = m8_eval['total_score'] >= 7
-            
+        # --- DIVINE GATE CALCULATION (Pre-calc for Snake) ---
         divine_confirmation = False
+        m8_score = 0
+        
+        # Check M8 Time Gate
+        if df_m8 is not None and df_h1 is not None and df_h4 is not None:
+            try:
+                m8_eval = self.m8_fib.evaluate(df_h1, df_h4, df_m8, None, current_time)
+                if m8_eval.get('total_score', 0) >= 7:
+                    divine_confirmation = True
+                    m8_score = m8_eval['total_score']
+            except Exception as e:
+                logger.error(f"M8 Error: {e}")
+
+        # Check Vortex Trap Gate
+        vortex_signal = None
+        try:
+            vortex_signal = self.vortex.process({'df_m5': df_m5, 'tick': {'bid': current_price, 'ask': current_price}})
+        except:
+            pass
         
         # ════════════════════════════════════════════════
-        # PATH 1: THE LION (Trend Following)
+        # PATH 1: THE LION (Trend Following - High Volume)
         # ════════════════════════════════════════════════
         if is_lion_territory:
-            # We are surfing a Tsunami. Don't ask for permission from M8.
             target_direction = "BUY" if master_trend == 1 else "SELL"
             
-            flow = momentum.get('flow')
-            if flow:
-                # A. Compression Breakout (Pattern 1)
-                if flow['compression']['detected'] and flow['expansion']['detected']:
-                    exp_dir = "BUY" if flow['expansion']['direction'] == "UP" else "SELL"
-                    if exp_dir == target_direction:
-                         decision['execute'] = True
-                         decision['direction'] = target_direction
-                         decision['confidence'] = 80 # Solid
-                         decision['setup_type'] = "LION_BREAKOUT"
-                         decision['reasons'].append(f"Lion Trend Follow: {target_direction}")
-                         return decision
-            
-            # B. Order Block Continuation (Pattern 2)
+            # Check for ANY valid structure in direction of trend
+            # 1. Order Block Retest
             entry = structure.get('entry_signal', {})
             if entry.get('direction') == target_direction:
-                 # Minimal RSI check
-                 rsi_ok = True
-                 if target_direction == "BUY" and momentum['rsi']['overbought']: rsi_ok = False
-                 if target_direction == "SELL" and momentum['rsi']['oversold']: rsi_ok = False
-                 
-                 if rsi_ok:
-                     decision['execute'] = True
-                     decision['direction'] = target_direction
-                     decision['confidence'] = 75
-                     decision['setup_type'] = "LION_CONTINUATION"
-                     decision['reasons'].append(f"Lion OB Retest: {target_direction}")
-                     return decision
-                     
-            # C. Shallow Pullback (Pattern 3 - M8 Bonus)
-            # If M8 says GO in trend direction, we add conviction, but it's optional?
-            # Implemented as a "Nice to have" booster.
-            if m8_open:
-                 pass # Could boost confidence to 90
-        
-        # ════════════════════════════════════════════════
-        # PATH 2: THE SNAKE (Reversal / Neutral)
-        # ════════════════════════════════════════════════
-        else: # (is_lion_territory == False) -> Neutral or Conflict
-            # We are in the Jungle. Every step is potential death.
-            # Divine Gate is MANDATORY.
+                 decision['execute'] = True
+                 decision['direction'] = target_direction
+                 decision['confidence'] = 75
+                 decision['setup_type'] = "LION_OB_FLOW"
+                 decision['reasons'].append(f"Lion Trend (H4) + Structure Entry. D1={d1_trend}")
+                 return decision
             
-            # 1. Identify Candidate Move (SFP / Turtle Soup)
-            swept_pools = [p for p in structure['liquidity_pools'] if p.swept]
-            candidate_dir = "WAIT"
+            # 2. Momentum Breakout (New)
+            # If RSI is healthy and we are trending, take the break
+            rsi = momentum.get('rsi', {})
+            if rsi:
+                is_safe_rsi = (target_direction == "BUY" and not rsi.get('overbought')) or \
+                              (target_direction == "SELL" and not rsi.get('oversold'))
+                
+                if is_safe_rsi and structure.get('trend') == "BULLISH" and target_direction == "BUY":
+                     decision['execute'] = True
+                     decision['direction'] = "BUY"
+                     decision['confidence'] = 70
+                     decision['setup_type'] = "LION_MOMENTUM"
+                     decision['reasons'].append("Lion Trend + RSI Safe + Structure Align")
+                     return decision
+                elif is_safe_rsi and structure.get('trend') == "BEARISH" and target_direction == "SELL":
+                     decision['execute'] = True
+                     decision['direction'] = "SELL"
+                     decision['confidence'] = 70
+                     decision['setup_type'] = "LION_MOMENTUM"
+                     decision['reasons'].append("Lion Trend + RSI Safe + Structure Align")
+                     return decision
+
+        # ════════════════════════════════════════════════
+        # PATH 2: THE SNAKE (Reversal Sniper - High Precision)
+        # ════════════════════════════════════════════════
+        else: 
+            # We are in the Jungle (Neutral/Conflict).
+            # ONLY trade if we have a Trap (Liquidity Sweep) AND Divine Confirmation.
+            
+            liq_pools = structure.get('liquidity_pools', [])
+            swept_pools = [p for p in liq_pools if getattr(p, 'swept', False)]
             
             if swept_pools:
                  last_sweep = swept_pools[-1]
-                 # Reversal from sweep
-                 candidate_dir = "SELL" if last_sweep.type == "BUY" else "BUY" 
+                 # If we swept a HIGH, we want to SELL
+                 sweep_type = getattr(last_sweep, 'type', 'UNKNOWN')
+                 candidate_dir = "SELL" if sweep_type == "HIGH" else "BUY" 
                  
-                 # 2. CHECK THE GODS (Divine Gate)
-                 m8_says_go = m8_open 
-                 vortex_says_go = False
-                 if vortex_signal and vortex_signal.signal_type == candidate_dir:
-                      vortex_says_go = True
-                      
-                 divine_confirmation = m8_says_go or vortex_says_go
-                 
-                 if divine_confirmation:
-                      # Execute Reversal
+                 # MANDATORY: Divine Gate or Strong Structure Rejection
+                 sweep_strength = getattr(last_sweep, 'strength', 0)
+                 if divine_confirmation or sweep_strength >= 80:
                       decision['execute'] = True
                       decision['direction'] = candidate_dir
-                      decision['confidence'] = 90 # High Precision
-                      decision['setup_type'] = "SNAKE_AMBUSH"
-                      decision['reasons'].append(f"Snake Reversal (Divine Gate: M8={m8_says_go} V={vortex_says_go})")
+                      decision['confidence'] = 90 # Divine
+                      decision['setup_type'] = "SNAKE_DIVINE_REVERSAL"
+                      sweep_level = getattr(last_sweep, 'level', 0)
+                      decision['reasons'].append(f"Snake Ambush: Liquidity Sweep of {sweep_level:.5f} + Divine/Structure Conf.")
                       return decision
                       
         return decision
@@ -755,24 +771,46 @@ class LaplaceDemonCore:
                          direction: str,
                          current_price: float,
                          atr_pips: float,
-                         structure_result: Dict) -> Dict:
-        """Calculate Stop Loss and Take Profit levels."""
+                         structure_result: Dict,
+                         setup_type: str = "NORMAL") -> Dict:
+        """
+        ASYMMETRIC TARGETING ENGINE (Hydra Protocol)
+        
+        Lion = Infinite Horizon (Trend Following, 6x R:R)
+        Snake = Mean Reversion (Precision Strike, 2.5x R:R)
+        """
         pip_size = 0.0001  # GBPUSD
         
-        # Base SL: 1.5x ATR, minimum 10 pips
+        # 1. Stop Loss: Sempre Técnico ou Baseado em Volatilidade (Sobrevivência)
         sl_pips = max(10, atr_pips * 1.5)
         
-        # Base TP: 2.5x ATR or 2:1 R:R
-        tp_pips = max(sl_pips * 2, atr_pips * 2.5)
-        
-        # Adjust for structure
+        # Ajuste estrutural se disponível
         ob = structure_result.get('ob')
         if ob and ob.get('sl_price'):
-            # Use structure-based SL
             structure_sl = abs(current_price - ob['sl_price']) / pip_size
-            if 5 < structure_sl < sl_pips * 2:  # Reasonable range
+            if 5 < structure_sl < 30:  # Aceitamos SL estrutural se razoável
                 sl_pips = structure_sl
         
+        # 2. Take Profit: AQUI MORA O LUCRO EXPONENCIAL
+        tp_pips = 0.0
+        
+        if "LION" in setup_type:
+            # LION MODE: Trend Following.
+            # O objetivo é a Home Run que paga por 10 perdas.
+            # Alvo: 5x a 6x o Risco (R:R 1:5 ou 1:6)
+            tp_pips = max(50, sl_pips * 6.0)  # Alvo massivo (50-100+ pips)
+            
+        elif "SNAKE" in setup_type:
+            # SNAKE MODE: Reversão à média.
+            # O mercado pega liquidez e volta rápido, não vai longe.
+            # Não seja ganancioso. Saia no próximo OB ou 2.5R.
+            tp_pips = max(20, sl_pips * 2.5)  # Alvo cirúrgico (20-40 pips)
+            
+        else:
+            # Default: 2x R:R
+            tp_pips = sl_pips * 2.0
+
+        # Preços Finais
         if direction == 'BUY':
             sl = current_price - (sl_pips * pip_size)
             tp = current_price + (tp_pips * pip_size)
