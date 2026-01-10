@@ -44,6 +44,8 @@ from signals.correlation import (
 )
 from signals.momentum import MomentumAnalyzer, ToxicFlowDetector
 from signals.volatility import VolatilityAnalyzer, DisplacementCandle, VolatilityFilter
+from analysis.m8_fibonacci_system import M8FibonacciSystem
+from analysis.swarm.vortex_swarm import VortexSwarm
 
 logger = logging.getLogger("LaplaceDemon")
 
@@ -176,6 +178,10 @@ class LaplaceDemonCore:
         self.time_macro = TimeMacroFilter()
         self.initial_balance = InitialBalanceFilter()
         
+        # Phase 6-B: Divine Gate (Esoteric Modules)
+        self.m8_fib = M8FibonacciSystem() # Re-init here for clarity or use existing import
+        self.vortex = VortexSwarm()
+
         self.trend_architect = TrendArchitect(symbol=symbol) # Phase 3 (Sniper)
         self.smc = SMCAnalyzer()
         self.institutional = InstitutionalLevels()
@@ -280,7 +286,11 @@ class LaplaceDemonCore:
             current_price=current_price,
             h4_trend=h4_ocean,
             d1_trend=d1_galaxy,
-            df_m5=df_m5 # Passed for Candle Size check
+            df_m5=df_m5, # Passed for Candle Size check
+            df_m8=self._resample_to_m8(df_m1) if df_m1 is not None else None,
+            df_h1=df_h1,
+            df_h4=df_h4,
+            current_time=current_time
         )
         
         # ═══════════════════════════════════════════════════════════

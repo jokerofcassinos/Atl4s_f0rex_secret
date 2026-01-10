@@ -92,7 +92,8 @@ class LaplaceTradingSystem:
         # Core components
         self.bridge = ZmqBridge(port=zmq_port)
         self.data_loader = DataLoader()
-        self.executor = ExecutionEngine(self.bridge, self.config)
+        self.executor = ExecutionEngine(self.bridge)
+        self.executor.set_config(self.config)
         
         # Laplace Demon - The Brain
         self.laplace = LaplaceDemonCore(symbol)
@@ -171,8 +172,9 @@ class LaplaceTradingSystem:
                     self.cached_data['M5'] = m1_data.resample('5min').agg(agg).dropna()
                     self.cached_data['H1'] = m1_data.resample('1h').agg(agg).dropna()
                     self.cached_data['H4'] = m1_data.resample('4h').agg(agg).dropna()
+                    self.cached_data['D1'] = m1_data.resample('1D').agg(agg).dropna() # Added D1
                     
-                    logger.info(f"Data refreshed: M1={len(m1_data)}, M5={len(self.cached_data['M5'])}")
+                    logger.info(f"Data refreshed: M1={len(m1_data)}, M5={len(self.cached_data['M5'])}, D1={len(self.cached_data['D1'])}")
             
             self.last_data_fetch = time.time()
             
@@ -221,7 +223,9 @@ class LaplaceTradingSystem:
                     await self._refresh_data()
                 
                 # Check if we have data
-                if not self.cached_data.get('M5') is None:
+                if self.cached_data.get('M5') is None or self.cached_data.get('M5').empty:
+                    # logger.warning("Waiting for data...")
+                    await asyncio.sleep(1)
                     continue
                 
                 # Generate Laplace Demon prediction
@@ -249,7 +253,8 @@ class LaplaceTradingSystem:
             # Check for staleness
             tick_time = tick.get('time', 0)
             if time.time() - tick_time > 5:
-                return None
+                # return None # Allow some staleness for now if needed
+                pass 
             return tick
         
         # Simulation mode fallback
@@ -284,6 +289,7 @@ class LaplaceTradingSystem:
                 break
         
         if not in_killzone:
+            # logger.debug("Outside Killzone")
             return False
         
         # Check max concurrent trades
@@ -301,6 +307,7 @@ class LaplaceTradingSystem:
                 df_m5=self.cached_data.get('M5'),
                 df_h1=self.cached_data.get('H1'),
                 df_h4=self.cached_data.get('H4'),
+                df_d1=self.cached_data.get('D1'), # Added for Phase 4
                 current_time=current_time,
                 current_price=current_price
             )

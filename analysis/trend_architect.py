@@ -152,7 +152,7 @@ class TrendArchitect:
         # If Regime is TRENDING, we heavily penalize fighting the River
         if regime == "TRENDING" and river_dir != 0:
             if direction != river_dir:
-                logger.warning("M5 Trend opposes H1 River. Applying Penalty (Counter-Trend).")
+                # logger.debug("M5 Trend opposes H1 River. Applying Penalty (Counter-Trend).")
                 score -= 20 # Penalty instead of Veto
                 # direction remains as is (Counter-Trend Trade possible)
             else:

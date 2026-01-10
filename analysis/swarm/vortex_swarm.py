@@ -24,7 +24,7 @@ class VortexSwarm(SubconsciousUnit):
     def __init__(self):
         super().__init__("Vortex_Swarm")
 
-    async def process(self, context) -> SwarmSignal:
+    def process(self, context) -> SwarmSignal:
         df_m5 = context.get('df_m5') # Switch to M5 for reliability
         tick = context.get('tick')
         
