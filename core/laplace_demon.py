@@ -435,6 +435,40 @@ class LaplaceDemonCore:
             pass
         
         # ════════════════════════════════════════════════
+        # HEISENBERG LAYER: QUANTUM PHYSICS (A Vantagem Desleal)
+        # ════════════════════════════════════════════════
+        
+        # Extrair níveis de liquidez para calcular barreiras de potencial
+        structure_levels = [p.level for p in structure.get('liquidity_pools', [])]
+        
+        # O QuantumCore analisa a energia cinética do preço vs barreiras
+        tunneling_prob = 0.0
+        is_particle_excited = False
+        try:
+            q_metrics = self.quantum.analyze(df_m5, structure_levels)
+            tunneling_prob = q_metrics.get('tunneling_prob', 0.0)
+            is_particle_excited = q_metrics.get('is_excited', False)
+        except Exception as e:
+            logger.debug(f"Quantum Analyze Error: {e}")
+
+        # --- FREE ENERGY: VETO DE REALIDADE ---
+        current_surprise = 0.0
+        if self.last_prediction and self.last_prediction.tp_price:
+            try:
+                target = self.last_prediction.tp_price if self.last_prediction.direction == 'BUY' else self.last_prediction.sl_price
+                target = target if target else current_price
+                prediction_mock = {'bid': target, 'volatility': 0.001} 
+                reality_mock = {'bid': current_price}
+                current_surprise = self.free_energy.calculate_surprise(prediction_mock, reality_mock)
+            except:
+                pass
+
+        # REGRA DE SOBREVIVÊNCIA: Se Surpresa > 50 (5 Sigma), VETO TOTAL
+        if current_surprise > 50.0:
+            logger.warning(f"HEISENBERG VETO: Market Surprise Critical ({current_surprise:.2f})")
+            return decision
+
+        # ════════════════════════════════════════════════
         # PATH 1: THE LION (Trend Following - High Volume)
         # ════════════════════════════════════════════════
         if is_lion_territory:
@@ -449,6 +483,12 @@ class LaplaceDemonCore:
                  decision['confidence'] = 75
                  decision['setup_type'] = "LION_OB_FLOW"
                  decision['reasons'].append(f"Lion Trend (H4) + Structure Entry. D1={d1_trend}")
+                 
+                 # QUANTUM BOOST: Tunneling increases confidence
+                 if tunneling_prob > 0.7:
+                     decision['confidence'] = min(99, decision['confidence'] + 15)
+                     decision['reasons'].append(f"QUANTUM TUNNELING ({tunneling_prob:.2f})")
+                 
                  return decision
             
             # 2. Momentum Breakout (New)
@@ -464,6 +504,9 @@ class LaplaceDemonCore:
                      decision['confidence'] = 70
                      decision['setup_type'] = "LION_MOMENTUM"
                      decision['reasons'].append("Lion Trend + RSI Safe + Structure Align")
+                     if tunneling_prob > 0.7:
+                         decision['confidence'] = min(99, decision['confidence'] + 15)
+                         decision['reasons'].append(f"QUANTUM TUNNELING ({tunneling_prob:.2f})")
                      return decision
                 elif is_safe_rsi and structure.get('trend') == "BEARISH" and target_direction == "SELL":
                      decision['execute'] = True
@@ -471,6 +514,9 @@ class LaplaceDemonCore:
                      decision['confidence'] = 70
                      decision['setup_type'] = "LION_MOMENTUM"
                      decision['reasons'].append("Lion Trend + RSI Safe + Structure Align")
+                     if tunneling_prob > 0.7:
+                         decision['confidence'] = min(99, decision['confidence'] + 15)
+                         decision['reasons'].append(f"QUANTUM TUNNELING ({tunneling_prob:.2f})")
                      return decision
 
         # ════════════════════════════════════════════════
@@ -498,6 +544,12 @@ class LaplaceDemonCore:
                       decision['setup_type'] = "SNAKE_DIVINE_REVERSAL"
                       sweep_level = getattr(last_sweep, 'level', 0)
                       decision['reasons'].append(f"Snake Ambush: Liquidity Sweep of {sweep_level:.5f} + Divine/Structure Conf.")
+                      
+                      # QUANTUM BOOST: Excited state means reversal is imminent
+                      if is_particle_excited:
+                          decision['confidence'] = min(99, decision['confidence'] + 8)
+                          decision['reasons'].append("QUANTUM EXCITED STATE: Mean reversion imminent")
+                      
                       return decision
                       
         return decision
