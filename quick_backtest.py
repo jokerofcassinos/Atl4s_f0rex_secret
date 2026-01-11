@@ -99,7 +99,13 @@ async def run_quick_backtest():
             exit_reason = engine.update_trade(trade, current_price, current_time)
             if exit_reason:
                 exit_price = trade.sl_price if exit_reason == "SL_HIT" else trade.tp_price
-                engine.close_trade(trade, exit_price, current_time, exit_reason)
+                pnl = engine.close_trade(trade, exit_price, current_time, exit_reason)
+                
+                # OVERLORD: Neural Plasticity Learning
+                if pnl is not None:
+                    success = exit_reason == "TP_HIT"
+                    setup_type = getattr(trade, 'setup_type', 'UNKNOWN')
+                    laplace.learn_from_trade(success=success, pnl=pnl, setup_type=setup_type)
         
         # Signal interval check
         if last_signal_idx and (i - last_signal_idx) < min_interval:
@@ -111,8 +117,8 @@ async def run_quick_backtest():
         
         # Get prediction
         try:
-            prediction = laplace.analyze(
-                df_m1=None,
+            prediction = await laplace.analyze(
+                df_m1=slice_m5, # Mock M1 with M5 for quick test
                 df_m5=slice_m5,
                 df_h1=slice_h1,
                 df_h4=slice_h4,
@@ -134,6 +140,8 @@ async def run_quick_backtest():
                 )
                 
                 if trade:
+                    # Store setup_type for Neural Plasticity learning
+                    trade.setup_type = getattr(prediction, 'setup_type', 'UNKNOWN')
                     last_signal_idx = i
                     
         except Exception as e:

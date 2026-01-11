@@ -36,6 +36,10 @@ class ChaosEngine:
         # Create mask for self.lag exclusion
         indices = np.arange(M)
         
+        # Initialize divergence accumulator
+        div_sum = 0.0
+        count = 0
+        
         for i in range(M - 20, M - 1): 
             p_i = orbit[i]
             
