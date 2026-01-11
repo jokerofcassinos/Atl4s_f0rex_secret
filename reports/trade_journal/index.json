@@ -1,0 +1,39 @@
+[
+  {
+    "trade_id": "TEST001",
+    "timestamp": "2026-01-11T20:27:51.315632",
+    "direction": "BUY",
+    "symbol": "GBPUSD",
+    "entry_price": 1.265,
+    "exit_price": 1.268,
+    "sl_price": 1.263,
+    "tp_price": 1.27,
+    "profit_loss": 30.0,
+    "profit_pips": 30.0,
+    "win": true,
+    "setup_type": "GENESIS_PULLBACK",
+    "confidence": 75.0,
+    "signal_score": 70,
+    "agi_score": 80,
+    "swarm_score": 75,
+    "market_regime": "TRENDING",
+    "volatility_regime": "NORMAL",
+    "trend": "BULLISH",
+    "hour_of_day": 14,
+    "day_of_week": 2,
+    "reasons": [
+      "Strong pullback to support",
+      "Confluence with 50 EMA",
+      "High swarm consensus"
+    ],
+    "vetoes": [],
+    "review_notes": "Perfect execution. Entry was precise at support level.",
+    "lessons_learned": "Wait for pullback confirmation before entry.",
+    "rating": 5,
+    "tags": [
+      "pullback",
+      "perfect-entry",
+      "support"
+    ]
+  }
+]

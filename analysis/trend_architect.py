@@ -184,18 +184,11 @@ class TrendArchitect:
             "river_dir": int(river_dir),
         }
 
-        thought: ModuleThoughtResult = self.agi_adapter.think_on_analysis(
-            symbol=self.symbol,
-            timeframe=self.timeframe,
-            market_state=market_state,
-            raw_module_output=raw_output,
-        )
+        # AGI Integration - DISABLED FOR BACKTEST PERFORMANCE
+        # TODO Phase 2: Re-enable for live trading
+        # thought: ModuleThoughtResult = self.agi_adapter.think_on_analysis(...)
+        # enriched = dict(raw_output)
+        # enriched["agi_decision"] = thought.decision
+        # ...
 
-        # Enriquecer saída original com metadados AGI
-        enriched = dict(raw_output)
-        enriched["agi_decision"] = thought.decision
-        enriched["agi_score"] = thought.score
-        enriched["thought_root_id"] = thought.thought_root_id
-        enriched["agi_meta"] = thought.meta
-
-        return enriched
+        return raw_output

@@ -138,8 +138,8 @@ class ScalpSwarm:
         # Clip
         S = np.clip(S, -1.0, 1.0)
         
-        # --- SIGNAL INVERSION (User Request) ---
-        S = -S 
+        # ✅ PHASE 0 FIX #1: Signal Inversion REMOVED
+        # Previously: S = -S (DELETED - was inverting all signals!)
         
         # --- 13th EYE OVERRIDE (Project Tachyon) ---
         # If Alpha Brain screams (100.0), we force the Vector to match.

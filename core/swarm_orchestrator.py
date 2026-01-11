@@ -451,8 +451,10 @@ class SwarmOrchestrator:
         if fractal_vote and liquidity_vote:
             if fractal_vote in ["BUY", "SELL"] and liquidity_vote in ["BUY", "SELL"]:
                 if fractal_vote != liquidity_vote:
-                    logger.warning(f"GATE 3 FAILED: Tier 1 Conflict (Fractal={fractal_vote} vs Liquidity={liquidity_vote}). Force WAIT.")
-                    return ("WAIT", 0.0, {"reason": "GATE3_TIER1_CONFLICT"})
+                    # ✅ PHASE 0 FIX #2: Convert hard block to penalty
+                    logger.warning(f"GATE 3: Tier 1 Conflict (Fractal={fractal_vote} vs Liquidity={liquidity_vote}). Applying Penalty +15.")
+                    penalty_score += 15.0
+                    penalty_reasons.append(f"GATE3_CONFLICT({fractal_vote}vs{liquidity_vote})")
         
         # -------------------------------------------------------
 

@@ -30,6 +30,10 @@ from analysis.swarm.physarum_swarm import PhysarumSwarm
 from analysis.swarm.event_horizon_swarm import EventHorizonSwarm
 from analysis.swarm.overlord_swarm import OverlordSwarm
 
+# AGI Components (for initialization)
+from core.holographic_memory import HolographicMemory
+from core.agi.infinite_why_engine import InfiniteWhyEngine
+
 logger = logging.getLogger("LaplaceDemon")
 
 class SignalStrength(Enum):
@@ -64,6 +68,14 @@ class LaplaceDemonCore:
         self.symbol = symbol
         self.daily_trades = {'date': None, 'count': 0}
         
+        # Advanced AGI Components
+        self.holographic_memory = HolographicMemory()
+        self.infinite_why = InfiniteWhyEngine(
+            max_depth=1,  # REDUCED from 4 for backtest performance
+            max_branches=6,  # REDUCED from 12
+            parallel_workers=1,  # REDUCED from 2
+            enable_meta_reasoning=False  # DISABLED for speed
+        )
         # BASIC MODULES
         self.quarterly = QuarterlyTheory()
         self.m8_fib = M8FibonacciSystem()
@@ -154,7 +166,13 @@ class LaplaceDemonCore:
             
             # Dynamic SL/TP (Protocolo Sniper: Alvos Curtos)
             vol = self.volatility.analyze(df_m5)
-            atr = vol.get('regime', {}).get('atr', 0.0020) * 10000
+            
+            # ✅ BACKTEST FIX: VolatilityState is a dataclass, not a dict
+            vol_regime = vol.get('regime')  # Returns VolatilityState object
+            if vol_regime and hasattr(vol_regime, 'atr'):
+                atr = vol_regime.atr * 10000  # Convert to pips
+            else:
+                atr = 20.0  # Default 20 pips if analysis fails
             
             sl_tp = self._calculate_sl_tp(prediction.direction, current_price, atr, structure_data, decision['setup_type'])
             

@@ -772,7 +772,8 @@ class ConsensusEngine:
 
         # Logic A: MOMENTUM BREAKOUT
         # Momentum is Strong AND Structure Supports (or is Neutral) AND Reversion is Weak
-        if abs(v_momentum) > 50:
+        # ✅ PHASE 0 FIX #3: Relaxed threshold from 50 → 30
+        if abs(v_momentum) > 30:
              mom_dir = 1 if v_momentum > 0 else -1
              # Check alignment
              if (v_structure * mom_dir) >= 0: # Structure doesn't oppose
@@ -783,7 +784,8 @@ class ConsensusEngine:
 
         # Logic B: REVERSION TRADE (Sniper Entry)
         # Reversion is Strong AND Structure Supports
-        if abs(v_reversion) > 40:
+        # ✅ PHASE 0 FIX #3: Relaxed threshold from 40 → 25
+        if abs(v_reversion) > 25:
              rev_dir = 1 if v_reversion > 0 else -1
              if (v_structure * rev_dir) > 20: # Structure MUST support Reversion (Confluence)
                  final_decision = "BUY" if rev_dir == 1 else "SELL"
@@ -792,7 +794,8 @@ class ConsensusEngine:
                  
         # Logic C: STRUCTURE BOUNCE (Laminar Flow)
         # Structure is Strong + Trend is Laminar Flow (Low Entropy)
-        if abs(v_structure) > 60 and entropy < 1.0:
+        # ✅ PHASE 0 FIX #3: Relaxed threshold from 60 → 40
+        if abs(v_structure) > 40 and entropy < 1.0:
              struc_dir = 1 if v_structure > 0 else -1
              if (v_momentum * struc_dir) >= 0:
                  final_decision = "BUY" if struc_dir == 1 else "SELL"

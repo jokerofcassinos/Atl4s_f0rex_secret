@@ -510,23 +510,73 @@ class M8FibonacciSystem:
         else:
             return current['high'] >= candle_2_back['low']
     
-    def _detect_ema_cross(self, df: pd.DataFrame, fast: int = 8, slow: int = 21) -> str:
+    def _detect_ema_cross(self, df: pd.DataFrame, fast: int = 8, slow: int = 21) -> Tuple[str, int]:
         """Detect EMA crossover."""
-        if len(df) < slow + 2:
-            return "NONE"
+        if df is None or len(df) < slow:
+            return "WAIT", 0
         
-        ema_fast = df['close'].ewm(span=fast).mean()
-        ema_slow = df['close'].ewm(span=slow).mean()
+        ema_fast = df['close'].ewm(span=fast, adjust=False).mean()
+        ema_slow = df['close'].ewm(span=slow, adjust=False).mean()
         
-        curr_above = ema_fast.iloc[-1] > ema_slow.iloc[-1]
-        prev_above = ema_fast.iloc[-2] > ema_slow.iloc[-2]
+        # Check recent cross
+        if len(df) < 3:
+            return "WAIT", 0
         
-        if curr_above and not prev_above:
-            return "BUY"
-        elif not curr_above and prev_above:
-            return "SELL"
+        curr_diff = ema_fast.iloc[-1] - ema_slow.iloc[-1]
+        prev_diff = ema_fast.iloc[-2] - ema_slow.iloc[-2]
         
-        return "NONE"
+        if curr_diff > 0 and prev_diff <= 0:
+            return "BUY", 1
+        elif curr_diff < 0 and prev_diff >= 0:
+            return "SELL", 1
+        else:
+            return "WAIT", 0
+    
+    def analyze(self, df_m8: pd.DataFrame, current_time: datetime) -> Dict:
+        """
+        Simplified analyze() method for Genesis integration.
+        
+        Args:
+            df_m8: M8 or M5 dataframe
+            current_time: Current timestamp
+        
+        Returns:
+            Dict with signal, confidence, and gate info
+        """
+        if current_time is None:
+            current_time = datetime.now()
+        
+        # Get M8 gate position
+        gate_info = self.get_m8_position(current_time)
+        
+        # Simple result structure
+        result = {
+            'signal': 'WAIT',
+            'confidence': 0,
+            'gate': gate_info['gate'],
+            'tradeable': gate_info['tradeable'],
+            'reason': gate_info['reason'],
+            'score': gate_info['score']
+        }
+        
+        # If in dead zone, return immediately
+        if not gate_info['tradeable']:
+            return result
+        
+        # Try simple pattern detection if we have M8 data
+        if df_m8 is not None and len(df_m8) >= 10:
+            try:
+                # Detect engulfing pattern (_detect_engulfing returns string: "BUY", "SELL", or "NONE")
+                direction = self._detect_engulfing(df_m8)
+                
+                if direction in ['BUY', 'SELL']:
+                    result['signal'] = direction
+                    result['confidence'] = 70  # Good engulfing signal
+                    result['reason'] = f"{gate_info['gate']}: Engulfing {direction}"
+            except Exception as e:
+                logger.warning(f"M8 pattern detection error: {e}")
+        
+        return result
 
 
 class TimeMacroFilter:

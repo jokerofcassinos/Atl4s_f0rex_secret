@@ -51,7 +51,7 @@ async def run_quick_backtest():
             print(f"⚠️ Failed to load M1: {e}")
 
     # Limit to last 10000 candles (~35 days) - Essential for H4 Trend Calc
-    df_m5 = df_m5.iloc[-10000:]
+    df_m5 = df_m5.iloc[-1300:]
     
     # Normalize columns
     if hasattr(df_m5.columns, 'droplevel'):

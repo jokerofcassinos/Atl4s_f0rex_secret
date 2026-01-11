@@ -1,0 +1,7 @@
+Genesis Backtest Results
+========================
+
+Win Rate: 0.0%
+Trades: 0
+Profit: $0.00
+Profit Factor: 0.00

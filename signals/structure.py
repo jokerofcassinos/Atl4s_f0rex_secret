@@ -121,14 +121,15 @@ class SMCAnalyzer:
             current_price = float(df['close'].iloc[-1])
         
         try:
-            # 1. Detect Liquidity Pools (Critical for Snake)
-            self._detect_liquidity_pools(df)
-            
-            # 2. Detect Order Blocks (Critical for Lion)
+            # Market structure detection
+            # self._detect_bos(df) # Assuming these methods exist elsewhere or will be added
+            # self._detect_choch(df) # Assuming these methods exist elsewhere or will be added
+            self._detect_fvgs(df)
             self._detect_order_blocks(df)
             
-            # 3. Detect FVGs
-            self._detect_fvgs(df)
+            # TEMPORARILY DISABLED: Performance issue with loop-based pandas indexing
+            # TODO Phase 1.2: Refactor to use vectorized operations
+            # self._detect_liquidity_pools(df)
             
             # 4. Determine Structure
             self._determine_structure(df)

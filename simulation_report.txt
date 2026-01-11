@@ -1,0 +1,10 @@
+=== LAPLACE DEMON SIMULATION REPORT ===
+Total Trades: 10
+Win Rate: 70.0%
+Net Profit: $8.00
+Balance: $38.00
+Max Drawdown: 27.5%
+Consecutive Wins: 6
+Consecutive Losses: 3
+Profit Factor: 2.33
+=======================================

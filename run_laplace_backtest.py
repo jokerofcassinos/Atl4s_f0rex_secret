@@ -137,7 +137,7 @@ class LaplaceBacktestRunner:
             logger.error(f"Error loading data: {e}")
             return False
     
-    def run_backtest(self, use_m5: bool = True) -> Dict:
+    async def run_backtest(self, use_m5: bool = True) -> Dict:
         """
         Run the backtest simulation.
         
@@ -206,9 +206,9 @@ class LaplaceBacktestRunner:
             if len(self.engine.active_trades) >= self.config.max_concurrent_trades:
                 continue
             
-            # Get Laplace Demon prediction
+            # Get Laplace Demon prediction (✅ BACKTEST FIX: Added await)
             try:
-                prediction = self.laplace.analyze(
+                prediction = await self.laplace.analyze(
                     df_m1=slice_m1,  # Passed M1 slice
                     df_m5=slice_m5,
                     df_h1=slice_h1,
@@ -495,8 +495,8 @@ async def main():
         runner.df_m5 = runner.df_m5.loc[mask]
         print(f"📉 Filtered data to last 30 days: {len(runner.df_m5)} candles ({runner.df_m5.index[0]} to {runner.df_m5.index[-1]})")
     
-    # Run backtest
-    result = runner.run_backtest(use_m5=True)
+    # Run backtest (✅ BACKTEST FIX: Added await)
+    result = await runner.run_backtest(use_m5=True)
     
     if result:
         # Generate report
