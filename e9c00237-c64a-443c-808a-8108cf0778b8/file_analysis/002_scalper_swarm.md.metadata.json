@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_OTHER",
+  "summary":  "Detailed technical analysis of analysis/scalper_swarm.py. CRITICAL FINDING: Complete architectural change from simple 5-eye voting (119 lines) to complex Unified Field physics model (304 lines) with hardcoded signal inversion. This is a root cause of performance regression.",
+  "updatedAt":  "2026-01-11T16:44:41.042682200Z"
+}

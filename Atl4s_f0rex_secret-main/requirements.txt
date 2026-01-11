@@ -1,0 +1,11 @@
+yfinance
+MetaTrader5
+pandas
+numpy
+scipy
+requests
+beautifulsoup4
+jinja2
+statsmodels
+pytz
+plyer

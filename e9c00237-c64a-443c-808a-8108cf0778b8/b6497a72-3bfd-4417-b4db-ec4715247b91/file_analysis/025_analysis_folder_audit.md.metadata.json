@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_OTHER",
+  "summary":  "Comprehensive analysis of analysis/ folder structure with 56 files across 8 subdirectories. Documents integration status of each subfolder, identifies ~180KB of dead/unintegrated code, and provides integration recommendations.",
+  "updatedAt":  "2026-01-11T17:19:43.293468100Z"
+}

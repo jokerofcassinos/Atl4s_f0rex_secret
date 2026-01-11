@@ -1,0 +1,121 @@
+# Analysis 051: COMPLETE core/agi/ Mapping (139 Files!)
+
+## Overview
+
+**Total Files:** 139 Python files
+**Subfolders:** 17+
+**Size:** ~400KB estimated
+
+---
+
+## Files by Subfolder
+
+### ROOT Level (17 files)
+- `__init__.py`, `abstraction.py`, `adversarial_network.py`
+- `augur.py`, `auto_evolution_engine.py`
+- `backtest_engine_agi.py`, `bridge_agi.py`
+- `causal_nexus.py`, `config_agi.py`
+- `conflict_resolution.py`, `consciousness_bus.py`
+- `data_loader_agi.py`, `decision_memory.py`
+- `decision_memory_expanded.py`, `dialectic.py`
+- `omega_agi_core.py` (THE BRAIN - 1269 lines!)
+
+### active_inference/ (3 files)
+- `__init__.py`, `free_energy.py`, `generative_model.py`
+**Status:** ✅ INTEGRATED
+
+### autonomy/ (4 files)
+- `__init__.py`, `autonomous_evolution.py`
+- `continuous_learning.py`, `self_modification.py`
+**Status:** ❌ DEAD CODE (~49KB)
+
+### big_beluga/ (12 files)
+- correlation, fractal_trend, math_kernels...
+**Status:** ✅ INTEGRATED (14 imports)
+
+### collaboration/ (2 files)
+- `__init__.py`, `collaboration_system.py`
+**Status:** ❌ DEAD CODE
+
+### communication/ (2 files)
+- `__init__.py`, `internal_language.py`
+**Status:** ✅ INTEGRATED
+
+### consciousness/ (4 files)
+- `__init__.py`, `conscious_access.py`
+- `self_awareness.py`, `values_system.py`
+**Status:** ❌ DEAD CODE (~51KB)
+
+### creativity/ (4 files)
+- `__init__.py`, `analogy_engine.py`
+- `innovation_engine.py`, `strategy_generator.py`
+**Status:** ❌ DEAD CODE (~54KB)
+
+### emergence/ (2 files)
+- `__init__.py`, `emergence_system.py`
+**Status:** ❌ DEAD CODE
+
+### emotions/ (2 files)
+- `__init__.py`, `emotions_system.py`
+**Status:** ❌ DEAD CODE (~13KB)
+
+### evolution/ (1 file)
+- `evolutionary_heuristics.py`
+**Status:** ✅ INTEGRATED
+
+### exploration/ (4 files)
+- `__init__.py`, `curiosity_engine.py`
+- `knowledge_expansion.py`, `novelty_search.py`
+**Status:** ❌ DEAD CODE (~11KB)
+
+### intuition/ (3 files)
+- `__init__.py`, `gut_feeling.py`, `intuition_engine.py`
+**Status:** ❌ DEAD CODE (~12KB)
+
+### metacognition/ (5+ files)
+- recursive_reflection.py...
+**Status:** ✅ INTEGRATED
+
+### microstructure/ (6 files)
+- flux_heatmap, liquidity_blackhole...
+**Status:** ✅ INTEGRATED (5 imports)
+
+### pan_cognitive/ (6 files)
+- causal_inference, empathic_bridge...
+**Status:** ✅ INTEGRATED (5 imports)
+
+### self_healing/ (2 files)
+- `__init__.py`, `self_healing_system.py`
+**Status:** ✅ INTEGRATED (1 import)
+
+### symbiosis/ (7 files)
+- cognitive_symbiosis_bridge, cross_domain_reasoner...
+**Status:** ✅ INTEGRATED
+
+---
+
+## Summary Table
+
+| Folder | Files | Status |
+|--------|-------|--------|
+| ROOT | 17 | ✅ Active |
+| active_inference | 3 | ✅ Integrated |
+| autonomy | 4 | ❌ Dead |
+| big_beluga | 12 | ✅ Integrated |
+| collaboration | 2 | ❌ Dead |
+| communication | 2 | ✅ Integrated |
+| consciousness | 4 | ❌ Dead |
+| creativity | 4 | ❌ Dead |
+| emergence | 2 | ❌ Dead |
+| emotions | 2 | ❌ Dead |
+| evolution | 1 | ✅ Integrated |
+| exploration | 4 | ❌ Dead |
+| intuition | 3 | ❌ Dead |
+| metacognition | 5+ | ✅ Integrated |
+| microstructure | 6 | ✅ Integrated |
+| pan_cognitive | 6 | ✅ Integrated |
+| self_healing | 2 | ✅ Integrated |
+| symbiosis | 7 | ✅ Integrated |
+
+**Integrated:** ~80 files (~200KB)
+**Dead Code:** ~45 files (~200KB)

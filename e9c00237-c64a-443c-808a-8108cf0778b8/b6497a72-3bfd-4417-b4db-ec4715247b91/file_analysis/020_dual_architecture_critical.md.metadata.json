@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_OTHER",
+  "summary":  "Critical analysis revealing dual architecture problem in Atl4s-Forex: main.py (OmegaSystem+Swarms) vs main_laplace.py (LaplaceDemon+signals/). Documents disconnected systems that may be causing confusion and performance issues.",
+  "updatedAt":  "2026-01-11T17:11:59.727994200Z"
+}

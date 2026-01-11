@@ -171,7 +171,7 @@ class SMCAnalyzer:
         # Bullish: Down-candle before Up-move
         # Bearish: Up-candle before Down-move
         
-        for i in range(len(df) - 10, 5, -1): # Scan backwards from recent
+        for i in range(len(df) - 5, max(5, len(df) - 40), -1): # ULTRA-FAST: Scan only last 40 candles
             # Check Bullish OB Candidate
             if closes.iloc[i] < opens.iloc[i]: # Bearish candle
                 # Check for Displacement relative to this candle

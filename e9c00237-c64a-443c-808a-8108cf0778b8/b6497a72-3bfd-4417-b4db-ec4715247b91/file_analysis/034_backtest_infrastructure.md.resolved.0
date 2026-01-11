@@ -1,0 +1,73 @@
+# Analysis 034: Backtesting Infrastructure
+
+## 1. backtest/engine.py (704 lines, 27KB)
+
+**Class:** [BacktestEngine](file:///D:/Atl4s-Forex/backtest/engine.py#167-704)
+
+### Features
+- Tick-by-tick simulation
+- Realistic spread/slippage
+- Unlimited leverage support
+- Commission modeling
+- Walk-forward optimization
+
+### Key Classes
+
+| Class | Purpose |
+|-------|---------|
+| [Trade](file:///D:/Atl4s-Forex/backtest/engine.py#31-81) | Trade representation |
+| [BacktestConfig](file:///D:/Atl4s-Forex/backtest/engine.py#83-116) | Simulation config |
+| [BacktestResult](file:///D:/Atl4s-Forex/backtest/engine.py#118-165) | Complete results |
+| [BacktestEngine](file:///D:/Atl4s-Forex/backtest/engine.py#167-704) | Main engine |
+
+### Methods
+
+| Method | Purpose |
+|--------|---------|
+| [calculate_position_size()](file:///D:/Atl4s-Forex/analysis/risk_neural.py#107-181) | Risk-based sizing |
+| [apply_spread()](file:///D:/Atl4s-Forex/backtest/engine.py#219-226) | Realistic spread |
+| [apply_slippage()](file:///D:/Atl4s-Forex/backtest/engine.py#227-234) | Random slippage |
+| [open_trade()](file:///D:/Atl4s-Forex/backtest/engine.py#235-315) | Open with anti-ruin |
+| [update_trade()](file:///D:/Atl4s-Forex/backtest/engine.py#316-348) | SL/TP checking |
+| [simulate_candle()](file:///D:/Atl4s-Forex/backtest/engine.py#383-466) | Per-candle sim |
+| [run()](file:///D:/Atl4s-Forex/analysis/monte_carlo.py#22-102) | Full backtest |
+
+### Metrics Calculated
+- Win Rate
+- Profit Factor
+- Sharpe/Sortino/Calmar
+- Max Drawdown
+- R-Multiple
+- PnL by Day/Hour
+
+**Status:** ✅ Production-ready
+
+---
+
+## 2. core/backtest/ (3 files, 8KB)
+
+| File | Size | Purpose |
+|------|------|---------|
+| [latency_simulator.py](file:///D:/Atl4s-Forex/core/backtest/latency_simulator.py) | 4KB | Network latency |
+| [realistic_executor.py](file:///D:/Atl4s-Forex/core/backtest/realistic_executor.py) | 2KB | Realistic fills |
+| [spread_simulator.py](file:///D:/Atl4s-Forex/core/backtest/spread_simulator.py) | 2KB | Spread modeling |
+
+**Status:** ✅ Advanced simulation layer
+
+---
+
+## 3. backtest/ Root (4 files, 61KB)
+
+| File | Size |
+|------|------|
+| [engine.py](file:///D:/Atl4s-Forex/backtest/engine.py) | 27KB |
+| [charts.py](file:///D:/Atl4s-Forex/backtest/charts.py) | 24KB |
+| [metrics.py](file:///D:/Atl4s-Forex/backtest/metrics.py) | 10KB |
+
+**Status:** ✅ Complete system
+
+---
+
+## Summary
+
+Total Backtest Infrastructure: **~70KB, well-designed**

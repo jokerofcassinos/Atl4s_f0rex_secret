@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_TASK",
+  "summary":  "Master task list tracking Phase 2 critical fixes for Atl4s-Forex bot. Documents 3 critical bugs: signal inversion, Gate 3 hard block, and strict thresholds that caused performance drop from $8K/day to $30/day.",
+  "updatedAt":  "2026-01-11T17:06:54.889693500Z"
+}

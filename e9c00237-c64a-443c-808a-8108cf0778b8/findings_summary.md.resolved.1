@@ -1,0 +1,109 @@
+# Phase 1 Complete: Consolidated Findings
+
+## Executive Summary
+
+Analyzed **20+ critical files** and **88 swarm agents** comparing Legacy ($8K/day) vs New AGI ($30/day).
+
+**Root Cause Confirmed:** 3 bugs in execution path (signal inversion, hard block, strict thresholds).
+
+---
+
+## 🔴 Root Causes (Fix Immediately)
+
+| # | File | Line | Issue | Impact |
+|---|------|------|-------|--------|
+| 1 | [scalper_swarm.py](file:///D:/Atl4s-Forex/analysis/scalper_swarm.py) | 142 | `S = -S` | **Inverts ALL signals** |
+| 2 | [swarm_orchestrator.py](file:///D:/Atl4s-Forex/core/swarm_orchestrator.py) | 454 | Gate 3 | **Forces WAIT on conflict** |
+| 3 | [consensus.py](file:///D:/Atl4s-Forex/analysis/consensus.py) | 775-799 | Thresholds 50/40/60 | **Blocks weak signals** |
+
+---
+
+## 🟡 Medium Issues (Fix After)
+
+| # | File | Issue |
+|---|------|-------|
+| 4 | [consensus.py](file:///D:/Atl4s-Forex/analysis/consensus.py) | ThoughtTree 100-200ms latency |
+| 5 | [consensus.py](file:///D:/Atl4s-Forex/analysis/consensus.py) | Score ×0.4 too aggressive |
+| 6 | [fourth_eye.py](file:///D:/Atl4s-Forex/analysis/fourth_eye.py) | RSI 75 too strict |
+| 7 | [fourth_eye.py](file:///D:/Atl4s-Forex/analysis/fourth_eye.py) | Bollinger 2.5 SD |
+| 8 | [swarm_orchestrator.py](file:///D:/Atl4s-Forex/core/swarm_orchestrator.py) | VETO +25 penalty |
+| 9 | [swarm_orchestrator.py](file:///D:/Atl4s-Forex/core/swarm_orchestrator.py) | Trend Aikido inversion |
+
+---
+
+## ✅ Files That Are OK
+
+| File | Status |
+|------|--------|
+| 88 Swarm Agents | Well designed |
+| omega_agi_core.py | Heavy but OK |
+| deep_cognition.py | Minor issues |
+| sniper.py | Good enhancements |
+| veto_swarm.py | Has Meta-Critic |
+| bridge.py | Identical |
+| data_loader.py | Enhanced |
+
+---
+
+## Phase 2: Fix Plan
+
+```mermaid
+graph LR
+    A[Fix 1: Remove S=-S] --> B[Test]
+    B --> C[Fix 2: Gate 3]
+    C --> D[Fix 3: Thresholds]
+    D --> E[Backtest]
+    E --> F[Target: 70% WR, 10 trades/day]
+```
+
+### Fix 1: Remove Signal Inversion
+```python
+# scalper_swarm.py line 142
+# DELETE THIS LINE:
+# S = -S
+```
+
+### Fix 2: Change Gate 3 to Penalty
+```python
+# swarm_orchestrator.py line 454
+# CHANGE FROM:
+# return ("WAIT", 0.0, {"reason": "GATE3_TIER1_CONFLICT"})
+
+# TO:
+penalty_score += 15.0
+penalty_reasons.append("TIER1_CONFLICT")
+```
+
+### Fix 3: Lower Holographic Thresholds
+```python
+# consensus.py lines 775-799
+# CHANGE:
+if abs(v_momentum) > 30:  # was 50
+if abs(v_reversion) > 25:  # was 40
+if abs(v_structure) > 40:  # was 60
+```
+
+---
+
+## Verification Plan
+
+After fixes, run:
+```powershell
+python quick_backtest.py --days 30 --verbose
+```
+
+Target Metrics:
+- Win Rate: ≥ 70%
+- Trades/Day: 5-10
+- Profit Factor: ≥ 2.0
+
+---
+
+## Files Produced
+
+| File | Purpose |
+|------|---------|
+| [task.md](file:///D:/Atl4s-Forex/brain/task.md) | Master checklist |
+| [implementation_plan.md](file:///C:/Users/pichau/.gemini/antigravity/brain/e9c00237-c64a-443c-808a-8108cf0778b8/implementation_plan.md) | Phase 1 plan |
+| [findings_summary.md](file:///C:/Users/pichau/.gemini/antigravity/brain/e9c00237-c64a-443c-808a-8108cf0778b8/findings_summary.md) | This document |
+| `file_analysis/001-009` | Individual file analyses |

@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_OTHER",
+  "summary":  "Deep analysis of core analytical modules: risk_neural.py (advanced position sizing), deep_cognition.py (neural learning), monte_carlo.py (scenario simulation). Documents key functions, integration points, and potential optimization areas.",
+  "updatedAt":  "2026-01-11T17:24:51.081982700Z"
+}

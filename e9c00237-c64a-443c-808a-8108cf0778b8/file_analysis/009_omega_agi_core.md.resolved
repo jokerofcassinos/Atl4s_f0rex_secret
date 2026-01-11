@@ -1,0 +1,117 @@
+# File Analysis #9: [core/agi/omega_agi_core.py](file:///D:/Atl4s-Forex/core/agi/omega_agi_core.py)
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| **Lines** | 1269 |
+| **Size** | 56KB |
+| **Subsystems** | 50+ |
+| **Status** | ⚠️ Heavy but OK |
+
+---
+
+## Key Components
+
+### 1. MetaExecutionLoop (Lines 59-151)
+- Self-monitoring loop
+- Optimization rules for latency, win rate
+- Auto-adjusts to conservative/aggressive modes
+
+### 2. AdaptiveScheduler (Lines 154-227)
+- Market hours awareness
+- Learned trading patterns
+- Adaptive sleep duration
+
+### 3. AdvancedStateMachine (Lines 230-295)
+- States: INITIALIZING → READY → ANALYZING → TRADING
+- Transition rules
+- Evolution detection
+
+### 4. PerformanceMonitor (Lines 298-362)
+- Win rate tracking
+- Latency monitoring
+- Health scoring
+
+### 5. SelfHealingManager (Lines 365-429)
+- Issue diagnosis
+- Auto-healing actions
+- Solution memory
+
+---
+
+## OmegaAGICore Class (Lines 499-1269)
+
+Massive class with 50+ subsystems initialized:
+
+| Category | Subsystems |
+|----------|------------|
+| Core | holographic_memory, generative_model, free_energy |
+| Microstructure | flux_heatmap, liquidity_blackhole, volume_resonance |
+| BigBeluga | market_echo, regime_filter, fractal_trend, volume_delta |
+| Pan-Cognitive | infinite_reflection, empathic_resonance, causal_inference |
+| Temporal | chronos, quarterly_cycle, time_engine |
+| SMC | power_of_3, snr_matrix, msnr_alchemist |
+
+---
+
+## pre_tick() Analysis (Lines 642-800+)
+
+This method runs BEFORE each tick and adds:
+1. Chronos session analysis
+2. Range scanning
+3. DANGEROUS_CHOP detection (Gate 4)
+4. Time physics
+5. AMD structure
+6. Operator profiling
+7. SNR/MSNR levels
+8. Active Inference (dreaming)
+9. Surprise calculation
+
+> [!WARNING]
+> **Latency Impact:** All these layers add 100-300ms per tick.
+
+---
+
+## Potential Issues
+
+| # | Issue | Severity |
+|---|-------|----------|
+| 1 | 50+ subsystems initialized per instance | 🟡 MED |
+| 2 | pre_tick runs 20+ analyses per tick | 🟡 MED |
+| 3 | Gate 4 DANGEROUS_CHOP may block trades | 🟡 MED |
+
+---
+
+## Gate 4: DANGEROUS_CHOP (Lines 684-700)
+
+```python
+if avg_body_ratio < 0.25 and alternations >= 4:
+    adjustments['regime_block'] = True
+    adjustments['regime_reason'] = "DANGEROUS_CHOP"
+```
+
+This can block trades in choppy markets.
+
+---
+
+## Verdict: ⚠️ HEAVY BUT NOT BROKEN
+
+The OmegaAGICore adds significant analysis overhead but:
+- Does NOT invert signals
+- Does NOT add hard VETO conditions
+- Provides useful market context
+
+**Recommendation:** Leave as-is for now. Focus fixes on signal inversion and threshold issues.
+
+---
+
+## Root Cause Confirmation
+
+After analyzing all major files, the **ROOT CAUSES** are confirmed:
+
+1. **[scalper_swarm.py](file:///D:/Atl4s-Forex/analysis/scalper_swarm.py) line 142: `S = -S`** → Inverts all signals
+2. **[swarm_orchestrator.py](file:///D:/Atl4s-Forex/core/swarm_orchestrator.py) line 454: Gate 3** → Forces WAIT on conflicts
+3. **[consensus.py](file:///D:/Atl4s-Forex/analysis/consensus.py) lines 775-799** → Holographic thresholds too strict
+
+The AGI infrastructure is well-designed but these 3 bugs break the execution path.

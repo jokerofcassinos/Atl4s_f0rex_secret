@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atl4s-Forex | Daily Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>ATL4S <span class="neon-text-blue">FOREX</span> REPORT</h1>
+        
+        <div class="glass-card">
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">Date</div>
+                    <div class="metric-value">2025-11-20</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Total PnL</div>
+                    <div class="metric-value profit">
+                        $5.00
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Win Rate</div>
+                    <div class="metric-value neon-text-purple">50.0%</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Trades</div>
+                    <div class="metric-value">2</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <h3>Equity Curve</h3>
+            <div id="equity-chart" class="chart-container"></div>
+        </div>
+
+        <div class="glass-card">
+            <h3>Trade History</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Price</th>
+                        <th>Lots</th>
+                        <th>PnL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td>10:00</td>
+                        <td class="profit">BUY</td>
+                        <td>2000.0</td>
+                        <td>0.01</td>
+                        <td class="profit">
+                            $10.00
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>11:00</td>
+                        <td class="loss">SELL</td>
+                        <td>2010.0</td>
+                        <td>0.01</td>
+                        <td class="loss">
+                            $-5.00
+                        </td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        var equity_data = [{"x": [0, 1, 2], "y": [30.0, 40.0, 35.0], "type": "scatter", "mode": "lines+markers", "marker": {"color": "#00f3ff"}, "line": {"shape": "spline"}}];
+        var layout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#a0a0a0' },
+            xaxis: { gridcolor: 'rgba(255,255,255,0.1)' },
+            yaxis: { gridcolor: 'rgba(255,255,255,0.1)' },
+            margin: { t: 20, l: 40, r: 20, b: 40 }
+        };
+        Plotly.newPlot('equity-chart', equity_data, layout);
+    </script>
+</body>
+</html>

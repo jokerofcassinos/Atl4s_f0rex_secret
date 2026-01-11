@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_OTHER",
+  "summary":  "Complete mapping of all 40 subdirectories in core/agi folder. Documents the full AGI architecture including 26 feature folders, totaling ~500KB of AGI code. Summarizes integration status and identifies ~400KB of unintegrated/orphaned modules.",
+  "updatedAt":  "2026-01-11T17:21:25.455344800Z"
+}

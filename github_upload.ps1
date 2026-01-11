@@ -1,6 +1,5 @@
 
 # GitHub Upload Script for Atl4s-Forex Singularity
-# Branch: agi-beta-v0.5
 
 Write-Host "INITIATING OMEGA UPLOAD SEQUENCE..." -ForegroundColor Cyan
 

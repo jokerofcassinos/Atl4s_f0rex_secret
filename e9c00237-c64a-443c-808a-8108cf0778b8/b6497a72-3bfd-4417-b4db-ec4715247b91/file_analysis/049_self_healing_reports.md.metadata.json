@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_OTHER",
+  "summary":  "Analysis of self_healing system (10KB, auto-recovery), reports folder (8 files with backtest outputs including PNGs and JSON), and more swarm agents (godel, nexus, oracle). Documents the self-healing and output infrastructure.",
+  "updatedAt":  "2026-01-11T17:40:41.434473500Z"
+}
