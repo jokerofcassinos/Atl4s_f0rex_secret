@@ -23,6 +23,28 @@ os.makedirs(output_dir, exist_ok=True)
 
 print(f"\nDownloading {symbol} data...")
 
+# Download M1 data (max 7 days)
+print("\n0. Fetching M1 data (7 days)...")
+df_m1 = yf.download(
+    symbol,
+    period="7d",
+    interval="1m",
+    progress=True
+)
+
+if df_m1 is not None and len(df_m1) > 0:
+    df_m1.columns = [c[0].lower() if isinstance(c, tuple) else c.lower() for c in df_m1.columns]
+    if 'adj close' in df_m1.columns: df_m1 = df_m1.drop('adj close', axis=1)
+    if df_m1.index.tz is not None: df_m1.index = df_m1.index.tz_localize(None)
+    
+    m1_path = os.path.join(output_dir, "GBPUSD_M1_7days.parquet")
+    df_m1.to_parquet(m1_path)
+    print(f"   ✅ Saved {len(df_m1)} M1 candles to {m1_path}")
+    print(f"   Date range: {df_m1.index[0]} to {df_m1.index[-1]}")
+else:
+    print("   ❌ Failed to download M1 data")
+    df_m1 = None
+
 # Download M5 data (max 60 days)
 print("\n1. Fetching M5 data (60 days)...")
 df_m5 = yf.download(

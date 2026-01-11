@@ -34,6 +34,22 @@ async def run_quick_backtest():
     
     df_m5 = pd.read_parquet(m5_path)
     
+    # Load M1 (Optional / Partial)
+    m1_path = "data/cache/GBPUSD_M1_7days.parquet"
+    df_m1 = None
+    if os.path.exists(m1_path):
+        try:
+            df_m1 = pd.read_parquet(m1_path)
+            # Normalize M1
+            if hasattr(df_m1.columns, 'droplevel'):
+                 try: df_m1.columns = df_m1.columns.droplevel(1)
+                 except: pass
+            df_m1.columns = [str(c).lower() for c in df_m1.columns]
+            if df_m1.index.tz is not None: df_m1.index = df_m1.index.tz_localize(None)
+            print(f"✅ Loaded M1 Data: {len(df_m1)} candles")
+        except Exception as e:
+            print(f"⚠️ Failed to load M1: {e}")
+
     # Limit to last 10000 candles (~35 days) - Essential for H4 Trend Calc
     df_m5 = df_m5.iloc[-10000:]
     
@@ -94,6 +110,16 @@ async def run_quick_backtest():
         slice_h1 = df_h1[df_h1.index <= current_time]
         slice_h4 = df_h4[df_h4.index <= current_time]
         
+        # Slice M1 (Last 60 mins context)
+        slice_m1 = None
+        if df_m1 is not None:
+             # Fast check if current_time in range
+             if current_time >= df_m1.index[0]:
+                 start_m1 = current_time - timedelta(minutes=60)
+                 # Use range slicing on index (assuming sorted)
+                 slice_m1 = df_m1[start_m1:current_time]
+                 if slice_m1.empty: slice_m1 = None
+
         # Update trades
         for trade in engine.active_trades[:]:
             exit_reason = engine.update_trade(trade, current_price, current_time)
@@ -118,7 +144,7 @@ async def run_quick_backtest():
         # Get prediction
         try:
             prediction = await laplace.analyze(
-                df_m1=slice_m5, # Mock M1 with M5 for quick test
+                df_m1=slice_m1,
                 df_m5=slice_m5,
                 df_h1=slice_h1,
                 df_h4=slice_h4,
@@ -145,6 +171,7 @@ async def run_quick_backtest():
                     last_signal_idx = i
                     
         except Exception as e:
+            # print(f"Error: {e}")
             continue
         
         # Equity tracking
@@ -204,6 +231,21 @@ async def run_quick_backtest():
     days = (df_m5.index[-1] - df_m5.index[0]).days
     print(f"\n⏱️ Period: {days} days")
     
+    # Save Report for AI
+    report_path = "simulation_report.txt"
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("=== LAPLACE DEMON SIMULATION REPORT ===\n")
+        f.write(f"Total Trades: {result.total_trades}\n")
+        f.write(f"Win Rate: {result.win_rate:.1f}%\n")
+        f.write(f"Net Profit: ${result.net_profit:.2f}\n")
+        f.write(f"Balance: ${engine.balance:.2f}\n")
+        f.write(f"Max Drawdown: {result.max_drawdown_pct:.1f}%\n")
+        f.write(f"Consecutive Wins: {result.consecutive_wins}\n")
+        f.write(f"Consecutive Losses: {result.consecutive_losses}\n")
+        f.write(f"Profit Factor: {result.profit_factor:.2f}\n")
+        f.write("=======================================\n")
+
+    print(f"\n📄 Report saved to {report_path}")
     print("\n" + "="*60)
     
     return result

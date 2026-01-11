@@ -281,32 +281,34 @@ class LaplaceDemonCore:
         quarterly = self.quarterly.analyze(current_time, df_m1)
         
         # 2. LEGION INTELLIGENCE (Async - Heavy Processing)
+        knife_sig, horizon_sig, physarum_sig, overlord_sig = None, None, None, None
         try:
-            # Run Swarms in parallel to avoid blocking
+            # Prepare Swarm Context
             swarm_ctx = {
                 'df_m1': df_m1, 'df_m5': df_m5, 'df_h1': df_h1, 
                 'tick': {'bid': current_price, 'ask': current_price},
-                'data_map': {'M5': df_m5, 'M1': df_m1, 'H1': df_h1, 'H4': df_h4} # For Overlord
+                'data_map': {'M5': df_m5, 'M1': df_m1, 'H1': df_h1, 'H4': df_h4}
             }
             
-            # Fire agents
-            t_knife = self.time_knife.process(swarm_ctx)
-            t_horizon = self.event_horizon.process(swarm_ctx)
-            t_physarum = self.physarum.process(swarm_ctx)
-            t_overlord = self.overlord.process(swarm_ctx)
+            # Use asyncio.gather directly with method calls to prevent coroutine leaks
+            # properly handle exceptions for each task individually within gather if needed,
+            # but return_exceptions=True does that.
+            legion_results = await asyncio.gather(
+                self.time_knife.process(swarm_ctx),
+                self.event_horizon.process(swarm_ctx),
+                self.physarum.process(swarm_ctx),
+                self.overlord.process(swarm_ctx),
+                return_exceptions=True
+            )
             
-            # Gather results (Suppress exceptions to keep bot alive)
-            legion_results = await asyncio.gather(t_knife, t_horizon, t_physarum, t_overlord, return_exceptions=True)
-            
-            # Unpack
+            # Unpack safely
             knife_sig = legion_results[0] if not isinstance(legion_results[0], Exception) else None
             horizon_sig = legion_results[1] if not isinstance(legion_results[1], Exception) else None
             physarum_sig = legion_results[2] if not isinstance(legion_results[2], Exception) else None
             overlord_sig = legion_results[3] if not isinstance(legion_results[3], Exception) else None
             
         except Exception as e:
-            # logger.debug(f"CRITICAL LEGION ERROR: {e}") # Log silently
-            knife_sig, horizon_sig, physarum_sig, overlord_sig = None, None, None, None
+            logger.error(f"CRITICAL LEGION ERROR: {e}")
 
         # 3. CAUSAL SYNTHESIS (The Great Judgement)
         decision = self._synthesize_agi_decision(
