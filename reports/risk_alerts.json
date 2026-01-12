@@ -1,0 +1,12 @@
+[
+  {
+    "alert_id": "LS_20260111233933",
+    "timestamp": "2026-01-11T23:39:33.864513",
+    "level": "CRITICAL",
+    "category": "LOSS_STREAK",
+    "message": "CRITICAL: 5 consecutive losses - STOP AND REVIEW STRATEGY!",
+    "value": 5,
+    "threshold": 4,
+    "action_required": true
+  }
+]
