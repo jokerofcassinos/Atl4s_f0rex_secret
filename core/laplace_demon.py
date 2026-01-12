@@ -208,9 +208,10 @@ class LaplaceDemonCore:
         # --- 2. LÓGICA DE EXECUÇÃO ---
         
         # SETUP A: SNIPER BULL (Compra na Tendência)
-        # Preço > EMA200 (Tendência de Alta) E RSI < 35 (Sobrevendido - Pullback)
+        # Preço > EMA200 (Tendência de Alta) E RSI < 40 (Oversold - Pullback)
+        # PHASE 2: Relaxed from 35 to 40 for more signals
         if current_price > ema200:
-            if rsi < 35:
+            if rsi < 40:
                 decision['execute'] = True
                 decision['direction'] = "BUY"
                 decision['confidence'] = 80
@@ -218,9 +219,10 @@ class LaplaceDemonCore:
                 decision['reasons'].append(f"Trend UP (Price > EMA200) + RSI Oversold ({rsi:.1f})")
         
         # SETUP B: SNIPER BEAR (Venda na Tendência)
-        # Preço < EMA200 (Tendência de Baixa) E RSI > 65 (Sobrecomprado - Pullback)
+        # Preço < EMA200 (Tendência de Baixa) E RSI > 60 (Overbought - Pullback)
+        # PHASE 2: Relaxed from 65 to 60 for more signals
         elif current_price < ema200:
-            if rsi > 65:
+            if rsi > 60:
                 decision['execute'] = True
                 decision['direction'] = "SELL"
                 decision['confidence'] = 80
