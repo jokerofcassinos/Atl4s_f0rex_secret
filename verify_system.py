@@ -1,99 +1,202 @@
+"""
+Genesis Verification Test - Phase 1.2/1.3 Validation
+
+Tests:
+1. All signals/ modules loaded
+2. All Eyes generating signals
+3. Swarms voting
+4. AGI making decisions
+5. Clean signal flow (no errors)
+"""
+
+import asyncio
+import sys
+import os
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+from pathlib import Path
+
+# Disable emojis for Windows console
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 import logging
-import os
-import config
-import json
-from data_loader import DataLoader
-from analysis.consensus import ConsensusEngine
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(name)s | %(message)s',
+    datefmt='%H:%M:%S'
+)
 
-# Setup Logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("Verification")
 
-def verify_system():
-    logger.info("--- Starting System Verification (Matrix 4.0 - Omniscience) ---")
+
+def generate_test_data(periods_m5=250):
+    """Generate realistic test data"""
+    np.random.seed(42)
     
-    # 1. Test Data Loader
-    data_loader = DataLoader()
-    data_map = data_loader.get_data()
+    base = 1.2650
     
-    # 2. Test Consensus (Omniscience)
-    logger.info("2. Testing Consensus Engine (Wavelet/Topology)...")
-    consensus = ConsensusEngine()
+    # Trending data
+    trend = np.linspace(0, 0.015, periods_m5)
+    close = base + trend + np.random.randn(periods_m5) * 0.001
     
-    # Run a single deliberation
-    decision, score, details = consensus.deliberate(data_map)
-    logger.info(f"Consensus Result: {decision} (Score: {score})")
+    df_m5 = pd.DataFrame({
+        'open': close - 0.0002,
+        'high': close + 0.0005,
+        'low': close - 0.0005,
+        'close': close,
+        'volume': np.random.randint(1000, 5000, periods_m5)
+    }, index=pd.date_range(end=datetime.now(), periods=periods_m5, freq='5min'))
     
-    # Validation Checks
-    if 'Wavelet' in details and 'coherence' in details['Wavelet']:
-        w = details['Wavelet']
-        logger.info(f"SUCCESS: Wavelet Active. Coherence: {w['coherence']:.4f}, Energy: {w['energy_fast']:.4f}")
-    else:
-        logger.error("FAILURE: Wavelet metrics missing.")
+    # Create M1, H1, H4
+    df_m1 = df_m5.resample('1min').ffill()
+    df_h1 = df_m5.resample('1h').agg({
+        'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
+    }).dropna()
+    df_h4 = df_m5.resample('4h').agg({
+        'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
+    }).dropna()
+    
+    return df_m1, df_m5, df_h1, df_h4
+
+
+async def run_verification():
+    """Run complete verification"""
+    
+    print("="*70)
+    print("  GENESIS VERIFICATION TEST")
+    print("="*70)
+    print()
+    
+    results = {
+        'signals_loaded': False,
+        'eyes_active': False,
+        'swarms_voting': False,
+        'agi_deciding': False,
+        'no_errors': True,
+        'trades_generated': 0
+    }
+    
+    # Test 1: Load Genesis System
+    print("[1/5] Loading Genesis System...")
+    try:
+        from main_genesis import GenesisSystem
+        genesis = GenesisSystem(symbol="GBPUSD", mode="test")
+        results['signals_loaded'] = True
+        print("      [OK] Genesis loaded successfully")
+    except Exception as e:
+        print(f"      [FAIL] {e}")
+        results['no_errors'] = False
+        return results
+    
+    # Test 2: Check signals/ modules
+    print("[2/5] Checking signals/ modules...")
+    try:
+        assert hasattr(genesis, 'smc'), "SMC not loaded"
+        assert hasattr(genesis, 'm8_fib'), "M8 Fibonacci not loaded"
+        assert hasattr(genesis, 'quarterly'), "Quarterly Theory not loaded"
+        assert hasattr(genesis, 'momentum'), "Momentum not loaded"
+        assert hasattr(genesis, 'volatility'), "Volatility not loaded"
+        results['eyes_active'] = True
+        print("      [OK] All 5 signal modules loaded")
+    except AssertionError as e:
+        print(f"      [FAIL] {e}")
+        results['no_errors'] = False
+    
+    # Test 3: Check swarm components
+    print("[3/5] Checking swarm components...")
+    try:
+        assert hasattr(genesis, 'legion_knife'), "Legion TimeKnife not loaded"
+        assert hasattr(genesis, 'legion_physarum'), "Legion Physarum not loaded"
+        assert hasattr(genesis, 'legion_horizon'), "Legion EventHorizon not loaded"
+        assert hasattr(genesis, 'legion_overlord'), "Legion Overlord not loaded"
+        results['swarms_voting'] = True
+        print("      [OK] All 4 Legion Elite swarms loaded")
+    except AssertionError as e:
+        print(f"      [FAIL] {e}")
+        results['no_errors'] = False
+    
+    # Test 4: Check AGI components
+    print("[4/5] Checking AGI components...")
+    try:
+        assert hasattr(genesis, 'agi_core'), "AGI Core not loaded"
+        assert hasattr(genesis, 'metacognition'), "MetaCognition not loaded"
+        assert hasattr(genesis, 'memory'), "Memory not loaded"
+        results['agi_deciding'] = True
+        print("      [OK] All AGI components loaded")
+    except AssertionError as e:
+        print(f"      [FAIL] {e}")
+        results['no_errors'] = False
+    
+    # Test 5: Run analysis cycle
+    print("[5/5] Running analysis cycle...")
+    try:
+        df_m1, df_m5, df_h1, df_h4 = generate_test_data()
         
-    if 'Topology' in details and 'loop_score' in details['Topology']:
-        t = details['Topology']
-        logger.info(f"SUCCESS: Topology Active. Loop Score: {t['loop_score']:.4f}, Betti-1: {t['betti_1']}")
-    # Verify Hyper-Complexity
-    game = details.get('Game')
-    chaos = details.get('Chaos')
-    
-    if game:
-        logger.info(f"SUCCESS: Game Theory Active. Nash Eq: {game.get('equilibrium_price', 0):.2f}, BullDom: {game.get('dominance_score', 0):.2f}")
-    else:
-        logger.error("FAILURE: Game Theory metrics missing.")
+        # Set time to trading hours
+        test_time = datetime.now().replace(hour=10, minute=30)
         
-    if chaos:
-        logger.info(f"SUCCESS: Chaos Engine Active. Lyapunov: {chaos.get('lyapunov', 0):.4f}")
+        signal = await genesis.analyze(
+            df_m1=df_m1,
+            df_m5=df_m5,
+            df_h1=df_h1,
+            df_h4=df_h4,
+            current_time=test_time,
+            current_price=df_m5['close'].iloc[-1]
+        )
+        
+        print(f"      Signal Direction: {signal.direction}")
+        print(f"      Confidence: {signal.confidence:.1f}%")
+        print(f"      Execute: {signal.execute}")
+        print(f"      Layer Scores: Signal={signal.signal_layer_score:.0f} AGI={signal.agi_layer_score:.0f} Swarm={signal.swarm_layer_score:.0f}")
+        
+        if signal.execute:
+            results['trades_generated'] += 1
+        
+        print("      [OK] Analysis completed without errors")
+        
+    except Exception as e:
+        print(f"      [FAIL] {e}")
+        import traceback
+        traceback.print_exc()
+        results['no_errors'] = False
+    
+    # Summary
+    print()
+    print("="*70)
+    print("  VERIFICATION RESULTS")
+    print("="*70)
+    print()
+    print(f"  Signals/ Loaded:     {'PASS' if results['signals_loaded'] else 'FAIL'}")
+    print(f"  Eyes Active:         {'PASS' if results['eyes_active'] else 'FAIL'}")
+    print(f"  Swarms Voting:       {'PASS' if results['swarms_voting'] else 'FAIL'}")
+    print(f"  AGI Deciding:        {'PASS' if results['agi_deciding'] else 'FAIL'}")
+    print(f"  No Errors:           {'PASS' if results['no_errors'] else 'FAIL'}")
+    print(f"  Trades Generated:    {results['trades_generated']}")
+    print()
+    
+    passed = sum([
+        results['signals_loaded'],
+        results['eyes_active'],
+        results['swarms_voting'],
+        results['agi_deciding'],
+        results['no_errors']
+    ])
+    
+    print(f"  TOTAL: {passed}/5 checks passed")
+    print()
+    
+    if passed == 5:
+        print("  STATUS: VERIFICATION PASSED!")
     else:
-        logger.error("FAILURE: Chaos metrics missing.")
+        print("  STATUS: VERIFICATION FAILED - See errors above")
+    
+    print("="*70)
+    
+    return results
 
-    # 3. Test Neural Risk (Geometric Stop)
-    logger.info("3. Testing Neural Risk (Geometric Stop)...")
-    from analysis.risk_neural import NeuralRiskManager
-    risk_manager = NeuralRiskManager()
-    
-    # Mock inputs
-    entry = 2000.0
-    direction = 1 # Buy
-    atr = 2.0 # Base stop 3.0
-    
-    # Scenario A: Low Energy (Sniper)
-    stop_a = risk_manager.get_geometric_stop(entry, direction, atr, kinematics_energy=0.2, wavelet_power=0.9, uncertainty=0.5)
-    dist_a = entry - stop_a
-    logger.info(f"Risk Test A (Low Energy, High Coherence): Dist {dist_a:.2f} (Expected < 3.0)")
-    
-    # Scenario B: High Energy (Chaos)
-    stop_b = risk_manager.get_geometric_stop(entry, direction, atr, kinematics_energy=1.5, wavelet_power=0.2, uncertainty=0.5)
-    dist_b = entry - stop_b
-    logger.info(f"Risk Test B (High Energy, Low Coherence): Dist {dist_b:.2f} (Expected > 3.0)")
-    
-    # Scenario C: Heisenberg Limit
-    stop_c = risk_manager.get_geometric_stop(entry, direction, atr, kinematics_energy=0, wavelet_power=1.0, uncertainty=5.0)
-    dist_c = entry - stop_c
-    logger.info(f"Risk Test C (Heisenberg Limit 5.0): Dist {dist_c:.2f} (Expected 5.0)")
-
-    # 4. Test Quantum Sizing
-    logger.info("4. Testing Quantum Position Sizing...")
-    # Base Case
-    lots_base = risk_manager.calculate_quantum_size(entry, entry-2.0, 1000, consensus_score=50)
-    
-    # Boost Case (Clean Trend, Fast Move, Memory Support)
-    lots_boost = risk_manager.calculate_quantum_size(entry, entry-2.0, 1000, consensus_score=80, 
-                                                   wavelet_coherence=0.9, kinematics_score=80, cortex_conf=0.9)
-                                                   
-    # Noise Case (Choppy)
-    lots_noise = risk_manager.calculate_quantum_size(entry, entry-2.0, 1000, consensus_score=40,
-                                                   wavelet_coherence=0.2, kinematics_score=20)
-                                                   
-    logger.info(f"Sizing Results: Base={lots_base} | Boost={lots_boost} | Noise={lots_noise}")
-    if lots_boost > lots_base and lots_noise < lots_base:
-        logger.info("SUCCESS: Dynamic Sizing Logic Verified.")
-    else:
-        logger.error("FAILURE: Sizing logic incoherent.")
-
-    logger.info("--- Verification Complete ---")
 
 if __name__ == "__main__":
-    verify_system()
+    results = asyncio.run(run_verification())

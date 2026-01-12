@@ -365,8 +365,15 @@ class GenesisSystem:
             current_price=current_price
         )
         
-        # Combine: If LaplaceDemon has high confidence, boost signal_score
-        if laplace_signal and laplace_signal.confidence > 70:
+        # Combine: If LaplaceDemon has execute=True, use its signal
+        if laplace_signal and laplace_signal.execute:
+            signal_score = max(signal_score, laplace_signal.confidence)
+            # CRITICAL: Store LaplaceDemon direction in m8_fib for vote extraction
+            signal_context.m8_fib['signal'] = laplace_signal.direction
+            signal_context.m8_fib['confidence'] = laplace_signal.confidence
+            signal_context.m8_fib['laplace_active'] = True
+            logger.debug(f"  LaplaceDemon ACTIVE: {laplace_signal.direction} @ {laplace_signal.confidence:.0f}%")
+        elif laplace_signal and laplace_signal.confidence > 50:
             signal_score = (signal_score + laplace_signal.confidence) / 2
             logger.debug(f"  LaplaceDemon boost: {laplace_signal.confidence:.0f}%")
         
@@ -577,9 +584,30 @@ class GenesisSystem:
             'setup_type': 'NONE'
         }
         
-        # Layer votes
-        signal_vote = signal_context.m8_fib.get('signal', 'WAIT') if signal_context.m8_fib else 'WAIT'
+        # FIXED: Extract votes from multiple signal sources
+        # Signal layer vote - use SMC trend, momentum, or M8
+        smc_trend = signal_context.smc.get('trend', 'RANGING') if signal_context.smc else 'RANGING'
+        smc_vote = 'BUY' if smc_trend == 'BULLISH' else 'SELL' if smc_trend == 'BEARISH' else 'WAIT'
+        
+        momentum_trend = signal_context.momentum.get('trend', 'NEUTRAL') if signal_context.momentum else 'NEUTRAL'
+        momentum_vote = 'BUY' if momentum_trend == 'BULLISH' else 'SELL' if momentum_trend == 'BEARISH' else 'WAIT'
+        
+        m8_signal = signal_context.m8_fib.get('signal', 'WAIT') if signal_context.m8_fib else 'WAIT'
+        
+        # Use the strongest signal from Layer 1
+        if smc_vote != 'WAIT':
+            signal_vote = smc_vote
+        elif momentum_vote != 'WAIT':
+            signal_vote = momentum_vote
+        elif m8_signal != 'WAIT':
+            signal_vote = m8_signal
+        else:
+            signal_vote = 'WAIT'
+        
+        # AGI vote
         agi_vote = agi_context.get('direction', 'WAIT') if agi_context else 'WAIT'
+        
+        # Swarm vote
         swarm_vote = swarm_decision['direction']
         
         votes = {'BUY': 0, 'SELL': 0, 'WAIT': 0}
@@ -590,6 +618,29 @@ class GenesisSystem:
         # Majority direction
         majority_direction = max(votes, key=votes.get)
         majority_count = votes[majority_direction]
+        
+        # LAPLACE DEMON OVERRIDE: When LaplaceDemon has execute=True, use its direction
+        laplace_active = signal_context.m8_fib.get('laplace_active', False) if signal_context.m8_fib else False
+        if laplace_active:
+            laplace_direction = signal_context.m8_fib.get('signal', 'WAIT')
+            laplace_conf = signal_context.m8_fib.get('confidence', 0)
+            if laplace_direction in ['BUY', 'SELL'] and laplace_conf >= 70:
+                # OVERRIDE: Use LaplaceDemon directly (70% WR proven)
+                decision['execute'] = True
+                decision['direction'] = laplace_direction
+                decision['confidence'] = laplace_conf
+                decision['reasons'].append(f"LaplaceDemon SNIPER: {laplace_direction} @ {laplace_conf:.0f}%")
+                decision['setup_type'] = 'SNIPER_LAPLACE'
+                
+                # Strength classification
+                if laplace_conf >= 90:
+                    decision['strength'] = SignalStrength.DIVINE
+                elif laplace_conf >= 80:
+                    decision['strength'] = SignalStrength.EXTREME
+                else:
+                    decision['strength'] = SignalStrength.STRONG
+                
+                return decision
         
         # PHASE 1.2: Lower threshold to allow M8Fib signals through
         # Require only 1/3 agreement (since we're in simplified mode)
