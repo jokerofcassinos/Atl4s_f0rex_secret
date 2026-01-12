@@ -290,11 +290,72 @@ class GenesisSystem:
             current_price = df_m5['close'].iloc[-1]
         
         # ═══════════════════════════════════════════════════════
-        # LAYER 1: SIGNAL GENERATION (LAPLACE ENGINE)
+        # LAYER 1: SIGNAL GENERATION - PROPER ORDER (Phase 1.2)
         # ═══════════════════════════════════════════════════════
-        logger.debug("Layer 1: Generating signals via LaplaceDemonCore...")
+        # Order: 1. SMC → 2. M8 Timing → 3. Momentum → 4. Volatility
         
-        # Use LaplaceDemon directly - it has proven 70% WR
+        logger.debug("Layer 1: Signal Generation (signals/ integration)...")
+        
+        # STEP 1: SMC Structure Analysis (Identify Market Structure)
+        smc_analysis = self.smc.analyze(df_m5, current_price)
+        structure_trend = smc_analysis.get('trend', 'RANGING')
+        logger.debug(f"  1.1 SMC: {structure_trend} | OBs: {len(smc_analysis.get('active_order_blocks', []))} | FVGs: {len(smc_analysis.get('active_fvgs', []))}")
+        
+        # STEP 2: M8 Fibonacci Timing (Check Timing Alignment)
+        m8_analysis = self.m8_fib.analyze(df_m5, current_time)
+        m8_signal = m8_analysis.get('signal', 'WAIT')
+        m8_gate = m8_analysis.get('gate', 'Q1')
+        m8_confidence = m8_analysis.get('confidence', 0)
+        logger.debug(f"  1.2 M8: {m8_signal} | Gate: {m8_gate} | Conf: {m8_confidence}")
+        
+        # STEP 3: Quarterly Theory (90-minute cycle position)
+        quarterly_analysis = self.quarterly.analyze(current_time, df_m5, structure_trend)
+        quarterly_tradeable = quarterly_analysis.tradeable if hasattr(quarterly_analysis, 'tradeable') else False
+        quarterly_phase = quarterly_analysis.phase if hasattr(quarterly_analysis, 'phase') else 'Q1'
+        logger.debug(f"  1.3 Quarterly: Phase {quarterly_phase} | Tradeable: {quarterly_tradeable}")
+        
+        # STEP 4: Momentum Analysis (Confirm Momentum)
+        momentum_analysis = self.momentum.analyze(df_m5)
+        momentum_direction = momentum_analysis.get('composite', {}).get('direction', 'NEUTRAL')
+        momentum_score = momentum_analysis.get('composite', {}).get('strength', 50)
+        logger.debug(f"  1.4 Momentum: {momentum_direction} | Score: {momentum_score}")
+        
+        # STEP 5: Volatility Analysis
+        volatility_analysis = self.volatility.analyze(df_m5)
+        vol_regime = volatility_analysis.get('regime')
+        logger.debug(f"  1.5 Volatility: {vol_regime.regime if vol_regime else 'NORMAL'}")
+        
+        # BUILD SIGNAL CONTEXT from individual analyses
+        signal_context = SignalContext(
+            smc=smc_analysis,
+            m8_fib={
+                'signal': m8_signal,
+                'confidence': m8_confidence,
+                'gate': m8_gate,
+                'setup': m8_analysis.get('setup_type', 'M8_FIB')
+            },
+            quarterly={
+                'tradeable': quarterly_tradeable,
+                'phase': quarterly_phase,
+                'score': quarterly_analysis.score if hasattr(quarterly_analysis, 'score') else 0,
+                'reason': quarterly_analysis.reason if hasattr(quarterly_analysis, 'reason') else ''
+            },
+            momentum={
+                'score': momentum_score,
+                'trend': momentum_direction,
+                'rsi': momentum_analysis.get('rsi', {}),
+                'macd': momentum_analysis.get('macd', {})
+            },
+            volatility={
+                'regime': vol_regime.regime if vol_regime and hasattr(vol_regime, 'regime') else 'NORMAL',
+                'atr': vol_regime.atr if vol_regime and hasattr(vol_regime, 'atr') else 0.002
+            }
+        )
+        
+        # Calculate unified signal score
+        signal_score = signal_context.get_unified_score()
+        
+        # Also get LaplaceDemon prediction for backup/confirmation
         laplace_signal = await self.laplace_core.analyze(
             df_m1=df_m1,
             df_m5=df_m5,
@@ -304,11 +365,12 @@ class GenesisSystem:
             current_price=current_price
         )
         
-        # Convert LaplacePrediction to Genesis format
-        signal_context = self._convert_laplace_signal(laplace_signal)
+        # Combine: If LaplaceDemon has high confidence, boost signal_score
+        if laplace_signal and laplace_signal.confidence > 70:
+            signal_score = (signal_score + laplace_signal.confidence) / 2
+            logger.debug(f"  LaplaceDemon boost: {laplace_signal.confidence:.0f}%")
         
-        signal_score = laplace_signal.confidence if laplace_signal else 0
-        logger.debug(f"Signal Layer Score: {signal_score:.1f}")
+        logger.debug(f"Layer 1 Complete: Signal Score = {signal_score:.1f}")
         
         # ═══════════════════════════════════════════════════════
         # LAYER 2: AGI INTELLIGENCE
