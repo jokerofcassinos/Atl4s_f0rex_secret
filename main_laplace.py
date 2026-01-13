@@ -469,24 +469,46 @@ class LaplaceTradingSystem:
             lots = risk_amount / (sl_pips * pip_value * contract_size)
             lots = max(0.01, min(lots, 1.0))  # Clamp between 0.01 and 1.0
             
-            # Apply position multiplier from volatility
-            lots *= prediction.lot_multiplier
-            lots = round(lots, 2)
-            
-            # Execute via bridge
-            order_type = prediction.direction
-            
-            logger.info(f"⚡ EXECUTING: {order_type} {lots} lots @ {current_price:.5f}")
-            logger.info(f"   ∟ SL: {prediction.sl_price:.5f} ({prediction.sl_pips}p) | TP: {prediction.tp_price:.5f} ({prediction.tp_pips}p)")
-            
-            result = await self.executor.execute_trade(
-                symbol=symbol,
-                direction=prediction.direction,
-                lots=lots,
-                sl_pips=prediction.sl_pips,
-                tp_pips=prediction.tp_pips,
-                comment=f"LAPLACE_{prediction.strength.name}"
-            )
+            # Split Fire Logic (User Request: 5x Separate Orders for Granular Control)
+            if prediction.lot_multiplier > 1.5: # Use threshold > 1.5 to catch 2x, 5x, etc.
+                 num_orders = int(prediction.lot_multiplier)
+                 # lots remains the 'Base Unit' (e.g. 1.0 or calculated risk)
+                 
+                 logger.info(f"⚔️ SPLIT FIRE PROTOCOL: Splitting {prediction.lot_multiplier}x Multiplier into {num_orders} separate orders.")
+                 
+                 results = []
+                 for i in range(num_orders):
+                     logger.info(f"   ► Fire {i+1}/{num_orders}: {order_type} {lots} lots @ {current_price:.5f}")
+                     res = await self.executor.execute_trade(
+                        symbol=symbol,
+                        direction=prediction.direction,
+                        lots=lots,
+                        sl_pips=prediction.sl_pips,
+                        tp_pips=prediction.tp_pips,
+                        comment=f"LAPLACE_{prediction.strength.name}_SPLIT_{i+1}"
+                    )
+                     results.append(res)
+                     # Tiny delay to ensure unique order IDs/timestamps if high frequency
+                     await asyncio.sleep(0.2) 
+                 
+                 result = results[0] if results else None # Return first result for success check
+                 
+            else:
+                # Standard Execution (Multiplier 1.0 or fractional)
+                lots *= prediction.lot_multiplier
+                lots = round(lots, 2)
+                
+                logger.info(f"⚡ EXECUTING: {order_type} {lots} lots @ {current_price:.5f}")
+                logger.info(f"   ∟ SL: {prediction.sl_price:.5f} ({prediction.sl_pips}p) | TP: {prediction.tp_price:.5f} ({prediction.tp_pips}p)")
+                
+                result = await self.executor.execute_trade(
+                    symbol=symbol,
+                    direction=prediction.direction,
+                    lots=lots,
+                    sl_pips=prediction.sl_pips,
+                    tp_pips=prediction.tp_pips,
+                    comment=f"LAPLACE_{prediction.strength.name}"
+                )
             
             if result:
                 self.trade_count += 1

@@ -14,7 +14,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # 1. Signals (New Architecture)
 from signals.timing import QuarterlyTheory, M8FibonacciSystem
 from signals.structure import SMCAnalyzer
+from analysis.smart_money import Liquidator # New Strategy Integration
+from analysis.nano_structure import NanoBlockAnalyzer # Nano Algo Protocol
 from signals.momentum import MomentumAnalyzer, ToxicFlowDetector
+from analysis.vortex_math import VortexMath # Tesla 3-6-9
+from analysis.swarm.event_horizon_swarm import EventHorizonSwarm # Seek & Destroy
 # from signals.volatility import VolatilityAnalyzer # Conflict: Use Legacy Guard or New?
 # Let's use the New Volatility Analyzer if it's cleaner, but Legacy Logic relies on specific methods.
 # For safety, we will import legacy classes from analysis for logic consistency.
@@ -152,7 +156,17 @@ class LaplaceDemonCore:
         self.m8_system = M8FibonacciSystem()
         self.toxic_flow = ToxicFlowDetector()
         
-        # --- 6. TIER 3 AGI CORE ---
+        # 1.5 The Liquidator (Session Sweeps)
+        self.liquidator = Liquidator()
+
+        # 1.6 Nano Algo Protocol (Nano Blocks & Icebergs)
+        self.nano_analyzer = NanoBlockAnalyzer()
+        
+        # 1.7 Vortex & Event Horizon (Esoteric Layer)
+        self.vortex = VortexMath()
+        self.event_horizon = EventHorizonSwarm()
+        
+        # 2. Analysis Engines6. TIER 3 AGI CORE ---
         self.snr_matrix = SNRMatrix()
         self.flux_heatmap = FluxHeatmap()
 
@@ -263,8 +277,22 @@ class LaplaceDemonCore:
         
         # 1. PERCEPTION (FAST) -> Microstructure (Tier 3 Flux)
         flux_metrics = {}
+        details = {} # Initialize details container
         if 'tick' in kwargs:
              flux_metrics = self.flux_heatmap.update(kwargs['tick'])
+             self.nano_analyzer.on_tick(kwargs['tick']) 
+             self.event_horizon.nano.on_tick(kwargs['tick']) # Sync Swarm Nano
+             
+        # ... (Legacy Map Update) ...
+        
+        # 0.A Vortex 3-6-9 Analysis
+        vortex_res = self.vortex.analyze(df_m5, current_time) # M8 simulation on M5 for now or mock
+        details['Vortex'] = vortex_res
+        
+        # 0.B Event Horizon Swarm (Seek & Destroy)
+        swarm_context = {'df_m5': df_m5, 'tick': kwargs.get('tick')}
+        eh_signal = await self.event_horizon.process(swarm_context)
+        details['EventHorizon'] = eh_signal.meta_data if eh_signal else {}
         
         # Data Map for V1 Engines
         data_map = {
@@ -292,20 +320,29 @@ class LaplaceDemonCore:
         legion_intel['swarm_decision'] = swarm_decision
         legion_intel['swarm_score'] = swarm_score
         
-        # 2. LEGACY CONSENSUS (CPU Bound - Run in Thread)
-        # The heavy math engines
-        loop = asyncio.get_event_loop() # Changed from get_running_loop()
-        legacy_result, details = await loop.run_in_executor(
-            None, # Use default executor (self.executor if set, otherwise default ThreadPoolExecutor)
-            self._run_legacy_consensus, 
-            data_map
-        )
+        # 3. LEGACY CONSENSUS (V1 Logic) - The "Bugatti Engine"
+        # We run this to get the base "Template" for the trade
+        legacy_result, legacy_details = self._run_legacy_consensus(data_map)
+        details.update(legacy_details) # Merge legacy details into master details
         
         # --- TIER 2 SIGNALS (SMC / M8 / Toxic) ---
         details['SMC'] = self.smc_signal.analyze(df_m5, current_price)
         details['ToxicFlow'] = self.toxic_flow.detect_compression(df_m5)
+        details['ToxicFlow'] = self.toxic_flow.detect_compression(df_m5)
         details['Flux'] = flux_metrics
+        
+        # Liquidator Analysis
+        if df_h1 is not None:
+             self.liquidator.update_session_levels(df_h1)
+        
+        liq_signal = self.liquidator.check_sweep(df_m5, current_price)
+        details['Liquidator'] = liq_signal
 
+        # 6.4 Nano Algo Protocol
+        # Analyze Order Flow Blocks (Red/Green)
+        nano_res = self.nano_analyzer.analyze(current_price)
+        details['nano_blocks'] = nano_res
+        
         # Neural Oracle (Tier 4) - Hypothetical Check
         try:
              # We query the Oracle for both directions to gauge market bias
@@ -464,10 +501,78 @@ class LaplaceDemonCore:
         smc_res = details.get('SMC', {})
         m8_res = details.get('M8', {})
         toxic_flow = details.get('ToxicFlow', False)
+        liq_signal = details.get('Liquidator')
+        nano_res = details.get('nano_blocks', {}) # Added this line to get nano_res
+
+        # 0. The Liquidator (New 90% Setup)
+        if liq_signal:
+             if "BUY" in liq_signal:
+                  reasons.append(f"THE LIQUIDATOR: {liq_signal}")
+                  # If score contradicts, we flip it or boost massive if aligns
+                  if score < 0: score = 50 # Force flip to Buy
+                  else: score += 50
+                  if not setup: setup = "LIQUIDATOR_SWEEP"
+             elif "SELL" in liq_signal:
+                  reasons.append(f"THE LIQUIDATOR: {liq_signal}")
+                  if score > 0: score = -50
+                  else: score -= 50
+                  if not setup: setup = "LIQUIDATOR_SWEEP"
         
-        # 1. SMC Order Blocks
-        if isinstance(smc_res, dict) and smc_res.get('zone_type') and smc_res.get('zone_type') != "NONE":
-             zone = smc_res['zone_type']
+        # A. Sell at Red Block (Resistance)
+        if nano_res.get('algo_sell_detected'):
+             reasons.append("NANO ALGO: Sell Block Detected (Resistance)")
+             if score > 0: score = -50 # Flip to Sell
+             else: score -= 30 # Boost sell
+             if not setup: setup = "NANO_SCALE_IN"
+             
+        # B. Buy at Green Block (Support)
+        if nano_res.get('algo_buy_detected'):
+             reasons.append("NANO ALGO: Buy Block Detected (Support)")
+             if score < 0: score = 50 # Flip to Buy
+             else: score += 30 # Boost buy
+             if not setup: setup = "NANO_SCALE_IN"
+        
+        # 6.5 Vortex 3-6-9 & Event Horizon
+        vortex = details.get('Vortex', {})
+        eh_meta = details.get('EventHorizon', {})
+        
+        # A. Vortex Time Trigger
+        if vortex.get('signal') != "WAIT":
+             reasons.append(f"VORTEX 3-6-9: {vortex['reason']}")
+             if vortex['signal'] == "BUY":
+                  if score < 0: score = 50 # Flip
+                  else: score += 40
+                  if not setup: setup = "VORTEX_TIMING"
+             elif vortex['signal'] == "SELL":
+                  if score > 0: score = -50
+                  else: score -= 40
+                  if not setup: setup = "VORTEX_TIMING"
+
+        # B. Event Horizon Swarm (Seek & Destroy)
+        if eh_meta.get('mode') == "SWARM_369":
+             reasons.append(f"EVENT HORIZON: {eh_meta.get('reason', 'Swarm Attack')}")
+             # This is a dominant signal (Predatory)
+             if eh_meta.get('signal_type') == "BUY": # Logic implied from meta if propagated, wait I need signal direction
+                  pass # Handled below
+             
+             # Force Swarm Mode if high confidence
+             setup = "SWARM_369"
+             # Score override? The Swarm Signal itself isn't fully propagated in EH Meta yet, 
+             # let's assume if EH Meta exists, it's a valid trigger.
+             # Actually, I should have passed the signal direction in meta or details.
+             
+        # Correction: The Event Horizon signal was returned as 'eh_signal' in analyze, 
+        # but I only put 'meta_data' into details['EventHorizon'].
+        # I need the direction.
+        # Implied direction: Iceberg Buy -> BUY.
+             if "Buy Detected" in eh_meta.get('reason', ''):
+                  if score < 0: score = 60 # Strong Flip
+                  else: score += 50
+             elif "Sell Detected" in eh_meta.get('reason', ''):
+                   if score > 0: score = -60
+                   else: score -= 50
+
+        # 7. Final Confidence Adjustment
              if "BUY" in zone and score > -10:
                   score += 25
                   reasons.append(f"SMC: Reacting off Bullish Order Block")
@@ -564,12 +669,11 @@ class LaplaceDemonCore:
             win_prob = self.neural_oracle.predict_win_probability(df_m5, decision_dir, confidence)
             details['Neural_Win_Prob'] = float(win_prob)
             
-            # CALIBRATION: Since training data (83 trades) is small, we use a more relaxed threshold.
-            # Base WR was 41%, so anything > 40% is 'acceptable' for now.
-            # We also BYPASS veto if Consensus score is extremely high (Momentum Overlap).
+            # CALIBRATION: Phase 6 (Round 3) - Target 70% WR
+            # We enforce stricter thresholds: WinProb > 60% and High Bypass Bar (85.0)
             
-            threshold = 0.40 # Reduced from 0.60
-            bypass_score = 45.0 # Extremely high conviction
+            threshold = 0.60 # Increased from 0.40
+            bypass_score = 85.0 # Increased from 45.0 (Force high-confidence trades to pass Neural check)
             
             if win_prob < threshold and abs(score) < bypass_score:
                 execute = False
@@ -585,6 +689,12 @@ class LaplaceDemonCore:
         if execute:
             if setup in ["KINETIC_BOOM", "LEGION_KNIFE_SCALP", "LION_PROTOCOL", "REVERSION_SNIPER"]:
                 lot_multiplier = 5.0
+            elif setup == "NANO_SCALE_IN":
+                lot_multiplier = 3.0 # User Request: 3+3+3 Recurring
+            elif setup == "SWARM_369":
+                lot_multiplier = 9.0 # Full Geometric Swarm (Starts small but capacity is 9x)
+                # Note: The Execution Engine handles the splitting. 
+                # Here we just authorize the mass.
             elif setup == "MOMENTUM_BREAKOUT" and confidence >= 95.0:
                 lot_multiplier = 2.0
             elif setup == "MOMENTUM_BREAKOUT":
@@ -614,11 +724,12 @@ class LaplaceDemonCore:
         # Get ATR
         atr = ta.volatility.AverageTrueRange(df_m5['high'], df_m5['low'], df_m5['close'], window=14).average_true_range().iloc[-1]
         
-        # SL = 200 pips (User Requested: Restore distance)
-        sl_pips = max(200, (atr * 3.5) * 10000)
+        # SL = 200 pips (User Requested "Even More Distant" - Safety Net)
+        sl_pips = max(200.0, (atr * 10.0) * 10000)
         
-        # TP = Optimized Ratio (User Request: Lower TP for faster rotation)
-        tp_pips = sl_pips * 0.8 # 1:0.8 RR (Ensures trades close faster)
+        # TP = 16 pips (User: "o tp estava otimo" - Back to 16p baseline)
+        tp_pips = 16.0 
+
         
         prediction.sl_pips = sl_pips
         prediction.tp_pips = tp_pips

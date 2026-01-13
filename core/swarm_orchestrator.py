@@ -474,8 +474,8 @@ class SwarmOrchestrator:
         # 2. Holographic Recall (Tier 2 Check)
         if current_state_vector:
              intuition = self.holographic_memory.retrieve_intuition(current_state_vector)
-             # Relaxed Threshold for Aggressive Mode (was -30.0)
-             if intuition < -50.0:  
+             # Relaxed Threshold for Aggressive Mode (was -30.0) -> Re-tightened to -40.0 for 70% WR (Round 3)
+             if intuition < -40.0:  
                   logger.warning(f"DEJA VU: Holographic Danger (Score: {intuition:.2f}). Applying Penalty.")
                   penalty_score += 20.0
                   penalty_reasons.append(f"HOLOGRAPHIC_DANGER({intuition:.1f})")

@@ -66,8 +66,8 @@ class LaplaceBacktestRunner:
         self.config = BacktestConfig(
             initial_capital=initial_capital,
             leverage=leverage,
-            risk_per_trade_pct=risk_per_trade,
-            max_concurrent_trades=30,
+            risk_per_trade_pct=20.0, # Increased for Sniper Profits ($800/trade)
+            max_concurrent_trades=100, # Increased for Split Fire (Swarm needs space)
             spread_pips=spread_pips,
             slippage_pips=0.5,
             symbol=symbol
@@ -338,46 +338,63 @@ class LaplaceBacktestRunner:
                 )
                 
                 # Execute if signal is valid
-                # Execute if signal is valid
                 if prediction.execute and prediction.direction in ["BUY", "SELL"]:
                     direction = TradeDirection.BUY if prediction.direction == "BUY" else TradeDirection.SELL
                     
-                    trade = self.engine.open_trade(
-                        direction=direction,
-                        current_time=current_time,
-                        current_price=current_price,
-                        sl_pips=prediction.sl_pips,
-                        tp_pips=prediction.tp_pips,
-                        signal_source=prediction.primary_signal or "LAPLACE",
-                        confidence=prediction.confidence,
-                        lot_multiplier=prediction.lot_multiplier # Passed from Omega Sniper
-                    )
+                    # SPLIT FIRE EXECUTION LOGIC
+                    # Instead of one giant trade, we split into N trades of 1x.
+                    # This aligns with the "Swarm" concept and allows granular management.
+                    num_orders = 1
+                    lot_multiplier = prediction.lot_multiplier
                     
-                    if trade:
-                        last_signal_time = i
-                        logger.info(
-                            f"TRADE #{trade.id}: {direction.value} @ {current_price:.5f} | "
-                            f"SL: {prediction.sl_pips:.1f}p | TP: {prediction.tp_pips:.1f}p | "
-                            f"Conf: {prediction.confidence:.0f}%"
-                        )
-                        # Log Neural Decision if present
-                        for reason in prediction.reasons:
-                            if "Neural" in reason:
-                                logger.info(f"  > {reason}")
-                                
-                        if self.telegram.enabled:
-                            await self.telegram.notify_trade_entry(
-                                direction=prediction.direction,
-                                symbol=self.symbol,
-                                entry=current_price,
-                                sl=trade.sl_price,
-                                tp=trade.tp_price,
-                                confidence=prediction.confidence,
-                                setup=prediction.primary_signal or "LAPLACE"
-                            )
-                    else:
-                         logger.warning(f"SKIPPED EXECUTION: Consensus said {prediction.direction} but execution failed (Max Slots/Margin?).")
+                    if lot_multiplier >= 2.0:
+                        num_orders = int(lot_multiplier)
+                        lot_multiplier = 1.0 # Reset to base unit per order
 
+                    # Execute N times
+                    for order_idx in range(num_orders):
+                        trade = self.engine.open_trade(
+                            direction=direction,
+                            current_time=current_time,
+                            current_price=current_price,
+                            sl_pips=prediction.sl_pips,
+                            tp_pips=prediction.tp_pips,
+                            signal_source=prediction.primary_signal or "LAPLACE",
+                            confidence=prediction.confidence,
+                            lot_multiplier=lot_multiplier # Always 1.0 if split
+                        )
+                        
+                        if trade:
+                            last_signal_time = i
+                            
+                            # Log EVERY split trade for clarity
+                            logger.info(
+                                f"TRADE #{trade.id}: {direction.value} @ {current_price:.5f} | "
+                                f"SL: {prediction.sl_pips:.1f}p | TP: {prediction.tp_pips:.1f}p | "
+                                f"Conf: {prediction.confidence:.0f}% | SPLIT FIRE ({order_idx+1}/{num_orders})"
+                            )
+                            
+                            # Log Neural Decision if present (only once per candle to avoid noise? No, log it so it's clear)
+                            if order_idx == 0:
+                                for reason in prediction.reasons:
+                                    if "Neural" in reason:
+                                        logger.info(f"  > {reason}")
+                                
+                            if self.telegram.enabled:
+                                await self.telegram.notify_trade_entry(
+                                    direction=prediction.direction,
+                                    symbol=self.symbol,
+                                    entry=current_price,
+                                    sl=trade.sl_price,
+                                    tp=trade.tp_price,
+                                    confidence=prediction.confidence,
+                                    setup=f"{prediction.primary_signal} [{order_idx+1}/{num_orders}]"
+                                )
+                        else:
+                             # If one fails (margin/slots), likely all fail. Break.
+                             logger.warning(f"SKIPPED SPLIT EXECUTION at {order_idx+1}/{num_orders}: Consensus said {prediction.direction} but execution failed (Max Slots/Margin?).")
+                             break
+                                
                 elif prediction.direction in ["BUY", "SELL"] and not prediction.execute:
                     # Logic Vetoed it (Nash, Neural, etc)
                     logger.info(f"SIGNAL VETOED: {prediction.direction} | Vetoes: {prediction.vetoes}")
@@ -468,7 +485,7 @@ class LaplaceBacktestRunner:
         print("═" * 60)
         
         print(f"\n📊 PERFORMANCE")
-        print(f"   Total Trades:      {result.total_trades}")
+        print(f"   Total Executions:  {result.total_trades} (Includes Split Orders)")
         print(f"   Winning Trades:    {result.winning_trades}")
         print(f"   Losing Trades:     {result.losing_trades}")
         print(f"   Win Rate:          {result.win_rate:.1f}%")

@@ -215,6 +215,58 @@ class GlobalThoughtOrchestrator:
         self.trees: Dict[str, ThoughtTree] = {}
         self.cross_module_connections: Dict[str, List[str]] = {}  # node_id -> [other_module_node_ids]
         
+        # Phase 7 Optimization: Inverted Keyword Index
+        self.keyword_index: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
+        self.indexed_node_ids: Set[str] = set()
+        
+        # Phase 7 Optimization: Tree Compressor (RAM Management)
+        self.compressor = TreeCompressor(self)
+        self.compression_counter = 0
+        
+    def _index_all_new_nodes(self):
+        """Indexes all nodes and periodically prunes RAM."""
+        self.compression_counter += 1
+        
+        # Pruning: Compress all trees every 100 calls to prevent memory leaks
+        if self.compression_counter % 100 == 0:
+            logger.info("AGI RAM Management: Running Tree Compression...")
+            self.compressor.compress_all()
+            # Clear index mapping for removed nodes
+            self._cleanup_index()
+        for mod_name, tree in self.trees.items():
+            for node_id, node in tree.nodes.items():
+                if node_id not in self.indexed_node_ids:
+                    self._index_node(mod_name, node_id, node.question)
+                    self.indexed_node_ids.add(node_id)
+                    
+    def _index_node(self, module_name: str, node_id: str, question: str):
+        """Adds a single node's keywords to the global index."""
+        if not question: return
+        words = set(question.lower().replace("?", "").replace("!", "").split())
+        # Filter common stop words (simplified)
+        stop_words = {'why', 'did', 'i', 'decide', 'the', 'was', 'this', 'correct', 'how', 'should', 'act', 'now', 'based', 'on', 'analysis'}
+        keywords = words - stop_words
+        
+        for word in keywords:
+            if len(word) > 2: # Ignore very short tokens
+                self.keyword_index[word].append((module_name, node_id))
+        
+    def _cleanup_index(self):
+        """Removes orphaned Node IDs from the keyword index after compression."""
+        valid_nodes = set()
+        for tree in self.trees.values():
+            valid_nodes.update(tree.nodes.keys())
+            
+        # Filter the index
+        for word in list(self.keyword_index.keys()):
+            self.keyword_index[word] = [
+                (mod, nid) for mod, nid in self.keyword_index[word] 
+                if nid in valid_nodes
+            ]
+        
+        # Sync indexed set
+        self.indexed_node_ids &= valid_nodes
+        
     def get_or_create_tree(self, module_name: str) -> ThoughtTree:
         """
         Obtém ou cria uma árvore para um módulo.
@@ -254,45 +306,60 @@ class GlobalThoughtOrchestrator:
             self.cross_module_connections[key].append(connection)
     
     def find_similar_thoughts(self, module_name: str, question: str, 
-                             threshold: float = 0.7) -> List[tuple]:
+                             threshold: float = 0.7, limit: int = 20) -> List[tuple]:
         """
-        Encontra pensamentos similares em outros módulos.
+        Optimized similarity search using Keyword Index and Recency Bias.
+        """
+        # Ensure all nodes are indexed before search
+        self._index_all_new_nodes()
         
-        Args:
-            module_name: Módulo que está perguntando
-            question: Pergunta a buscar
-            threshold: Limiar de similaridade (0-1)
-            
-        Returns:
-            Lista de tuplas (module_name, node_id, similarity_score)
-        """
-        # Implementação simplificada: busca por palavras-chave
-        # Em produção, usar embedding vetorial ou NLP avançado
         question_lower = question.lower()
         question_words = set(question_lower.split())
         
+        # 1. Candidate Generation via Keyword Index
+        candidates: Set[Tuple[str, str]] = set()
+        stop_words = {'why', 'did', 'i', 'decide', 'the', 'was', 'this', 'correct', 'how', 'should', 'act', 'now'}
+        search_keywords = question_words - stop_words
+        
+        for word in search_keywords:
+            if word in self.keyword_index:
+                # Add top N from the index for this word (index is naturally chronological if nodes were added sequentially)
+                # We take the most recent ones first
+                candidates.update(self.keyword_index[word][-100:]) 
+        
+        # 2. Recency Bias: Always check the most recent thoughts from each module
+        for mod_name, tree in self.trees.items():
+            if mod_name == module_name: continue
+            recent = tree.get_recent_thoughts(limit=20)
+            for node in recent:
+                candidates.add((mod_name, node.node_id))
+        
         similar = []
         
-        for mod_name, tree in self.trees.items():
-            if mod_name == module_name:
-                continue  # Pula o próprio módulo
+        # 3. Targeted Comparison
+        for mod_name, node_id in candidates:
+            if mod_name == module_name: continue
             
-            for node_id, node in tree.nodes.items():
-                if node.question:
-                    node_question_lower = node.question.lower()
-                    node_words = set(node_question_lower.split())
-                    
-                    # Similaridade simples: Jaccard
-                    intersection = len(question_words & node_words)
-                    union = len(question_words | node_words)
-                    similarity = intersection / union if union > 0 else 0
-                    
-                    if similarity >= threshold:
-                        similar.append((mod_name, node_id, similarity))
+            tree = self.trees.get(mod_name)
+            if not tree: continue
+            
+            node = tree.nodes.get(node_id)
+            if not node or not node.question: continue
+            
+            node_question_lower = node.question.lower()
+            node_words = set(node_question_lower.split())
+            
+            # Jaccard
+            intersection = len(question_words & node_words)
+            union = len(question_words | node_words)
+            similarity = intersection / union if union > 0 else 0
+            
+            if similarity >= threshold:
+                similar.append((mod_name, node_id, similarity))
         
-        # Ordena por similaridade
+        # Sort and limit
         similar.sort(key=lambda x: x[2], reverse=True)
-        return similar
+        return similar[:limit]
     
     def get_global_thought_summary(self) -> Dict[str, Any]:
         """

@@ -53,16 +53,16 @@ class TrendingSwarm(SubconsciousUnit):
         atr = high_low.rolling(14).mean().iloc[-1]
         if pd.isna(atr) or atr == 0: atr = 0.0010 # Default fallback
         
-        # A. Parabolic Check: Price moved > 5x ATR in last 3 candles? (Relaxed from 3x)
+        # A. Parabolic Check: Price moved > 4.0x ATR in last 3 candles? (Reverted to 4.0x)
         accel = abs(df_m5['close'].iloc[-1] - df_m5['close'].iloc[-4])
-        is_parabolic = accel > (5.0 * atr)
+        is_parabolic = accel > (4.0 * atr)
         
         # B. Climax / Churn: High Volume (> 3x) but Small Body (< 0.5x ATR)
         body = abs(df_m5['close'].iloc[-1] - df_m5['open'].iloc[-1])
         is_churn = (curr_vol > 3.0 * vol_ma) and (body < 0.5 * atr)
         
-        # C. Volume Climax: Extreme Volume (> 5x) (Relaxed from 3x)
-        is_climax = curr_vol > 5.0 * vol_ma
+        # C. Volume Climax: Extreme Volume (> 4.0x) (Reverted to 4.0x)
+        is_climax = curr_vol > 4.0 * vol_ma
         
         exhaustion_state = False
         exhaustion_reason = ""

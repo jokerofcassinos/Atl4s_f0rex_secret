@@ -275,16 +275,15 @@ class BacktestEngine:
             return None
         
         # 3. Check if SL would cost more than 5% of account
-        MAX_RISK_PCT = 5.0  # $1.50 on $30 account
-        max_risk_dollars = self.balance * (MAX_RISK_PCT / 100)
-        potential_loss = sl_pips * self.config.pip_value * 0.01  # For 0.01 lot
+        # CALIBRATION: Disabled per user request to allow "Aggressive Sniper" profits (20% risk)
+        # MAX_RISK_PCT = 5.0  
+        # max_risk_dollars = self.balance * (MAX_RISK_PCT / 100)
+        # potential_loss = sl_pips * self.config.pip_value * 0.01  
         
-        if potential_loss > max_risk_dollars:
-            # Reduce trade size or skip
-            logger.debug(f"RISK TOO HIGH: ${potential_loss:.2f} > ${max_risk_dollars:.2f}")
-            # Adjust risk_per_trade to fit within limits
-            adjusted_risk = MAX_RISK_PCT * 0.5  # Use half the max
-            self.config.risk_per_trade_pct = adjusted_risk
+        # if potential_loss > max_risk_dollars:
+        #     logger.debug(f"RISK TOO HIGH: ${potential_loss:.2f} > ${max_risk_dollars:.2f}")
+        #     adjusted_risk = MAX_RISK_PCT * 0.5  
+        #     self.config.risk_per_trade_pct = adjusted_risk
         
         # Apply spread and slippage
         entry_price = self.apply_spread(current_price, direction)

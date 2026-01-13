@@ -864,8 +864,8 @@ class ConsensusEngine:
         # If we are WAITING, but Structure suggests a clear path (Map) AND Ocean (H4) agrees...
         # We FORCE the trade.
         if final_decision == "WAIT":
-             # Requirement 1: Strong Structure (> 50)
-             if abs(v_structure) > 50:
+             # Requirement 1: Strong Structure (> 40) - Relaxed from 50
+             if abs(v_structure) > 40:
                  struc_dir = 1 if v_structure > 0 else -1
                  
                  # Requirement 2: Ocean Alignment (H4 Trend)
