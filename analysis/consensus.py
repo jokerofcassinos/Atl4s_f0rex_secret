@@ -36,6 +36,7 @@ from core.agi.decision_memory import GlobalDecisionMemory, ModuleDecisionMemory
 from core.agi.unified_reasoning import UnifiedReasoningLayer, ModuleInsight
 from core.agi.health_monitor import HealthMonitor, HealthStatus
 from core.agi.memory_integration import MemoryIntegrationLayer
+from analysis.agi.pattern_hunter import PatternHunter
 
 logger = logging.getLogger("Atl4s-Consensus")
 
@@ -70,6 +71,15 @@ class ConsensusEngine:
         self.debater = RecursiveReasoner() # The Internal Critic
         self.adversary = BlackSwanAdversary() # The Stress Tester
         self.weekend_gap = WeekendGapPredictor() # Phase 5: Weekend Gap Predictor
+        
+        # Akashic AGI Integration
+        try:
+            self.pattern_hunter = PatternHunter()
+            self.agi_active = True
+        except Exception as e:
+            logger.warning(f"Failed to load PatternHunter: {e}")
+            self.pattern_hunter = None
+            self.agi_active = False
         
         # Phase 6: Thought Tree and Decision Memory
         self.thought_orchestrator = GlobalThoughtOrchestrator()
@@ -109,6 +119,20 @@ class ConsensusEngine:
     def update_ticks(self, tick):
         """Pass live tick to micro module"""
         self.micro.on_tick(tick)
+
+    def _consult_akashic(self, df):
+        """Helper to consult the Akashic Records"""
+        if not self.agi_active or df.empty: return None
+        try:
+            row = df.iloc[-1]
+            return self.pattern_hunter.analyze_live_market(
+                row['open'], row['high'], row['low'], row['close'], 
+                row.get('tick_volume', 0), row.get('RSI_14', 50), row.get('ATR_14', 0.0001), 
+                row.name
+            )
+        except Exception as e:
+            logger.error(f"Akashic Error: {e}")
+            return None
 
     def deliberate(self, data_map, parallel=True, verbose=True):
         """
@@ -162,7 +186,9 @@ class ConsensusEngine:
             'Overlord': lambda: self.overlord.deliberate(data_map),
             'Sovereign': lambda: self.sovereign.deliberate(data_map),
             'Singularity': lambda: self.singularity.deliberate(data_map),
-            'WeekendGap': lambda: self.weekend_gap.deliberate(data_map) 
+            'Singularity': lambda: self.singularity.deliberate(data_map),
+            'WeekendGap': lambda: self.weekend_gap.deliberate(data_map),
+            'Akashic': lambda: self._consult_akashic(df_m5) 
         }
         
         results = {}
@@ -307,7 +333,8 @@ class ConsensusEngine:
         t_dir = trend_res['direction']
         regime = trend_res['regime']
         river = trend_res['river']
-        details['Trend'] = {'score': t_score, 'dir': t_dir, 'regime': regime, 'river': river}
+        ocean_dir = trend_res.get('ocean', 0) # H4 Trend (Previously undefined in local scope)
+        details['Trend'] = {'score': t_score, 'dir': t_dir, 'regime': regime, 'river': river, 'ocean': ocean_dir}
         
         # Sniper
         sniper_res = results.get('Sniper')
@@ -507,6 +534,21 @@ class ConsensusEngine:
         # --- GOLDEN SETUP OVERRIDES (The Royal Flush) ---
 
         # --- GOLDEN SETUP OVERRIDES (The Royal Flush) ---
+
+        # 0. OMEGA SNIPER (Akashic Override)
+        akashic_res = results.get('Akashic')
+        details['Akashic'] = akashic_res
+        if akashic_res and akashic_res['status'] == 'SUCCESS':
+            if akashic_res['confidence'] > 0.90:
+                logger.info(f"OMEGA SNIPER ACTIVATED: Akashic Match {akashic_res['confidence']*100:.1f}% -> {akashic_res['direction']}")
+                # We override EVERYTHING. History repeats.
+                decision = akashic_res['direction']
+                # Score is 100 + confidence
+                score = 100.0 + (akashic_res['confidence'] * 10)
+                if decision == "SELL": score = -score
+                
+                # We assume the caller handles the 'limit_entry' logic based on details['Akashic']['avg_drawdown']
+                return decision, score, details
         # 1. Sniper Level + Reversal Pattern + Divergence
         if s_score > 50 and p_name != "None" and d_type != "None":
             if s_dir == p_dir == d_dir:
@@ -515,6 +557,13 @@ class ConsensusEngine:
                 # Dynamic Score: Base 95 + excess Sniper Score
                 base_dynamic = 95.0 + (s_score - 50) * 0.1
                 score = base_dynamic if decision == "BUY" else -base_dynamic
+                
+                # --- HYBRID ATTACK: OMEGA SNIPER UPGRADE ---
+                # "The Tank": Slow, precise -> Heavily Leveraged
+                details['lot_multiplier'] = 5.0
+                details['tp_multiplier'] = 0.5 # "Ladder Down" logic starts preemptively at 50% target
+                details['mode'] = "OMEGA_REV_SNIPER"
+                
                 return decision, score, details
                 
         # 2. Momentum Burst (Kinematics) + Trend Alignment
@@ -793,6 +842,13 @@ class ConsensusEngine:
                  final_score = abs(v_reversion) + abs(v_structure)
                  holographic_reason = "REVERSION_SNIPER"
                  
+                 # --- OMEGA SNIPER UPGRADE (User Request) ---
+                 # "Reversion Sniper = Omega Sniper Concept (x5)"
+                 details['lot_multiplier'] = 5.0
+                 details['tp_multiplier'] = 0.5
+                 details['mode'] = "OMEGA_REV_SNIPER"
+                 logger.info(f"OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 5x.")
+                 
         # Logic C: STRUCTURE BOUNCE (Laminar Flow)
         # Structure is Strong + Trend is Laminar Flow (Low Entropy)
         # ✅ PHASE 0 FIX #3: Relaxed threshold from 60 → 40
@@ -802,6 +858,27 @@ class ConsensusEngine:
                  final_decision = "BUY" if struc_dir == 1 else "SELL"
                  final_score = abs(v_structure) + abs(v_momentum)
                  holographic_reason = "STRUCTURE_FLOW"
+                 
+        # Logic D: PROTOCOL LION (Last Resort Breakout)
+        # "The Lion does not ask for permission."
+        # If we are WAITING, but Structure suggests a clear path (Map) AND Ocean (H4) agrees...
+        # We FORCE the trade.
+        if final_decision == "WAIT":
+             # Requirement 1: Strong Structure (> 50)
+             if abs(v_structure) > 50:
+                 struc_dir = 1 if v_structure > 0 else -1
+                 
+                 # Requirement 2: Ocean Alignment (H4 Trend)
+                 if struc_dir == ocean_dir:
+                     # Check v_momentum isn't fighting us too hard (>-20)
+                     if (v_momentum * struc_dir) > -20:
+                         logger.warning(f"🦁 PROTOCOL LION ACTIVATED: Structure ({v_structure:.1f}) + Ocean ({ocean_dir}) override WAIT.")
+                         final_decision = "BUY" if struc_dir == 1 else "SELL"
+                         final_score = abs(v_structure) + 10 # Base score on structure + small boost
+                         holographic_reason = "LION_BREAKOUT"
+                         
+                         # Lion trades are structure-based, standard leverage.
+                         details['mode'] = "LION_PROTOCOL"
                  
         # Override with Golden Setups (The Royal Flush) logic preserved below...
         total_vector = v_momentum + v_reversion + v_structure # Legacy compatibility

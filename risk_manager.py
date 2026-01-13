@@ -220,3 +220,96 @@ class RiskManager:
         max_lots = math.floor(max_lots * 100) / 100.0
         
         return max_lots
+    def calculate_oracle_lots(self, balance, entry_price, stop_loss_price, volatility_score, structure_score):
+        """
+        DRAWDOWN ORACLE (O 'Santo Graal' da Gestão).
+        Adjusts lots based on PREDICTED VOLATILITY ("Samba") vs SUPPORT ("Concrete").
+        """
+        self.update_capital(balance)
+        
+        # 1. Base Risk (Fixed % of Balance)
+        base_risk_pct = self.risk_per_trade # e.g. 0.02 (2%)
+        risk_amount = balance * base_risk_pct
+        
+        # Distance calculation
+        dist = abs(entry_price - stop_loss_price)
+        if dist == 0: return 0.01
+        
+        tick_value = 100.0 # Approx for XAUUSD/Forex roughly
+        
+        # Standard Lots Calculation
+        standard_lots = risk_amount / (dist * tick_value)
+        
+        # 2. The Oracle's Adjustment
+        # Volatility Score (0-100): Higher = More "Samba" (Riskier) -> Lower Size
+        # Structure Score (0-100): Higher = More "Concrete" (Safer) -> Higher Size
+        
+        safety_factor = 1.0
+        
+        if volatility_score > 70:
+            # High Turbulence. Reduce size to survive the noise.
+            # If structure is strict, maybe 0.7, else 0.5.
+            safety_factor = 0.5
+            logger.info(f"🔮 ORACLE: High Volatility ({volatility_score}). Safety Mode ON (0.5x).")
+            
+        elif volatility_score < 30 and structure_score > 80:
+            # Sniper Conditions. Calm waters + Wall of concrete.
+            # We can push harder.
+            safety_factor = 1.25
+            logger.info(f"🔮 ORACLE: Sniper Conditions (Vol {volatility_score}, Str {structure_score}). Boost ON (1.25x).")
+            
+        elif structure_score < 40:
+             # Weak structure? Be careful.
+             safety_factor = 0.8
+             
+        # Apply Factor
+        oracle_lots = standard_lots * safety_factor
+        
+        # 3. Sanitary Checks
+        oracle_lots = max(0.01, round(oracle_lots, 2))
+        
+        # Optional: Cap max lots to prevent craziness
+        if oracle_lots > 50.0: oracle_lots = 50.0
+        
+        return oracle_lots
+
+    def calculate_decayed_tp(self, entry_price, initial_tp_price, open_time_timestamp, current_timestamp):
+        """
+        LUCRO EM ESCADA DESCENDENTE (Time Decay TP).
+        The older the trade, the closer the TP moves to entry (easier to hit).
+        Goal: Clear stale inventory.
+        """
+        try:
+            # Calculate Age in Hours
+            age_seconds = current_timestamp - open_time_timestamp
+            age_hours = age_seconds / 3600.0
+            
+            if age_hours < 1.0:
+                return initial_tp_price # No decay in first hour
+            
+            # Decay Rate: Aggressive 15% per hour (30% in 2 hours as requested)
+            decay_per_hour = 0.15 
+            
+            direction = 1 if initial_tp_price > entry_price else -1
+            initial_dist = abs(initial_tp_price - entry_price)
+            
+            # Calculate Total Decay Factor
+            # e.g. 2 hours -> 30% reduction
+            # Cap at 50% reduction (Limit Maximo)
+            decay_factor = min(0.50, age_hours * decay_per_hour)
+            
+            new_dist = initial_dist * (1.0 - decay_factor)
+            
+            # Ensure we don't go below breakeven + minimal profit
+            # Let's say min profit is 10% of initial dist
+            min_dist = initial_dist * 0.20
+            if new_dist < min_dist: new_dist = min_dist
+            
+            if direction == 1:
+                return entry_price + new_dist
+            else:
+                return entry_price - new_dist
+                
+        except Exception as e:
+            logger.error(f"Error calculating decayed TP: {e}")
+            return initial_tp_price

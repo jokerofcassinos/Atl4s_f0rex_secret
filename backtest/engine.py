@@ -243,7 +243,8 @@ class BacktestEngine:
                    sl_pips: float,
                    tp_pips: float,
                    signal_source: str = "UNKNOWN",
-                   confidence: float = 0.0) -> Optional[Trade]:
+                   confidence: float = 0.0,
+                   lot_multiplier: float = 1.0) -> Optional[Trade]:
         """
         Opens a new trade with proper risk management.
         Includes Anti-Ruin protection.
@@ -256,11 +257,21 @@ class BacktestEngine:
         MIN_FREE_MARGIN = 15.0  # Block new trades if FreeMargin < $15
         free_margin = self.balance  # Simplified: FreeMargin ≈ Balance for spot forex
         if free_margin < MIN_FREE_MARGIN:
-            logger.debug(f"BLOCKED: FreeMargin ${free_margin:.2f} < ${MIN_FREE_MARGIN}")
+            logger.warning(f"BLOCKED: FreeMargin ${free_margin:.2f} < ${MIN_FREE_MARGIN}")
             return None
         
         # 2. Check concurrent trades limit
-        if len(self.active_trades) >= self.config.max_concurrent_trades:
+        # Dynamic Slot Scaling: Base config + 1 slot per $30,000 capital
+        # This answers user request: "conforme capital, aumenta os slots?"
+        max_slots = self.config.max_concurrent_trades
+        if self.balance > 30000:
+            extra_slots = int(self.balance / 30000)
+            max_slots += extra_slots
+            # Cap at reasonable limit (e.g. 60) to prevent API bans or overload
+            max_slots = min(max_slots, 60)
+            
+        if len(self.active_trades) >= max_slots:
+            logger.warning(f"BLOCKED: Max Slots Reached ({len(self.active_trades)}/{max_slots})")
             return None
         
         # 3. Check if SL would cost more than 5% of account
@@ -291,6 +302,11 @@ class BacktestEngine:
         
         # Calculate position size with Anti-Ruin limits
         lots = self.calculate_position_size(sl_pips)
+        
+        # Apply Omega Sniper Multiplier (5x, etc)
+        if lot_multiplier != 1.0:
+            logger.info(f"Applying Lot Multiplier: {lot_multiplier}x (Base: {lots})")
+            lots *= lot_multiplier
         
         # For small accounts (<$100), use fixed minimum lot
         if self.balance < 100:

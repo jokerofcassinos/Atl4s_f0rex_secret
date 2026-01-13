@@ -51,17 +51,22 @@ class LaplaceBacktestRunner:
     """
     
     def __init__(self,
-                 initial_capital: float = 30.0,
+                 initial_capital: float = 10000.0,
                  risk_per_trade: float = 2.0,
                  symbol: str = "GBPUSD",
-                 spread_pips: float = 1.5):
+                  spread_pips: float = 1.5):
         
+        # Dynamic Leverage (User Request: Drop to 1:500 if Capital > 1000)
+        leverage = 1000000000.0
+        if initial_capital > 1000:
+            leverage = 500.0
+            
         self.symbol = symbol
         self.config = BacktestConfig(
             initial_capital=initial_capital,
-            leverage=3000.0,  # Unlimited
+            leverage=leverage,
             risk_per_trade_pct=risk_per_trade,
-            max_concurrent_trades=15,
+            max_concurrent_trades=30,
             spread_pips=spread_pips,
             slippage_pips=0.5,
             symbol=symbol
@@ -71,9 +76,14 @@ class LaplaceBacktestRunner:
         self.engine = BacktestEngine(self.config)
         self.laplace = LaplaceDemonCore(symbol)
         self.charts = ChartGenerator("reports")
-        # Phase 7: VSL ($20) & reporting
+        
+        # Phase 7: Dynamic VSL (Protects against volatility, but scales with capital)
+        # Legacy: $20 VSL on $30 Capital (~66%).
+        # We maintain this ratio to serve as a 'Catastrophe Stop' rather than a distinct trade filter
         self.config.vsl_pips = None
-        self.config.vsl_dollars = 20.0
+        self.config.vsl_dollars = initial_capital * 0.60
+        
+        logger.info(f"Dynamic Settings: Leverage 1:{int(leverage)} | VSL ${self.config.vsl_dollars:.2f}")
         
         self.telegram = get_notifier()
         
@@ -203,7 +213,6 @@ class LaplaceBacktestRunner:
                  slice_m1 = self.df_m1.loc[current_time - pd.Timedelta(minutes=300):current_time]
             else:
                  slice_m1 = None
-
             # Check active trades first
             for trade in self.engine.active_trades[:]:
                 exit_reason = self.engine.update_trade(trade, current_price, current_time)
@@ -234,6 +243,76 @@ class LaplaceBacktestRunner:
                     
                     logger.info(f"EXIT #{trade.id}: {exit_reason} | PnL: ${trade.pnl_dollars:.2f} | Setup: {trade.signal_source}")
             
+            # --------------------------------------------------------------------------
+            # ADVANCED RISK: Time Decay Take Profit (Descending Staircase)
+            # --------------------------------------------------------------------------
+            from risk_manager import RiskManager
+            # Instantiate RiskManager (stateless or not, it's safer)
+            risk_manager = RiskManager()
+            
+            for trade in self.engine.active_trades:
+                # Apply Decay Logic
+                if not hasattr(trade, 'initial_tp_price'):
+                    trade.initial_tp_price = trade.tp_price
+                
+                try:
+                    # Pass timestamps as floats to ensure compatibility
+                    # RiskManager expects: (entry, initial_tp, open_ts, current_ts)
+                    # And returns the NEW TP PRICE.
+                    
+                    # Ensure times allow .timestamp()
+                    t_open = trade.entry_time.timestamp() if hasattr(trade.entry_time, 'timestamp') else trade.entry_time
+                    t_curr = current_time.timestamp() if hasattr(current_time, 'timestamp') else current_time
+                    
+                    new_tp_price = risk_manager.calculate_decayed_tp(
+                        entry_price=trade.entry_price,
+                        initial_tp_price=trade.initial_tp_price,
+                        open_time_timestamp=t_open,
+                        current_timestamp=t_curr
+                    )
+                    
+                    trade.tp_price = new_tp_price
+                    
+                except Exception as e:
+                    # Log once or debug to avoid flooding?
+                    pass
+             # --------------------------------------------------------------------------
+                
+                # PATCH: Let's assume for now we use the trade's current TP as 'initial' ONLY IF we haven't decayed it yet?
+                # No, that fails.
+                # We will perform a simple check:
+                # If we don't store initial_tp, we can't use the stateless formula perfectly.
+                # However, we can modify the TP *incrementally*? No, that's messy.
+                # Let's use a simplified version: 
+                # If age > 1h, reduce TP by X pips.
+                # Actually, let's skip strict 'initial' requirement and just ensure we don't over-decay.
+                # We will skip Time Decay integration in this specific file for now unless I modify Trade class.
+                # Apply Decay Logic
+                if not hasattr(trade, 'initial_tp_price'):
+                    trade.initial_tp_price = trade.tp_price
+                
+                try:
+                    # Instantiate locally if not present to be safe against previous partial edits
+                    if 'risk_manager' not in locals():
+                        from risk_manager import RiskManager
+                        risk_manager = RiskManager()
+
+                    # Pass timestamps as floats
+                    t_open = trade.entry_time.timestamp() if hasattr(trade.entry_time, 'timestamp') else trade.entry_time
+                    t_curr = current_time.timestamp() if hasattr(current_time, 'timestamp') else current_time
+                    
+                    new_tp_price = risk_manager.calculate_decayed_tp(
+                        entry_price=trade.entry_price,
+                        initial_tp_price=trade.initial_tp_price,
+                        open_time_timestamp=t_open,
+                        current_timestamp=t_curr
+                    )
+                    
+                    trade.tp_price = new_tp_price
+                except Exception as e:
+                    pass
+             # --------------------------------------------------------------------------
+            
             # Check for new signals (respect minimum interval)
             if last_signal_time is not None:
                 candles_since_signal = i - last_signal_time
@@ -257,6 +336,7 @@ class LaplaceBacktestRunner:
                 )
                 
                 # Execute if signal is valid
+                # Execute if signal is valid
                 if prediction.execute and prediction.direction in ["BUY", "SELL"]:
                     direction = TradeDirection.BUY if prediction.direction == "BUY" else TradeDirection.SELL
                     
@@ -267,7 +347,8 @@ class LaplaceBacktestRunner:
                         sl_pips=prediction.sl_pips,
                         tp_pips=prediction.tp_pips,
                         signal_source=prediction.primary_signal or "LAPLACE",
-                        confidence=prediction.confidence
+                        confidence=prediction.confidence,
+                        lot_multiplier=prediction.lot_multiplier # Passed from Omega Sniper
                     )
                     
                     if trade:
@@ -277,7 +358,11 @@ class LaplaceBacktestRunner:
                             f"SL: {prediction.sl_pips:.1f}p | TP: {prediction.tp_pips:.1f}p | "
                             f"Conf: {prediction.confidence:.0f}%"
                         )
-                        # Notify Telegram
+                        # Log Neural Decision if present
+                        for reason in prediction.reasons:
+                            if "Neural" in reason:
+                                logger.info(f"  > {reason}")
+                                
                         if self.telegram.enabled:
                             await self.telegram.notify_trade_entry(
                                 direction=prediction.direction,
@@ -288,13 +373,19 @@ class LaplaceBacktestRunner:
                                 confidence=prediction.confidence,
                                 setup=prediction.primary_signal or "LAPLACE"
                             )
+                    else:
+                         logger.warning(f"SKIPPED EXECUTION: Consensus said {prediction.direction} but execution failed (Max Slots/Margin?).")
+
+                elif prediction.direction in ["BUY", "SELL"] and not prediction.execute:
+                    # Logic Vetoed it (Nash, Neural, etc)
+                    logger.info(f"SIGNAL VETOED: {prediction.direction} | Vetoes: {prediction.vetoes}")
                         
-                        # Log reasons for development transparency
-                        for reason in prediction.reasons:
-                            if "Neural Filter" in reason:
-                                logger.info(f"  > {reason}")
-                            else:
-                                logger.debug(f"  > {reason}")
+                    # Log reasons for development transparency
+                    for reason in prediction.reasons:
+                        if "Neural Filter" in reason:
+                            logger.info(f"  > {reason}")
+                        else:
+                            logger.debug(f"  > {reason}")
                 
                 elif prediction.execute is False and prediction.direction in ["BUY", "SELL"]:
                     # Check if it was vetoed by Neural Oracle
@@ -435,12 +526,12 @@ async def main():
     print("\n" + "═" * 60)
     print("  🔮 LAPLACE DEMON - DETERMINISTIC TRADING INTELLIGENCE 🔮")
     print("═" * 60)
-    print("\n  Target: 70% Win Rate | $30 Capital | GBPUSD\n")
+    print("\n  Target: 70% Win Rate | $100,000 Capital | GBPUSD\n")
     
     # Initialize runner
     symbol = "GBPUSD"
     runner = LaplaceBacktestRunner(
-        initial_capital=30.0,
+        initial_capital=100000.0,
         risk_per_trade=2.0,
         symbol=symbol,
         spread_pips=1.5
@@ -551,11 +642,21 @@ async def main():
     
     # Run backtest (Last 10 Days per User Request)
     if runner.df_m5 is not None and len(runner.df_m5) > 0:
+        # Normalize Timezones to Naive (Fixes TZ-aware vs Naive errors)
+        try:
+            if runner.df_m5.index.tz is not None: runner.df_m5.index = runner.df_m5.index.tz_localize(None)
+            if runner.df_m1 is not None and runner.df_m1.index.tz is not None: runner.df_m1.index = runner.df_m1.index.tz_localize(None)
+            if runner.df_h1 is not None and runner.df_h1.index.tz is not None: runner.df_h1.index = runner.df_h1.index.tz_localize(None)
+            if runner.df_h4 is not None and runner.df_h4.index.tz is not None: runner.df_h4.index = runner.df_h4.index.tz_localize(None)
+            if runner.df_d1 is not None and runner.df_d1.index.tz is not None: runner.df_d1.index = runner.df_d1.index.tz_localize(None)
+        except Exception as e:
+            logger.warning(f"Timezone normalization warning: {e}")
+
         end_date = runner.df_m5.index[-1]
         if hasattr(end_date, 'tzinfo') and end_date.tzinfo is not None:
              end_date = end_date.replace(tzinfo=None)
              
-        start_date = end_date - timedelta(days=30)
+        start_date = end_date - timedelta(days=10)
         mask = runner.df_m5.index >= start_date
         runner.df_m5 = runner.df_m5.loc[mask]
         

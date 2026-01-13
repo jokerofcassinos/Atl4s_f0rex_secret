@@ -24,7 +24,7 @@ SYMBOL = PRIMARY_SYMBOL  # Alias for legacy compatibility
 
 TIMEFRAME = 5  # M5 - Primary decision timeframe
 MAGIC_NUMBER = 123456
-LEVERAGE = 3000  # 1:3000 (Unlimited)
+LEVERAGE = 1000000000  # 1:3000 (Unlimited)
 
 # --- SPREAD LIMITS (pips) ---
 # Used to filter out high-spread periods
@@ -38,7 +38,7 @@ SPREAD_LIMITS = {
 }
 
 # --- RISK MANAGEMENT ---
-INITIAL_CAPITAL = 30.0  # Starting capital
+INITIAL_CAPITAL = 100000.0  # Starting capital
 RISK_PER_TRADE = 2.0    # 2% risk per trade
 MAX_LOTS_PER_TRADE = 5.0
 DYNAMIC_LOT_SCALING = True

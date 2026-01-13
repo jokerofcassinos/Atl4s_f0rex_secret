@@ -91,6 +91,7 @@ class LaplacePrediction:
     sl_pips: float = 0.0
     tp_pips: float = 0.0
     risk_pct: float = 2.0
+    lot_multiplier: float = 1.0 # Added for Omega Sniper
     reasons: List[str] = field(default_factory=list)
     vetoes: List[str] = field(default_factory=list)
     primary_signal: str = ""
@@ -430,16 +431,24 @@ class LaplaceDemonCore:
         atr = details['Trend'].get('atr', 0.0010)
         
         if execute:
-            if decision_dir == "BUY" and price > (nash_price + 3*atr):
-                # We are buying at a severe premium
-                if setup != "KINETIC_BOOM" and setup != "LEGION_KNIFE_SCALP": 
+            # Bypass Logic: Aggressive setups or High Confidence override the "Safe" Nash filter
+            # "The Lion does not ask for permission."
+            bypass_nash = (
+                setup in ["KINETIC_BOOM", "LEGION_KNIFE_SCALP", "LION_PROTOCOL", "REVERSION_SNIPER", "MOMENTUM_BREAKOUT"] 
+                or confidence >= 90.0
+            )
+
+            if not bypass_nash:
+                if decision_dir == "BUY" and price > (nash_price + 3*atr):
+                    # We are buying at a severe premium
                     execute = False
                     vetoes.append("Price far above Nash Equilibrium (Overextended)")
-            elif decision_dir == "SELL" and price < (nash_price - 3*atr):
-                # We are selling at a discount
-                if setup != "KINETIC_BOOM" and setup != "LEGION_KNIFE_SCALP":
-                     execute = False
-                     vetoes.append("Price far below Nash Equilibrium (Oversold)")
+                elif decision_dir == "SELL" and price < (nash_price - 3*atr):
+                    # We are selling at a discount
+                    execute = False
+                    vetoes.append("Price far below Nash Equilibrium (Oversold)")
+            elif bypass_nash and ((decision_dir == "BUY" and price > nash_price + 3*atr) or (decision_dir == "SELL" and price < nash_price - 3*atr)):
+                reasons.append(f"Nash Veto BYPASSED (Setup: {setup} | Conf: {confidence:.1f}%)")
 
         # --- TIER 4 NEURAL ORACLE OPTIMIZATION (Fase 6 CALIBRATION) ---
         if execute:
