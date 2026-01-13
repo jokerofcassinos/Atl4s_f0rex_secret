@@ -90,6 +90,10 @@ class BacktestConfig:
     risk_per_trade_pct: float = 2.0  # 2% risk per trade
     max_concurrent_trades: int = 3
     
+    # Virtual Stops (Phase 7 - User Request)
+    vsl_pips: Optional[float] = None  # Previous pip-based VSL
+    vsl_dollars: Optional[float] = 20.0  # Close if drawdown hits this amount in USD
+    
     # Spread/Commission (GBPUSD typical)
     spread_pips: float = 1.5  # Realistic spread
     commission_per_lot: float = 0.0  # Many brokers have 0 commission
@@ -343,6 +347,16 @@ class BacktestEngine:
                 return "SL_HIT"
             if current_price <= trade.tp_price:
                 return "TP_HIT"
+        
+        # Check VSL Pips (Legacy)
+        if self.config.vsl_pips is not None:
+            if current_pips <= -abs(self.config.vsl_pips):
+                return "VSL_HIT_PIPS"
+        
+        # Check VSL Dollars (Phase 7 - User Request: -$20)
+        if self.config.vsl_dollars is not None:
+            if current_pnl <= -abs(self.config.vsl_dollars):
+                return "VSL_HIT"
         
         return None
     

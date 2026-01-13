@@ -55,6 +55,7 @@ from analysis.swarm.overlord_swarm import OverlordSwarm
 from core.agi.big_beluga.snr_matrix import SNRMatrix
 from core.agi.microstructure.flux_heatmap import FluxHeatmap
 from core.agi.active_inference.free_energy import FreeEnergyMinimizer
+from core.agi.neural_oracle import NeuralOracle
 from core.ml.deep_models import ModelHub
 
 from core.swarm_orchestrator import SwarmOrchestrator
@@ -149,7 +150,8 @@ class LaplaceDemonCore:
 
         # --- 7. TIER 4 DEEP LEARNING (Neural Oracle) ---
         self.neural_hub = ModelHub()
-        self.oracle = self.neural_hub.create_price_predictor()
+        self.price_oracle = self.neural_hub.create_price_predictor()
+        self.neural_oracle = NeuralOracle()
         
         # Thread Pool for Heavy Math (Shared)
         self.executor = ThreadPoolExecutor(max_workers=10)
@@ -231,8 +233,8 @@ class LaplaceDemonCore:
         entropy_val = flux_metrics.get('entropy', 0.0)
         
         features = [rsi_val / 100.0, macd_val, delta_val, entropy_val]
-        pred_vector = self.oracle.predict(features)
-        details['Neural'] = pred_vector.tolist() if hasattr(pred_vector, 'tolist') else pred_vector
+        pred_vector = self.price_oracle.predict(features)
+        details['Neural_Price_Pred'] = pred_vector.tolist() if hasattr(pred_vector, 'tolist') else pred_vector
         
         # SNR Matrix (Tier 3)
         if df_h1 is not None and len(df_h1) > 50:
@@ -439,6 +441,27 @@ class LaplaceDemonCore:
                      execute = False
                      vetoes.append("Price far below Nash Equilibrium (Oversold)")
 
+        # --- TIER 4 NEURAL ORACLE OPTIMIZATION (Fase 6 CALIBRATION) ---
+        if execute:
+            win_prob = self.neural_oracle.predict_win_probability(df_m5, decision_dir, confidence)
+            details['Neural_Win_Prob'] = float(win_prob)
+            
+            # CALIBRATION: Since training data (83 trades) is small, we use a more relaxed threshold.
+            # Base WR was 41%, so anything > 40% is 'acceptable' for now.
+            # We also BYPASS veto if Consensus score is extremely high (Momentum Overlap).
+            
+            threshold = 0.40 # Reduced from 0.60
+            bypass_score = 45.0 # Extremely high conviction
+            
+            if win_prob < threshold and abs(score) < bypass_score:
+                execute = False
+                vetoes.append(f"Neural Oracle: Low Probability ({win_prob:.1%}) | Score: {abs(score):.1f}")
+                reasons.append(f"Neural Filter: REJECTED ({win_prob:.1%})")
+            elif win_prob < threshold and abs(score) >= bypass_score:
+                reasons.append(f"Neural Filter: BYPASSED (High Conviction Score {abs(score):.1f})")
+            else:
+                reasons.append(f"Neural Filter: APPROVED ({win_prob:.1%})")
+
         prediction = LaplacePrediction(
             execute=execute,
             direction=decision_dir,
@@ -457,16 +480,16 @@ class LaplaceDemonCore:
         return prediction
         
     def _apply_risk_management(self, prediction, df_m5):
-        """Standard SL/TP calculation (Sniper Protocol)"""
+        """Standard SL/TP calculation (Sniper Protocol) - Phase 7 Volatility Expansion"""
         # ... (simplified) ...
         # Get ATR
         atr = ta.volatility.AverageTrueRange(df_m5['high'], df_m5['low'], df_m5['close'], window=14).average_true_range().iloc[-1]
         
-        # SL = 2.0 ATR (Minimum 15 pips - Dynamic Risk)
-        sl_pips = max(15, (atr * 2.0) * 10000)
+        # SL = 200 pips (User Request: -$20 risk)
+        sl_pips = max(200, (atr * 3.5) * 10000)
         
         # TP = Fixed Ratio or Structure
-        tp_pips = sl_pips * 1.5 # 1:1.5 RR
+        tp_pips = sl_pips * 1.5 # 1:1.5 RR (Maintains mathematical edge)
         
         prediction.sl_pips = sl_pips
         prediction.tp_pips = tp_pips

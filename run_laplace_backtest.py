@@ -41,6 +41,9 @@ from backtest.metrics import MetricsCalculator, MonteCarloResult
 # Import Laplace Demon
 from core.laplace_demon import LaplaceDemonCore, LaplacePrediction
 
+# Import Analytics
+from analytics.telegram_notifier import get_notifier
+
 
 class LaplaceBacktestRunner:
     """
@@ -53,7 +56,7 @@ class LaplaceBacktestRunner:
                  symbol: str = "GBPUSD",
                  spread_pips: float = 1.5):
         
-        # Configuration
+        self.symbol = symbol
         self.config = BacktestConfig(
             initial_capital=initial_capital,
             leverage=3000.0,  # Unlimited
@@ -68,6 +71,11 @@ class LaplaceBacktestRunner:
         self.engine = BacktestEngine(self.config)
         self.laplace = LaplaceDemonCore(symbol)
         self.charts = ChartGenerator("reports")
+        # Phase 7: VSL ($20) & reporting
+        self.config.vsl_pips = None
+        self.config.vsl_dollars = 20.0
+        
+        self.telegram = get_notifier()
         
         # Data frames
         self.df_m1: Optional[pd.DataFrame] = None
@@ -78,21 +86,24 @@ class LaplaceBacktestRunner:
         
         logger.info(f"Laplace Backtest Runner initialized: ${initial_capital} | {symbol}")
     
-    def load_data(self, csv_path: str) -> bool:
+    async def load_data(self, file_path: str) -> bool:
         """
-        Load and prepare data from CSV.
+        Load and prepare data from CSV or Parquet.
         
-        Expects M1 data that will be resampled to all timeframes.
+        Expects M1 or M5 data.
         """
-        if not os.path.exists(csv_path):
-            logger.error(f"Data file not found: {csv_path}")
+        if not os.path.exists(file_path):
+            logger.error(f"Data file not found: {file_path}")
             return False
         
-        logger.info(f"Loading data from {csv_path}...")
+        logger.info(f"Loading data from {file_path}...")
         
         try:
-            # Load M1 data
-            df = pd.read_csv(csv_path)
+            # Load data based on extension
+            if file_path.endswith('.parquet'):
+                df = pd.read_parquet(file_path)
+            else:
+                df = pd.read_csv(file_path)
             
             # Standardize columns
             df.columns = [c.lower() for c in df.columns]
@@ -118,6 +129,10 @@ class LaplaceBacktestRunner:
             if 'volume' not in df.columns:
                 df['volume'] = 0
             
+            # Ensure naive timezone (Phase 7 Fix)
+            if df.index.tz is not None:
+                df.index = df.index.tz_localize(None)
+                
             self.df_m1 = df
             
             # Resample to other timeframes
@@ -194,12 +209,29 @@ class LaplaceBacktestRunner:
                 exit_reason = self.engine.update_trade(trade, current_price, current_time)
                 if exit_reason:
                     # Simulate proper exit price
-                    if trade.direction == TradeDirection.BUY:
-                        exit_price = trade.sl_price if exit_reason == "SL_HIT" else trade.tp_price
+                    if exit_reason == "SL_HIT":
+                        exit_price = trade.sl_price
+                    elif exit_reason == "TP_HIT":
+                        exit_price = trade.tp_price
                     else:
-                        exit_price = trade.sl_price if exit_reason == "SL_HIT" else trade.tp_price
+                        # For VSL or trailing stops, use current price
+                        exit_price = current_price
                     
                     self.engine.close_trade(trade, exit_price, current_time, exit_reason)
+                    
+                    # Notify Telegram
+                    if self.telegram.enabled:
+                        await self.telegram.notify_trade_exit(
+                            symbol=self.symbol,
+                            entry=trade.entry_price,
+                            exit=exit_price,
+                            pnl_dollars=trade.pnl_dollars,
+                            pnl_pips=trade.pnl_pips,
+                            reason=exit_reason,
+                            source=trade.signal_source
+                        )
+                    
+                    logger.info(f"EXIT #{trade.id}: {exit_reason} | PnL: ${trade.pnl_dollars:.2f} | Setup: {trade.signal_source}")
             
             # Check for new signals (respect minimum interval)
             if last_signal_time is not None:
@@ -239,11 +271,35 @@ class LaplaceBacktestRunner:
                     
                     if trade:
                         last_signal_time = i
-                        logger.info( # Changed to INFO to be visible in Production Mode
+                        logger.info(
                             f"TRADE #{trade.id}: {direction.value} @ {current_price:.5f} | "
-                            f"SL: {prediction.sl_pips}p | TP: {prediction.tp_pips}p | "
+                            f"SL: {prediction.sl_pips:.1f}p | TP: {prediction.tp_pips:.1f}p | "
                             f"Conf: {prediction.confidence:.0f}%"
                         )
+                        # Notify Telegram
+                        if self.telegram.enabled:
+                            await self.telegram.notify_trade_entry(
+                                direction=prediction.direction,
+                                symbol=self.symbol,
+                                entry=current_price,
+                                sl=trade.sl_price,
+                                tp=trade.tp_price,
+                                confidence=prediction.confidence,
+                                setup=prediction.primary_signal or "LAPLACE"
+                            )
+                        
+                        # Log reasons for development transparency
+                        for reason in prediction.reasons:
+                            if "Neural Filter" in reason:
+                                logger.info(f"  > {reason}")
+                            else:
+                                logger.debug(f"  > {reason}")
+                
+                elif prediction.execute is False and prediction.direction in ["BUY", "SELL"]:
+                    # Check if it was vetoed by Neural Oracle
+                    for veto in prediction.vetoes:
+                        if "Neural Oracle" in veto:
+                            logger.info(f"SIGNAL VETOED: {prediction.direction} @ {current_price:.5f} | {veto}")
                         
             except Exception as e:
                 logger.warning(f"Error in analysis at {current_time}: {e}")
@@ -495,7 +551,10 @@ async def main():
     # Run backtest (Last 10 Days per User Request)
     if runner.df_m5 is not None and len(runner.df_m5) > 0:
         end_date = runner.df_m5.index[-1]
-        start_date = end_date - timedelta(days=10)
+        if hasattr(end_date, 'tzinfo') and end_date.tzinfo is not None:
+             end_date = end_date.replace(tzinfo=None)
+             
+        start_date = end_date - timedelta(days=6)
         mask = runner.df_m5.index >= start_date
         runner.df_m5 = runner.df_m5.loc[mask]
         
@@ -520,6 +579,15 @@ async def main():
     if result:
         # Generate report
         runner.generate_report(result, f"laplace_{symbol.lower()}")
+        
+        # Notify Telegram (✅ FIX: Added await)
+        if runner.telegram.enabled:
+            await runner.telegram.notify_backtest_report(
+                symbol=symbol,
+                start_date=runner.df_m5.index[0].strftime('%Y-%m-%d'),
+                end_date=runner.df_m5.index[-1].strftime('%Y-%m-%d'),
+                results=result
+            )
         
         print("\n✅ Backtest complete! Check 'reports/' folder for charts.")
     else:

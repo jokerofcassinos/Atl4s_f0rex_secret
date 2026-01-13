@@ -50,7 +50,7 @@ class Quant:
         current_std = float(std_s.iloc[-1])
         
         if current_std == 0:
-            return 0, 0
+            return 0.0, 0, "NEUTRAL"
             
         z_score = (current_close - current_mean) / current_std
         

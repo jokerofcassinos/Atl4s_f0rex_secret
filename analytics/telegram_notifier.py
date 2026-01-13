@@ -1,33 +1,14 @@
-"""
-Genesis Telegram Notifier
-
-Real-time notifications via Telegram:
-- Trade alerts
-- Performance updates
-- Risk warnings
-- Daily summaries
-"""
-
 import logging
 import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any, List, Dict
 from pathlib import Path
 import json
 
 logger = logging.getLogger("TelegramNotifier")
 
-
 class TelegramNotifier:
-    """
-    Telegram notification system for Genesis
-    
-    Sends real-time alerts for:
-    - Trade entries/exits
-    - Performance milestones  
-    - Risk alerts
-    - Daily/weekly summaries
-    """
+    """Telegram notification system for Genesis"""
     
     def __init__(self, bot_token: str = None, chat_id: str = None):
         self.bot_token = bot_token
@@ -95,29 +76,26 @@ class TelegramNotifier:
                     else:
                         logger.error(f"Telegram error: {response.status}")
                         return False
-        except ImportError:
-            logger.warning("aiohttp not installed, using queue mode")
-            self.message_queue.append(text)
-            return False
         except Exception as e:
             logger.error(f"Telegram send error: {e}")
             return False
-    
+            
     def send_sync(self, text: str):
         """Synchronous send wrapper"""
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
+                # Avoid nested loops
                 asyncio.create_task(self.send_message(text))
             else:
                 loop.run_until_complete(self.send_message(text))
         except:
-            # Fallback for new event loop
-            asyncio.run(self.send_message(text))
-    
-    # Pre-formatted message templates
-    
-    def notify_trade_entry(self, direction: str, symbol: str, entry: float,
+            try:
+                asyncio.run(self.send_message(text))
+            except:
+                pass
+
+    async def notify_trade_entry(self, direction: str, symbol: str, entry: float,
                            sl: float, tp: float, confidence: float, setup: str):
         """Notify trade entry"""
         emoji = "🟢" if direction == "BUY" else "🔴"
@@ -129,39 +107,30 @@ class TelegramNotifier:
 Entry: `{entry:.5f}`
 SL: `{sl:.5f}`
 TP: `{tp:.5f}`
-
-🎯 Setup: {setup}
-💪 Confidence: {confidence:.0f}%
-⏰ {datetime.now().strftime('%H:%M:%S')}
+🎯 Setup: `{setup}`
+🔥 Conf: `{confidence:.1f}%`
 """
-        self.send_sync(message)
-    
-    def notify_trade_exit(self, direction: str, symbol: str, entry: float,
-                          exit_price: float, profit: float, pips: float, win: bool):
+        await self.send_message(message)
+
+    async def notify_trade_exit(self, symbol: str, entry: float, exit: float,
+                          pnl_dollars: float, pnl_pips: float, reason: str, source: str = "UNKNOWN"):
         """Notify trade exit"""
-        emoji = "✅" if win else "❌"
-        profit_emoji = "💰" if profit > 0 else "📉"
+        emoji = "💰" if pnl_dollars > 0 else "❌"
         
         message = f"""
-{emoji} *TRADE CLOSED - {'WIN' if win else 'LOSS'}*
+{emoji} *TRADE CLOSED - {symbol}*
 
-📊 *{symbol}* {direction}
 Entry: `{entry:.5f}`
-Exit: `{exit_price:.5f}`
-
-{profit_emoji} P/L: *${profit:.2f}* ({pips:.1f} pips)
-⏰ {datetime.now().strftime('%H:%M:%S')}
+Exit: `{exit:.5f}`
+Result: `${pnl_dollars:+.2f}` ({pnl_pips:+.1f} pips)
+🎯 Setup: `{source}`
+🚪 Reason: `{reason}`
 """
-        self.send_sync(message)
-    
-    def notify_risk_alert(self, level: str, category: str, message: str):
+        await self.send_message(message)
+
+    async def notify_risk_alert(self, level: str, category: str, message: str):
         """Notify risk alert"""
-        if level == "CRITICAL":
-            emoji = "🚨"
-        elif level == "WARNING":
-            emoji = "⚠️"
-        else:
-            emoji = "ℹ️"
+        emoji = "🚨" if level == "CRITICAL" else "⚠️" if level == "WARNING" else "ℹ️"
         
         text = f"""
 {emoji} *RISK ALERT - {level}*
@@ -171,129 +140,45 @@ Category: {category}
 
 ⏰ {datetime.now().strftime('%H:%M:%S')}
 """
-        self.send_sync(text)
-    
-    def notify_daily_summary(self, trades: int, wins: int, profit: float,
-                              win_rate: float, best_trade: float, worst_trade: float):
-        """Send daily summary"""
-        status = "✅" if win_rate >= 70 else "⚠️"
+        await self.send_message(text)
+
+    async def notify_backtest_report(self, symbol: str, start_date: str, end_date: str, results: Any):
+        """Send comprehensive backtest report"""
+        wr = getattr(results, 'win_rate', 0)
+        profit = getattr(results, 'net_profit', 0)
+        trades = getattr(results, 'total_trades', 0)
+        pf = getattr(results, 'profit_factor', 0)
+        mdd = getattr(results, 'max_drawdown_pct', 0)
+        
+        status = "🔥" if wr >= 60 else "✅" if wr >= 50 else "⚠️"
         
         message = f"""
-📊 *DAILY SUMMARY*
+{status} *BACKTEST COMPLETE - {symbol}*
+{start_date} ➔ {end_date}
 
-{status} Win Rate: *{win_rate:.1f}%*
+📊 *Win Rate: {wr:.1f}%*
+💰 *Net Profit: ${profit:.2f}*
+📉 *Profit Factor: {pf:.1f}*
+📉 *Max Drawdown: {mdd:.1f}%*
 
-📈 Trades: {trades}
-✅ Wins: {wins}
-❌ Losses: {trades - wins}
+📈 Total Trades: {trades}
+✅ Wins: {getattr(results, 'winning_trades', 0)}
+❌ Losses: {getattr(results, 'losing_trades', 0)}
 
-💰 Total P/L: *${profit:.2f}*
-🏆 Best: ${best_trade:.2f}
-📉 Worst: ${worst_trade:.2f}
-
-📅 {datetime.now().strftime('%Y-%m-%d')}
+🚀 *Genesis System Online*
 """
-        self.send_sync(message)
-    
-    def notify_milestone(self, milestone: str, details: str):
-        """Notify milestone achievement"""
-        message = f"""
-🎉 *MILESTONE ACHIEVED!*
+        await self.send_message(message)
 
-🏆 {milestone}
-
-{details}
-
-⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
-        self.send_sync(message)
-    
     def notify_system_status(self, status: str, details: str = ""):
-        """Notify system status"""
-        if status == "ONLINE":
-            emoji = "🟢"
-        elif status == "OFFLINE":
-            emoji = "🔴"
-        else:
-            emoji = "🟡"
-        
-        message = f"""
-{emoji} *GENESIS {status}*
-
-{details}
-
-⏰ {datetime.now().strftime('%H:%M:%S')}
-"""
+        """Notify system (sync fallback)"""
+        emoji = "🟢" if status == "ONLINE" else "🔴" if status == "OFFLINE" else "🟡"
+        message = f"{emoji} *GENESIS {status}*\n\n{details}"
         self.send_sync(message)
 
-
-# Global instance
 _notifier = None
 
-def get_notifier() -> TelegramNotifier:
-    """Get or create notifier instance"""
+def get_notifier():
     global _notifier
     if _notifier is None:
         _notifier = TelegramNotifier()
     return _notifier
-
-
-if __name__ == "__main__":
-    # Demo mode
-    print("="*60)
-    print("GENESIS TELEGRAM NOTIFIER - DEMO")
-    print("="*60)
-    print()
-    
-    notifier = TelegramNotifier()
-    
-    print("Telegram Status:", "Enabled" if notifier.enabled else "Disabled (no credentials)")
-    print()
-    
-    # Show sample messages
-    print("Sample Trade Entry Message:")
-    print("-" * 40)
-    print("""
-🟢 *NEW TRADE - BUY*
-
-📊 *GBPUSD*
-Entry: `1.26500`
-SL: `1.26300`
-TP: `1.27000`
-
-🎯 Setup: GENESIS_PULLBACK
-💪 Confidence: 75%
-⏰ 14:30:00
-""")
-    
-    print("Sample Trade Exit Message:")
-    print("-" * 40)
-    print("""
-✅ *TRADE CLOSED - WIN*
-
-📊 *GBPUSD* BUY
-Entry: `1.26500`
-Exit: `1.26800`
-
-💰 P/L: *$30.00* (30.0 pips)
-⏰ 15:45:00
-""")
-    
-    print("Sample Risk Alert:")
-    print("-" * 40)
-    print("""
-🚨 *RISK ALERT - CRITICAL*
-
-Category: DAILY_LOSS
-Daily loss $500 exceeds limit - STOP TRADING TODAY!
-
-⏰ 16:00:00
-""")
-    
-    print()
-    print("="*60)
-    print("To enable Telegram notifications:")
-    print("1. Create a bot via @BotFather on Telegram")
-    print("2. Get your chat ID via @userinfobot")
-    print("3. Run: notifier.save_config('BOT_TOKEN', 'CHAT_ID')")
-    print("="*60)
