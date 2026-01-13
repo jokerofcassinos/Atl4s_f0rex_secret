@@ -137,6 +137,13 @@ class LaplaceDemonCore:
 
         # --- 4. GAME THEORY (Nash Equilibrium) ---
         self.game = GameTheoryCore()
+
+        # --- 5. NEURAL ORACLE (Tier 4) ---
+        self.neural_oracle = NeuralOracle()
+        if self.neural_oracle._loaded:
+             logger.info("Neural Oracle Model: LOADED (Ready to Filter)")
+        else:
+             logger.warning("Neural Oracle Model: NOT LOADED (Bypass Mode)")
         
         # --- 5. TIER 2 SIGNALS (V2 Enhancements) ---
         self.smc_signal = SMCAnalyzer()
@@ -151,16 +158,90 @@ class LaplaceDemonCore:
 
         # --- 7. TIER 4 DEEP LEARNING (Neural Oracle) ---
         self.neural_hub = ModelHub()
-        self.price_oracle = self.neural_hub.create_price_predictor()
-        self.neural_oracle = NeuralOracle()
-        
-        # Thread Pool for Heavy Math (Shared)
-        self.executor = ThreadPoolExecutor(max_workers=10)
-        
-        self.params = { 'threshold': 20.0 } # Placeholder for synthesize usage
-        
-        self.last_prediction = None
-        logger.info(f"SYSTEM ONLINE: Laplace Demon V3 (Restored V1 Core + Swarm Hybrids)")
+
+    def record_trade(self, ticket: int, pnl: float, details: Dict):
+        """
+        Phase 4: Feedback Loop Interface.
+        Records closed trade outcome to the training dataset.
+        """
+        try:
+            # Save to CSV for offline training
+            import csv
+            import os
+            
+            file_path = "data/training/live_trades.csv"
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # Prepare row
+            row = {
+                'timestamp': datetime.now().isoformat(),
+                'ticket': ticket,
+                'pnl': pnl,
+                'direction': details.get('direction', 'UNKNOWN'),
+                'entry_price': details.get('entry_price', 0.0),
+                'exit_price': details.get('exit_price', 0.0),
+                'setup': details.get('source', 'UNKNOWN'),
+                'confidence': details.get('confidence', 0.0)
+            }
+            
+            # Write header if new
+            file_exists = os.path.exists(file_path)
+            
+            with open(file_path, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=row.keys())
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(row)
+                
+            logger.info(f"🧠 LEARNING: Recorded Trade {ticket} (PnL: ${pnl:.2f}) to training set.")
+            
+            logger.info(f"🧠 LEARNING: Recorded Trade {ticket} (PnL: ${pnl:.2f}) to training set.")
+            
+        except Exception as e:
+            logger.error(f"Failed to record trade for learning: {e}")
+
+    def record_experience(self, ticket: int, outcome: float, features: List[float]):
+        """
+        Phase 2 Integration: Cortex Memory & Akashic Records Interaction.
+        Called by ExecutionEngine upon trade closure.
+        outcome: 1.0 (Win), -1.0 (Loss)
+        """
+        try:
+            # 1. Update Short Term Memory (Cortex)
+            if self.consensus and self.consensus.cortex:
+                 self.consensus.cortex.store_experience(features, outcome)
+                 logger.info(f"🧠 CORTEX: Stored new memory (Feature Vector Len: {len(features)})")
+                 
+            # 2. Update Long Term Memory (Akashic) via Swarm (if available)
+            # (Akashic usually trains offline, but we can log unique events here)
+            pass 
+        except Exception as e:
+            logger.error(f"Failed to record experience: {e}")
+
+    async def initialize(self):
+        """
+        Awakens the Swarm. Must be called after instantiation and before loop.
+        """
+        logger.info("[INIT] AWAKENING SWARM AGENTS...")
+        if self.swarm:
+            await self.swarm.initialize_swarm()
+            count = len(self.swarm.active_agents)
+            logger.info(f"[SWARM] ONLINE: Discovered {count} active agents.")
+            
+            # Re-inject bridge now that agents exist
+            if hasattr(self, 'bridge') and self.bridge:
+                self.swarm.inject_bridge(self.bridge)
+                logger.info(f"[BRIDGE] PROPAGATED: {count} Agents armed.")
+
+    def set_bridge(self, bridge):
+        """
+        Phase 1 Integration: Connects the Brain (Laplace) to the Hand (ZmqBridge).
+        Allows Swarm Agents to execute advanced orders (Pruning, Harvesting).
+        """
+        self.bridge = bridge
+        if self.swarm:
+            self.swarm.inject_bridge(bridge)
+        logger.info("[BRIDGE] CONNECTED: Laplace Demon now has physical execution authority.")
 
     async def analyze(self,
                 df_m1: pd.DataFrame,
@@ -220,22 +301,16 @@ class LaplaceDemonCore:
         details['ToxicFlow'] = self.toxic_flow.detect_compression(df_m5)
         details['Flux'] = flux_metrics
 
-        # Neural Oracle (Tier 4)
-        # Features: [RSI (Norm), MACD, Delta, Entropy]
-        mom_res = self.momentum.analyze(df_m5)
-        
-        rsi_data = mom_res.get('rsi', {})
-        rsi_val = rsi_data.get('value', 50.0) if isinstance(rsi_data, dict) else 50.0
-        
-        macd_data = mom_res.get('macd', {})
-        macd_val = macd_data.get('macd', 0.0) if isinstance(macd_data, dict) else 0.0
-        
-        delta_val = df_m5['close'].diff().iloc[-1] if len(df_m5) > 1 else 0.0
-        entropy_val = flux_metrics.get('entropy', 0.0)
-        
-        features = [rsi_val / 100.0, macd_val, delta_val, entropy_val]
-        pred_vector = self.price_oracle.predict(features)
-        details['Neural_Price_Pred'] = pred_vector.tolist() if hasattr(pred_vector, 'tolist') else pred_vector
+        # Neural Oracle (Tier 4) - Hypothetical Check
+        try:
+             # We query the Oracle for both directions to gauge market bias
+             # Using 50% confidence as neutral baseline
+             prob_buy = self.neural_oracle.predict_win_probability(df_m5, "BUY", 50.0)
+             prob_sell = self.neural_oracle.predict_win_probability(df_m5, "SELL", 50.0)
+             details['Neural_Oracle_Hypothesis'] = {"BUY": f"{prob_buy:.2f}", "SELL": f"{prob_sell:.2f}"}
+        except Exception as e:
+             # Soft fail to not crash analysis
+             details['Neural_Oracle_Hypothesis'] = "N/A" # str(e)
         
         # SNR Matrix (Tier 3)
         if df_h1 is not None and len(df_h1) > 50:
@@ -254,6 +329,24 @@ class LaplaceDemonCore:
         # 3. SYNTHESIS
         prediction = self._synthesize_master_decision(legacy_result, legion_intel, details, current_price, df_m5)
         
+        # --- CONSCIOUSNESS STREAM (User Feedback) ---
+        # Log the internal state so the user sees the "Mind" at work
+        swarm_dec = legion_intel.get('swarm_decision', 'WAIT')
+        swarm_scr = legion_intel.get('swarm_score', 0.0)
+        
+        # Only log if there's something interesting or partially interesting
+        # OR just log concise heartbeat every tick
+        log_msg = (f"🤔 THINKING | Price: {current_price} | "
+                   f"Legacy: {legacy_result['score']:.1f} | "
+                   f"Swarm: {swarm_dec} ({swarm_scr:.1f}%) | "
+                   f"Setup: {prediction.primary_signal if prediction.primary_signal else 'Monitoring'}")
+                   
+        # Log at INFO level so it shows up in console
+        logger.info(log_msg)
+
+        if prediction.execute:
+            logger.info(f"🚨 SIGNAL GENERATED: {prediction.direction} | Conf: {prediction.confidence:.1f}% | Reasons: {prediction.reasons}")
+            
         return prediction
 
     def _run_legacy_consensus(self, data_map):
@@ -471,6 +564,16 @@ class LaplaceDemonCore:
             else:
                 reasons.append(f"Neural Filter: APPROVED ({win_prob:.1%})")
 
+        # --- OMEGA MULTIPLIER LOGIC ---
+        lot_multiplier = 1.0
+        if execute:
+            if setup in ["KINETIC_BOOM", "LEGION_KNIFE_SCALP", "LION_PROTOCOL", "REVERSION_SNIPER"]:
+                lot_multiplier = 5.0
+            elif setup == "MOMENTUM_BREAKOUT" and confidence >= 95.0:
+                lot_multiplier = 2.0
+            elif setup == "MOMENTUM_BREAKOUT":
+                lot_multiplier = 1.0
+
         prediction = LaplacePrediction(
             execute=execute,
             direction=decision_dir,
@@ -480,7 +583,8 @@ class LaplaceDemonCore:
             reasons=reasons,
             vetoes=vetoes,
             logic_vector=score,
-            details=details
+            details=details,
+            lot_multiplier=lot_multiplier # Pass calculated multiplier
         )
         
         if execute:

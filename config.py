@@ -24,7 +24,7 @@ SYMBOL = PRIMARY_SYMBOL  # Alias for legacy compatibility
 
 TIMEFRAME = 5  # M5 - Primary decision timeframe
 MAGIC_NUMBER = 123456
-LEVERAGE = 1000000000  # 1:3000 (Unlimited)
+LEVERAGE = 100  # FTMO Standard Max Leverage
 
 # --- SPREAD LIMITS (pips) ---
 # Used to filter out high-spread periods

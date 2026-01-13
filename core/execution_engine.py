@@ -55,8 +55,68 @@ class ExecutionEngine:
         if not self.bridge: return
         
         trades = tick.get('trades_json', [])
-        if not trades: return
+        if not trades: 
+            # If no open trades, checking if we had any before to record closures
+            pass
+            
+        current_tickets = {t.get('ticket') for t in trades}
         
+        # Phase 4.3: Detect Closed Trades (Inference)
+        # Check if any previously known trade is missing
+        crashed_tickets = []
+        for ticket, details in self.trade_sources.items():
+            if ticket not in current_tickets and ticket not in self.closed_tickets_cache:
+                # Trade Closed!
+                # We interpret this as a closed event.
+                
+                # Approximate PnL (We don't have exact exit price from tick, use current Bid/Ask)
+                # This is "good enough" for RL reward signal
+                # For exact auditing, we trust MT5 history report later.
+                
+                exit_price = tick.get('bid', 0)
+                
+                # Retrieve details
+                entry_price = details.get('entry_price', 0.0)
+                direction = details.get('direction', 'BUY')
+                lots = details.get('lots', 0.0)
+                
+                # Approx PnL (Price Diff * Direction)
+                price_diff = (exit_price - entry_price) if direction == "BUY" else (entry_price - exit_price)
+                # Raw dollar approx (assuming 100k contract for forex)
+                approx_pnl = price_diff * lots * 100000 
+                
+                # Report to Learning Engine
+                if self.history_engine:
+                     # 1. Record Trade (CSV)
+                     self.history_engine.record_trade(
+                         ticket=ticket, 
+                         pnl=approx_pnl, 
+                         details={**details, 'exit_price': exit_price, 'status': 'CLOSED'}
+                     )
+                     
+                     # 2. Record Experience (Cortex Memory)
+                     # We need features. If not stored, we approximate using current tick?
+                     # Ideal: We stored features in trade_sources.
+                     # Fallback: Capture current state features (Better than nothing)
+                     
+                     outcome = 1.0 if approx_pnl > 0 else -1.0
+                     # Placeholder features: [RSI, Volatility, ROC, Hour]. 
+                     # Accessing via history_engine.learning_module ?
+                     # We will dispatch the outcome and let Laplace handle feature extraction if possible.
+                     
+                     # Using a simplified feature set [Confidence, Hour, PnL_Sign] if real features missing
+                     features = [details.get('confidence', 50)/100.0, 0.5, 0.5, 0.5] 
+                     
+                     if hasattr(self.history_engine, 'record_experience'):
+                         self.history_engine.record_experience(ticket, outcome, features)
+                
+                crashed_tickets.append(ticket)
+                self.closed_tickets_cache.add(ticket)
+        
+        # Cleanup closed
+        for t in crashed_tickets:
+            del self.trade_sources[t]
+
         # Phase 4.2: Map new trades to pending sources
         for trade in trades:
             ticket = trade.get('ticket')
@@ -78,6 +138,16 @@ class ExecutionEngine:
                 if matcher is not None:
                     # Remove from pending (consumed)
                     del self.pending_sources[matcher]
+                
+                # Store vital stats for PnL calc on closure
+                type_int = trade.get('type')
+                direction = "BUY" if type_int == 0 else "SELL"
+                entry_price = trade.get('open_price', 0.0)
+                lots = trade.get('volume', 0.0)
+                
+                found_data['direction'] = direction
+                found_data['entry_price'] = entry_price
+                found_data['lots'] = lots
                     
                 self.trade_sources[ticket] = found_data
                 # logger.info(f"TRADE SOURCE MAPPED: Ticket {ticket} -> {found_source}")

@@ -262,6 +262,16 @@ class ZmqBridge:
                      if "DRAW" not in action:
                          logger.warning(f"Could not route command '{action}' to params {params} (Clients: {list(self.clients.keys())})")
 
+    def get_tick(self):
+        return self.latest_tick
+
+    def get_open_trades(self):
+        """
+        Returns the simplified list of open trades.
+        Used by LaplaceDemon to check concurrency limits.
+        """
+        return self.latest_trades
+
     def send_dashboard(self, state):
         pass
 

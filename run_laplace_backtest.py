@@ -56,10 +56,10 @@ class LaplaceBacktestRunner:
                  symbol: str = "GBPUSD",
                   spread_pips: float = 1.5):
         
-        # Dynamic Leverage (User Request: Drop to 1:500 if Capital > 1000)
-        leverage = 1000000000.0
+        # Dynamic Leverage (FTMO Compliance)
+        leverage = 100.0
         if initial_capital > 1000:
-            leverage = 500.0
+            leverage = 50.0
             
         self.symbol = symbol
         self.config = BacktestConfig(

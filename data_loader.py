@@ -200,12 +200,17 @@ class DataLoader:
              )
 
         if basket_tasks:
+            # logger.info(f"Checking Correlation Basket ({len(basket_symbols)} pairs)...")
             basket_results = await asyncio.gather(*basket_tasks)
             for i, df in enumerate(basket_results):
                 if df is not None and not df.empty:
                     global_basket[basket_symbols[i]] = df
              
         data_map['global_basket'] = global_basket # Apex and Nexus both use this
+        
+        # PERSIST STATE (Crucial for Main Loop validation)
+        self.cache_data = data_map 
+        self.cached_data = data_map
         
         return data_map
 
@@ -291,7 +296,8 @@ class DataLoader:
             if cached_df is not None and not cached_df.empty:
                 # Concatenate and remove duplicates
                 combined_df = pd.concat([cached_df, new_df])
-                combined_df = combined_df[~combined_df.index.duplicated(keep='last')]
+                combined_df = combined_df.groupby(combined_df.index).last()
+                combined_df = combined_df.sort_index()
             else:
                 combined_df = new_df
             
@@ -365,21 +371,17 @@ class DataLoader:
                 df.columns = [c.lower() for c in df.columns]
                 
                 required = ['open', 'high', 'low', 'close', 'volume']
-                if not all(col in df.columns for col in required):
-                     # This might happen if yfinance returns partial data (e.g., for indices)
-                     # or if there's an issue with the data source.
-                     # Filter only existing columns to avoid KeyErrors
-                     available = [c for c in required if c in df.columns]
-                     df = df[available]
-                     if not df.empty:
-                         logger.warning(f"Missing some required columns for {ticker}, using available: {available}")
-                     else:
-                         raise ValueError("Missing all required columns or empty after filtering.")
-                     
+                
+                # Validation
+                if df.empty:
+                    logger.warning(f"YFINANCE EMPTY: {ticker} (Attempt {attempt+1})")
+                    raise ValueError("Empty Data")
+                
+                logger.info(f"YFINANCE SUCCESS: {ticker} | Rows: {len(df)}")
                 return df
                 
             except Exception as e:
-                logger.warning(f"Fetch attempt {attempt+1}/{max_retries} failed for {ticker} (interval: {interval}): {e}")
+                logger.warning(f"Fetch attempt {attempt+1}/{max_retries} failed for {ticker}: {e}")
                 if attempt == max_retries - 1:
                     logger.error(f"FINAL FAIL: Could not fetch {ticker} after {max_retries} attempts.")
                     return None
@@ -437,6 +439,9 @@ class DataLoader:
             "Open": "open", "High": "high", "Low": "low", 
             "Close": "close", "Volume": "volume"
         })
+        
+        # Fix: Remove duplicate columns (e.g. if multiple 'open' present due to flattening)
+        df = df.loc[:, ~df.columns.duplicated()]
         
         # Ensure we have the required columns
         required = ['open', 'high', 'low', 'close', 'volume']
