@@ -49,11 +49,17 @@ class VolatilityGuard:
         # XAUUSD M5 typical ATR might be 0.5 - 2.0 points.
         # If ATR is too low, it's dead market.
         
-        if atr > 0.5: # Minimum volatility requirement
+        current_price = float(close_series.iloc[-1])
+        min_atr = 0.5 if current_price > 500 else 0.00005 # 0.5 for Gold, 0.5 pips (0.00005) for Forex
+        
+        if atr > min_atr: # Minimum volatility requirement
             score += 50
         else:
-            logger.info(f"Low Volatility detected. ATR: {atr:.2f}")
-            return 0, "LOW_VOL"
+            # logger.info(f"Low Volatility detected. ATR: {atr:.4f} < {min_atr}")
+            # Don't fail completely, just lower score? 
+            # Actually, return LOW_VOL but maybe Consensus can override perfectly valid 0.5 pip scalps?
+            # Let's keep it but make it very sensitive (0.5 pips).
+            return 20, "LOW_VOL" # Allow it but low score
             
         # Bandwidth Expansion
         # If bandwidth is increasing, volatility is expanding.

@@ -1,38 +1,72 @@
 import asyncio
 import pandas as pd
 import numpy as np
-import ta # Biblioteca de Análise Técnica
+import ta 
 from datetime import datetime
 import logging
 from typing import Dict, Optional, Tuple, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# --- MODULE IMPORTS ---
+# --- MODULE IMPORTS (RESTORING THE BUGATTI ENGINE) ---
+
+# 1. Signals (New Architecture)
 from signals.timing import QuarterlyTheory, M8FibonacciSystem
 from signals.structure import SMCAnalyzer
+from signals.momentum import MomentumAnalyzer, ToxicFlowDetector
+# from signals.volatility import VolatilityAnalyzer # Conflict: Use Legacy Guard or New?
+# Let's use the New Volatility Analyzer if it's cleaner, but Legacy Logic relies on specific methods.
+# For safety, we will import legacy classes from analysis for logic consistency.
+
+# 2. Legacy Analysis Modules (The V1 Core)
 from analysis.trend_architect import TrendArchitect
-from signals.momentum import MomentumAnalyzer
-from signals.volatility import VolatilityAnalyzer
-from analysis.m8_fibonacci_system import M8FibonacciSystem
-from analysis.swarm.vortex_swarm import VortexSwarm
-
-# --- OMNI & HEISENBERG ---
-from core.agi.big_beluga.snr_matrix import SNRMatrix
-from core.agi.microstructure.flux_heatmap import FluxHeatmap
+from analysis.sniper import Sniper
+from analysis.quant import Quant
+from analysis.volatility import VolatilityGuard
+from analysis.patterns import PatternRecon
+from analysis.market_cycle import MarketCycle
+from analysis.supply_demand import SupplyDemand
+from analysis.divergence import DivergenceHunter
+from analysis.kinematics import Kinematics
+from analysis.microstructure import MicroStructure
+from analysis.fractal_vision import FractalVision
+from analysis.math_core import MathCore
 from analysis.quantum_core import QuantumCore
-from core.agi.active_inference.free_energy import FreeEnergyMinimizer
+from analysis.cortex_memory import CortexMemory
+from analysis.prediction_engine import PredictionEngine
+from analysis.wavelet_core import WaveletCore
+from analysis.topology_engine import TopologyEngine
+from analysis.game_theory import GameTheoryCore
 from analysis.chaos_engine import ChaosEngine
+from analysis.supply_chain import SupplyChainGraph
+# Omitting Eye modules here to avoid circular dependencies (Laplace replaces Consensus)
+# We will integrate their logic directly or use simplified versions if needed.
+# For now, we focus on the ANALYTICAL engines, not the decision agents (which are swarms now).
 
-# --- LEGION ELITE ---
+# 3. LEGION ELITE (The Swarm)
+from analysis.swarm.vortex_swarm import VortexSwarm
 from analysis.swarm.time_knife_swarm import TimeKnifeSwarm
 from analysis.swarm.physarum_swarm import PhysarumSwarm
 from analysis.swarm.event_horizon_swarm import EventHorizonSwarm
 from analysis.swarm.overlord_swarm import OverlordSwarm
 
-# AGI Components (for initialization)
-from core.holographic_memory import HolographicMemory
-from core.agi.infinite_why_engine import InfiniteWhyEngine
+# 4. AGI Helpers
+from core.agi.big_beluga.snr_matrix import SNRMatrix
+from core.agi.microstructure.flux_heatmap import FluxHeatmap
+from core.agi.active_inference.free_energy import FreeEnergyMinimizer
+from core.ml.deep_models import ModelHub
+
+from core.swarm_orchestrator import SwarmOrchestrator
+from analysis.consensus import ConsensusEngine
+from analysis.deep_cognition import DeepCognition
+
+# Swarm Dependencies
+from core.consciousness_bus import ConsciousnessBus
+from core.genetics import EvolutionEngine
+from core.neuroplasticity import NeuroPlasticityEngine
+from core.transformer_lite import TransformerLite
+from core.mcts_planner import MCTSPlanner
 
 logger = logging.getLogger("LaplaceDemon")
 
@@ -59,53 +93,78 @@ class LaplacePrediction:
     reasons: List[str] = field(default_factory=list)
     vetoes: List[str] = field(default_factory=list)
     primary_signal: str = ""
+    logic_vector: float = 0.0
+    details: Dict = field(default_factory=dict)
 
 class LaplaceDemonCore:
-    # Horários de Alta Volatilidade (London + NY)
+    """
+    The True Succesor to ConsensusEngine (V1).
+    Merges the 'Bugatti' analytical engine of V1 with the Async Swarm architecture of V2.
+    """
     ALLOWED_HOURS_SET = {7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17} 
 
     def __init__(self, symbol: str = "GBPUSD", contrarian_mode: bool = False):
         self.symbol = symbol
         self.daily_trades = {'date': None, 'count': 0}
         
-        # Advanced AGI Components
-        self.holographic_memory = HolographicMemory()
-        self.infinite_why = InfiniteWhyEngine(
-            max_depth=1,  # REDUCED from 4 for backtest performance
-            max_branches=6,  # REDUCED from 12
-            parallel_workers=1,  # REDUCED from 2
-            enable_meta_reasoning=False  # DISABLED for speed
+        # --- 1. THE BUGATTI ENGINE (Legacy V1 Core) ---
+        # Refactored: We now wrap the dedicated ConsensusEngine instead of duplication
+        logger.info("Initializing Consensus Engine (V1 Logic)...")
+        self.consensus = ConsensusEngine()
+        
+        # --- 2. DEEP COGNITION (Subconscious) ---
+        logger.info("Initializing Deep Cognition...")
+        self.deep_brain = DeepCognition()
+        
+        # --- 3. SWARM INTELLIGENCE (V2 Swarm) ---
+        logger.info("Initializing AGI Components & Swarm...")
+        # Dependency Injection for Swarm
+        self.bus = ConsciousnessBus()
+        self.evo = EvolutionEngine()
+        self.neuro = NeuroPlasticityEngine()
+        self.attention = TransformerLite(embed_dim=64, head_dim=8)
+        self.planner = MCTSPlanner()
+        
+        self.swarm = SwarmOrchestrator(
+            bus=self.bus, 
+            evolution=self.evo, 
+            neuroplasticity=self.neuro, 
+            attention=self.attention, 
+            grandmaster=self.planner
         )
-        # BASIC MODULES
-        self.quarterly = QuarterlyTheory()
-        self.m8_fib = M8FibonacciSystem()
-        self.trend_architect = TrendArchitect(symbol=symbol)
-        self.smc = SMCAnalyzer()
+
+        # --- 4. GAME THEORY (Nash Equilibrium) ---
+        self.game = GameTheoryCore()
+        
+        # --- 5. TIER 2 SIGNALS (V2 Enhancements) ---
+        self.smc_signal = SMCAnalyzer()
         self.momentum = MomentumAnalyzer()
-        self.volatility = VolatilityAnalyzer()
-        self.vortex = VortexSwarm()
+        self.quarterly = QuarterlyTheory()
+        self.m8_system = M8FibonacciSystem()
+        self.toxic_flow = ToxicFlowDetector()
         
-        # ADVANCED MODULES
+        # --- 6. TIER 3 AGI CORE ---
         self.snr_matrix = SNRMatrix()
-        self.heatmap = FluxHeatmap()
-        self.quantum = QuantumCore()
-        self.free_energy = FreeEnergyMinimizer()
-        self.chaos = ChaosEngine()
+        self.flux_heatmap = FluxHeatmap()
+
+        # --- 7. TIER 4 DEEP LEARNING (Neural Oracle) ---
+        self.neural_hub = ModelHub()
+        self.oracle = self.neural_hub.create_price_predictor()
         
-        # LEGION ELITE
-        self.time_knife = TimeKnifeSwarm()
-        self.physarum = PhysarumSwarm()
-        self.event_horizon = EventHorizonSwarm()
-        self.overlord = OverlordSwarm()
+        # Thread Pool for Heavy Math (Shared)
+        self.executor = ThreadPoolExecutor(max_workers=10)
+        
+        self.params = { 'threshold': 20.0 } # Placeholder for synthesize usage
         
         self.last_prediction = None
-        logger.info("SYSTEM ONLINE: Laplace Sniper Protocol (70% WR Target)")
+        logger.info(f"SYSTEM ONLINE: Laplace Demon V3 (Restored V1 Core + Swarm Hybrids)")
 
     async def analyze(self,
                 df_m1: pd.DataFrame,
                 df_m5: pd.DataFrame,
                 df_h1: pd.DataFrame,
                 df_h4: pd.DataFrame,
+                df_d1: pd.DataFrame = None, # Added D1
                 current_time: datetime = None,
                 current_price: float = None,
                 **kwargs) -> LaplacePrediction:
@@ -113,171 +172,316 @@ class LaplaceDemonCore:
         if current_time is None: current_time = datetime.now()
         if current_price is None and df_m5 is not None: current_price = df_m5['close'].iloc[-1]
         
-        # 1. PERCEPTION (Síncrona)
-        structure_data = self.smc.analyze(df_m5, current_price)
-        trend_context = self.trend_architect.analyze(df_m5, df_h1, df_h4, None)
-        quarterly = self.quarterly.analyze(current_time, df_m5)
+        # 1. PERCEPTION (FAST) -> Microstructure (Tier 3 Flux)
+        flux_metrics = {}
+        if 'tick' in kwargs:
+             flux_metrics = self.flux_heatmap.update(kwargs['tick'])
         
-        # 2. LEGION PARALLEL PROCESSING (Async)
-        swarm_ctx = {
-            'df_m1': df_m1, 'df_m5': df_m5, 'df_h1': df_h1, 
-            'tick': {'bid': current_price, 'ask': current_price},
-            'data_map': {'M5': df_m5, 'M1': df_m1}
+        # Data Map for V1 Engines
+        data_map = {
+            'M5': df_m5,
+            'H1': df_h1,
+            'H4': df_h4,
+            'D1': df_d1
         }
         
-        tasks = [
-            self.time_knife.process(swarm_ctx),
-            self.event_horizon.process(swarm_ctx),
-            self.physarum.process(swarm_ctx),
-            self.overlord.process(swarm_ctx)
-        ]
+        # 1. SWARM ORCHESTRATOR (Async)
+        # We start the swarm first as it might need time (or runs parallel)
         
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Construct Inputs
+        tick_dict = {'bid': current_price, 'ask': current_price, 'time': current_time, 'symbol': self.symbol}
+        swarm_data_map = {'M1': df_m1, 'M5': df_m5, 'H1': df_h1, 'H4': df_h4}
         
-        legion_intel = {
-            'knife': results[0] if not isinstance(results[0], Exception) else None,
-            'horizon': results[1] if not isinstance(results[1], Exception) else None,
-            'physarum': results[2] if not isinstance(results[2], Exception) else None,
-            'overlord': results[3] if not isinstance(results[3], Exception) else None
-        }
+        # Call Swarm
+        swarm_decision, swarm_score, swarm_meta = await self.swarm.process_tick(
+            tick=tick_dict, 
+            data_map=swarm_data_map
+        )
+        
+        # Pack into Legion Intel dict for synthesis transparency
+        legion_intel = swarm_meta if swarm_meta else {}
+        legion_intel['swarm_decision'] = swarm_decision
+        legion_intel['swarm_score'] = swarm_score
+        
+        # 2. LEGACY CONSENSUS (CPU Bound - Run in Thread)
+        # The heavy math engines
+        loop = asyncio.get_event_loop() # Changed from get_running_loop()
+        legacy_result, details = await loop.run_in_executor(
+            None, # Use default executor (self.executor if set, otherwise default ThreadPoolExecutor)
+            self._run_legacy_consensus, 
+            data_map
+        )
+        
+        # --- TIER 2 SIGNALS (SMC / M8 / Toxic) ---
+        details['SMC'] = self.smc_signal.analyze(df_m5, current_price)
+        details['ToxicFlow'] = self.toxic_flow.detect_compression(df_m5)
+        details['Flux'] = flux_metrics
 
-        # 3. SYNTHESIS (Decisão Central - PROTOCOLO SNIPER)
-        decision = self._synthesize_agi_decision(
-            df_m5=df_m5,
-            current_price=current_price,
-            trend_context=trend_context,
-            legion_intel=legion_intel
-        )
+        # Neural Oracle (Tier 4)
+        # Features: [RSI (Norm), MACD, Delta, Entropy]
+        mom_res = self.momentum.analyze(df_m5)
         
-        # 4. EXECUTION
-        prediction = LaplacePrediction(
-            execute=decision['execute'], 
-            direction=decision['direction'], 
-            confidence=decision['confidence'],
-            strength=SignalStrength.STRONG,
-            reasons=decision['reasons'],
-            primary_signal=decision['setup_type']
-        )
+        rsi_data = mom_res.get('rsi', {})
+        rsi_val = rsi_data.get('value', 50.0) if isinstance(rsi_data, dict) else 50.0
         
-        if prediction.execute:
-            # Risco Conservador para construir a conta (1-2%)
-            # Aumentamos apenas se a confiança for extrema
-            prediction.risk_pct = 5.0 if prediction.confidence > 85 else 2.0
-            
-            # Dynamic SL/TP (Protocolo Sniper: Alvos Curtos)
-            vol = self.volatility.analyze(df_m5)
-            
-            # ✅ BACKTEST FIX: VolatilityState is a dataclass, not a dict
-            vol_regime = vol.get('regime')  # Returns VolatilityState object
-            if vol_regime and hasattr(vol_regime, 'atr'):
-                atr = vol_regime.atr * 10000  # Convert to pips
-            else:
-                atr = 20.0  # Default 20 pips if analysis fails
-            
-            sl_tp = self._calculate_sl_tp(prediction.direction, current_price, atr, structure_data, decision['setup_type'])
-            
-            prediction.sl_pips = sl_tp['sl_pips']
-            prediction.tp_pips = sl_tp['tp_pips']
-            prediction.sl_price = sl_tp['sl']
-            prediction.tp_price = sl_tp['tp']
-            
-        self.last_prediction = prediction
+        macd_data = mom_res.get('macd', {})
+        macd_val = macd_data.get('macd', 0.0) if isinstance(macd_data, dict) else 0.0
+        
+        delta_val = df_m5['close'].diff().iloc[-1] if len(df_m5) > 1 else 0.0
+        entropy_val = flux_metrics.get('entropy', 0.0)
+        
+        features = [rsi_val / 100.0, macd_val, delta_val, entropy_val]
+        pred_vector = self.oracle.predict(features)
+        details['Neural'] = pred_vector.tolist() if hasattr(pred_vector, 'tolist') else pred_vector
+        
+        # SNR Matrix (Tier 3)
+        if df_h1 is not None and len(df_h1) > 50:
+            self.snr_matrix.scan_structure(df_h1)
+            details['SNR'] = self.snr_matrix.get_nearest_levels(current_price)
+        
+        # M8 Fibonacci (Resample M1)
+        if df_m1 is not None and not df_m1.empty:
+             try:
+                 df_m8 = df_m1.resample('8min').agg({'open':'first', 'high':'max', 'low':'min', 'close':'last', 'volume':'sum'}).dropna()
+                 if not df_m8.empty:
+                     details['M8'] = self.m8_system.analyze(df_m8, current_time)
+             except Exception as e:
+                 logger.warning(f"M8 Analysis Failed: {e}")
+
+        # 3. SYNTHESIS
+        prediction = self._synthesize_master_decision(legacy_result, legion_intel, details, current_price, df_m5)
+        
         return prediction
 
-    def _synthesize_agi_decision(self, df_m5: pd.DataFrame, current_price: float, trend_context: Dict, legion_intel: Dict) -> Dict:
+    def _run_legacy_consensus(self, data_map):
         """
-        THE SNIPER BRAIN
-        Focado em Alta Probabilidade (Trend Pullback).
+        Executes the heavy V1 math engines via the dedicated ConsensusEngine.
+        Returns the 'Preliminary Vector' and detailed analysis.
         """
-        decision = {
-            'execute': False, 'direction': 'WAIT', 'confidence': 0, 
-            'reasons': [], 'setup_type': 'None', 'magnetic_target': None
-        }
+        # Delegate to the Single Source of Truth
+        decision, legacy_vector, details = self.consensus.deliberate(data_map)
         
-        if df_m5 is None or len(df_m5) < 200: return decision
+        # Adapt output format to match what _synthesize expects
+        # ConsensusEngine returns: (decision_str, vector_float, details_dict)
+        # We need: ({'score': vector, 'setup': setup_type}, details)
+        
+        setup_type = None
+        if isinstance(details, dict):
+            # Try to find reason in Vectors or general details
+            setup_type = details.get('Vectors', {}).get('Reason')
+            if not setup_type:
+                 setup_type = details.get('setup_name') # Just in case I patch consensus later
+        
+        return {'score': legacy_vector, 'setup': setup_type}, details
 
-        # --- 1. INDICADORES TÉCNICOS (O Motor Sniper) ---
-        close = df_m5['close']
+    def _synthesize_master_decision(self, legacy_result, legion_intel, details, price, df_m5):
+        """
+        Merges the Legacy Vector with Swarm Intelligence.
+        THE HYBRID ENGINE: Bugatti V1 + AGI Swarm V2
+        """
+        score = legacy_result['score']
+        setup = legacy_result['setup']
         
-        # EMA 200 (A Muralha da Tendência)
-        ema200 = ta.trend.EMAIndicator(close, window=200).ema_indicator().iloc[-1]
+        reasons = []
+        vetoes = []
         
-        # RSI 14 (O Gatilho)
-        rsi = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
-        
-        # --- 2. LÓGICA DE EXECUÇÃO ---
-        
-        # SETUP A: SNIPER BULL (Compra na Tendência)
-        # Preço > EMA200 (Tendência de Alta) E RSI < 40 (Oversold - Pullback)
-        # PHASE 2: Relaxed from 35 to 40 for more signals
-        if current_price > ema200:
-            if rsi < 40:
-                decision['execute'] = True
-                decision['direction'] = "BUY"
-                decision['confidence'] = 80
-                decision['setup_type'] = "SNIPER_PULLBACK_BUY"
-                decision['reasons'].append(f"Trend UP (Price > EMA200) + RSI Oversold ({rsi:.1f})")
-        
-        # SETUP B: SNIPER BEAR (Venda na Tendência)
-        # Preço < EMA200 (Tendência de Baixa) E RSI > 60 (Overbought - Pullback)
-        # PHASE 2: Relaxed from 65 to 60 for more signals
-        elif current_price < ema200:
-            if rsi > 60:
-                decision['execute'] = True
-                decision['direction'] = "SELL"
-                decision['confidence'] = 80
-                decision['setup_type'] = "SNIPER_PULLBACK_SELL"
-                decision['reasons'].append(f"Trend DOWN (Price < EMA200) + RSI Overbought ({rsi:.1f})")
-
-        # --- 3. CONFIRMAÇÃO DA LEGIÃO (Boost) ---
+        if setup:
+            reasons.append(f"Legacy V1 Setup: {setup} (Base Score: {score:.1f})")
+            
+        # --- SWARM INTELLIGENCE INTEGRATION ---
+        # 1. Specific Agent Confirmations (Micro-Boosts)
         knife = legion_intel.get('knife')
         horizon = legion_intel.get('horizon')
         
-        if decision['execute']:
-            # Se a Legião concorda, aumentamos a mão
-            if knife and knife.signal_type == decision['direction']:
-                decision['confidence'] = 95
-                decision['reasons'].append("Legion TimeKnife Confirm")
-            if horizon and horizon.signal_type == decision['direction']:
-                decision['confidence'] = 90
-                decision['reasons'].append("Legion EventHorizon Confirm")
-                
-        # --- 4. OVERRIDE DE EMERGÊNCIA (TimeKnife Scalp) ---
-        # Se não temos setup Sniper, mas o TimeKnife vê um pico absurdo (Reversão M1)
-        if not decision['execute']:
-            if knife and knife.confidence > 85:
-                decision['execute'] = True
-                decision['direction'] = knife.signal_type
-                decision['confidence'] = 85
-                decision['setup_type'] = "LEGION_KNIFE_SCALP"
-                decision['reasons'].append(f"TimeKnife Volatility Spike ({knife.meta_data.get('reason')})")
+        # TimeKnife (High Volatility Scalp)
+        if knife and knife.confidence > 80:
+             reasons.append(f"TimeKnife Spike detected ({knife.signal_type})")
+             # If math agrees, huge boost
+             if (knife.signal_type == "BUY" and score > 0) or (knife.signal_type == "SELL" and score < 0):
+                 score *= 1.5 
+             # If math is neutral but Knife is explicit, take the scalp
+             elif abs(score) < 10: 
+                 score += 50 if knife.signal_type == "BUY" else -50
+                 setup = "LEGION_KNIFE_SCALP"
 
-        return decision
+        # EventHorizon (Gravity/Reversion)
+        if horizon and horizon.signal_type in ["BUY", "SELL"]:
+             if "SINGULARITY" in horizon.meta_data.get('reason', ''):
+                 # Extreme Reversion
+                 reasons.append(f"EventHorizon Singularity: {horizon.signal_type}")
+                 score += 100 if horizon.signal_type == "BUY" else -100
+                 setup = "SINGULARITY_REVERSION"
 
-    def _calculate_sl_tp(self, direction, price, atr, structure, setup_type):
-        pip = 0.0001
+        # 2. Global Swarm Consensus (The "Legion" Vote)
+        # We now respect the 88-agent SwarmOrchestrator
+        swarm_decision = legion_intel.get('swarm_decision', 'WAIT')
+        swarm_score = legion_intel.get('swarm_score', 0.0)
+        swarm_meta = legion_intel.get('swarm_meta', {})
         
-        # SL TÉCNICO: Baseado em Estrutura Recente (Swing Point)
-        # Para 70% WR, o SL não pode ser curto demais.
-        sl_pips = max(20, atr * 2.0) # Mínimo 20 pips para respirar
-        
-        # TP ALVO: 1:1 a 1.5:1 para garantir o Win Rate
-        # Se for Sniper Pullback, buscamos a continuação da tendência (30-40 pips)
-        # Se for Scalp (Knife), pegamos rápido (10-15 pips)
-        
-        if "SNIPER" in setup_type:
-            tp_pips = sl_pips * 1.2 # R:R 1.2 conservador para bater a meta de WR
-        else:
-            tp_pips = 10.0 # Scalp rápido fixo
+        if swarm_decision in ["BUY", "SELL"]:
+            # Fusion Logic: Combine Legacy and Swarm Scores
+            swarm_vector = swarm_score if swarm_decision == "BUY" else -swarm_score
             
-        sl = price - (sl_pips*pip) if direction == 'BUY' else price + (sl_pips*pip)
-        tp = price + (tp_pips*pip) if direction == 'BUY' else price - (tp_pips*pip)
-        return {'sl': sl, 'tp': tp, 'sl_pips': sl_pips, 'tp_pips': tp_pips}
+            # Weighted Average? Or Boost?
+            # We want Legacy to lead, but Swarm to support.
+            
+            # Case A: Agreement (Symbiosis)
+            if (score > 0 and swarm_vector > 0) or (score < 0 and swarm_vector < 0):
+                score += (swarm_vector * 0.5) # Add 50% of Swarm strength
+                reasons.append(f"Global Swarm Agreement: {swarm_decision} (Conf {swarm_score:.1f}%)")
+                
+            # Case B: Significant Disagreement (Civil War)
+            elif (score > 20 and swarm_vector < -20) or (score < -20 and swarm_vector > 20):
+                # Legacy thinks Buy, Swarm thinks Sell (or vice versa)
+                # We punish the confidence but DO NOT VETO immediately (unless Swarm is Elite)
+                score *= 0.5 # Halve the confidence
+                reasons.append(f"⚠️ Swarm Disagreement ({swarm_decision}). Reducing Confidence.")
+                
+                # VETO if Swarm is emphatic (Wolf Pack / Elite)
+                if swarm_score > 85:
+                    vetoes.append(f"Critical Swarm Veto ({swarm_decision} {swarm_score:.1f}%)")
+                    
+            # Case C: Legacy Indecisive, Swarm Strong (Swarm Lead)
+            elif abs(score) < 20 and swarm_score > 75:
+                # If Legacy is sleeping but Swarm sees something clear
+                score += (swarm_vector * 0.8) # Adopt Swarm view
+                reasons.append(f"Swarm Initiative: {swarm_decision} (Conf {swarm_score:.1f}%)")
+                if not setup: setup = "SWARM_INITIATIVE"
 
-    def _resample_to_m8(self, df_m1, df_m5):
-        return None
+        # --- TIER 2 ENHANCEMENTS (SMC / M8) ---
+        smc_res = details.get('SMC', {})
+        m8_res = details.get('M8', {})
+        toxic_flow = details.get('ToxicFlow', False)
+        
+        # 1. SMC Order Blocks
+        if isinstance(smc_res, dict) and smc_res.get('zone_type') and smc_res.get('zone_type') != "NONE":
+             zone = smc_res['zone_type']
+             if "BUY" in zone and score > -10:
+                  score += 25
+                  reasons.append(f"SMC: Reacting off Bullish Order Block")
+             elif "SELL" in zone and score < 10:
+                  score -= 25
+                  reasons.append(f"SMC: Reacting off Bearish Order Block")
+        
+        # 2. M8 Fibonacci
+        if isinstance(m8_res, dict) and m8_res.get('gate') == "GOLDEN":
+             direction = m8_res.get('signal', 'NEUTRAL')
+             m8_boost = 15 if direction == "BUY" else -15 if direction == "SELL" else 0
+             score += m8_boost
+             if m8_boost != 0:
+                 reasons.append(f"M8: Golden Gate ({direction})")
+             
+        # 3. Toxic Flow Veto
+        if toxic_flow:
+             reasons.append(f"Toxic Flow: Compression Detected (Caution)")
+             if abs(score) < 30: 
+                  score *= 0.5 
 
-# Singleton
+        # 4. SNR Walls (Tier 3)
+        snr_data = details.get('SNR', {})
+        if snr_data:
+             res_dist = snr_data.get('res_dist', 999.0)
+             sup_dist = snr_data.get('sup_dist', 999.0)
+             
+             # VETO BUY into Resistance (< 5 Pips)
+             if score > 0 and res_dist < 0.0005: 
+                 score *= 0.1 # Kill confidence
+                 vetoes.append(f"SNR Wall Veto: Resistance Ahead ({res_dist:.5f})")
+                 if not setup: setup = "BLOCKED_BY_WALL"
+                 
+             # VETO SELL into Support
+             if score < 0 and sup_dist < 0.0005:
+                 score *= 0.1
+                 vetoes.append(f"SNR Wall Veto: Support Ahead ({sup_dist:.5f})")
+                 if not setup: setup = "BLOCKED_BY_WALL"
+
+        # 5. Neural Oracle (Tier 4 - Experimental)
+        neural_pred = details.get('Neural')
+        if neural_pred is not None:
+             try:
+                 # Flatten if nested list
+                 val = neural_pred[0] if isinstance(neural_pred, (list, np.ndarray)) else neural_pred
+                 if isinstance(val, (list, np.ndarray)): val = val[0] # Double unpack
+                 
+                 reasons.append(f"Neural Oracle: Raw Output {float(val):.3f}")
+             except Exception as e:
+                 # logger.debug(f"Neural Parse Error: {e}")
+                 pass
+
+        # --- DECISION THRESHOLD ---
+        decision_dir = "WAIT"
+        execute = False
+        confidence = 0.0
+        
+        if score > self.params['threshold']:
+            decision_dir = "BUY"
+            execute = True
+            confidence = min(99.0, 50 + (score - self.params['threshold']))
+        elif score < -self.params['threshold']:
+            decision_dir = "SELL"
+            execute = True
+            confidence = min(99.0, 50 + (abs(score) - self.params['threshold']))
+            
+        # --- GAME THEORY VETO (Nash) ---
+        # Don't buy if far above Nash, Don't sell if far below
+        nash_price = self.game.calculate_nash_equilibrium(df_m5)['equilibrium_price']
+        atr = details['Trend'].get('atr', 0.0010)
+        
+        if execute:
+            if decision_dir == "BUY" and price > (nash_price + 3*atr):
+                # We are buying at a severe premium
+                if setup != "KINETIC_BOOM" and setup != "LEGION_KNIFE_SCALP": 
+                    execute = False
+                    vetoes.append("Price far above Nash Equilibrium (Overextended)")
+            elif decision_dir == "SELL" and price < (nash_price - 3*atr):
+                # We are selling at a discount
+                if setup != "KINETIC_BOOM" and setup != "LEGION_KNIFE_SCALP":
+                     execute = False
+                     vetoes.append("Price far below Nash Equilibrium (Oversold)")
+
+        prediction = LaplacePrediction(
+            execute=execute,
+            direction=decision_dir,
+            confidence=confidence,
+            strength=SignalStrength.STRONG if abs(score) > 40 else SignalStrength.MODERATE,
+            primary_signal=setup if setup else "CONSENSUS_VOTE",
+            reasons=reasons,
+            vetoes=vetoes,
+            logic_vector=score,
+            details=details
+        )
+        
+        if execute:
+            self._apply_risk_management(prediction, df_m5)
+            
+        return prediction
+        
+    def _apply_risk_management(self, prediction, df_m5):
+        """Standard SL/TP calculation (Sniper Protocol)"""
+        # ... (simplified) ...
+        # Get ATR
+        atr = ta.volatility.AverageTrueRange(df_m5['high'], df_m5['low'], df_m5['close'], window=14).average_true_range().iloc[-1]
+        
+        # SL = 2.0 ATR (Minimum 15 pips - Dynamic Risk)
+        sl_pips = max(15, (atr * 2.0) * 10000)
+        
+        # TP = Fixed Ratio or Structure
+        tp_pips = sl_pips * 1.5 # 1:1.5 RR
+        
+        prediction.sl_pips = sl_pips
+        prediction.tp_pips = tp_pips
+        
+        # Convert to Price
+        pip_val = 0.0001
+        current_price = df_m5['close'].iloc[-1]
+        
+        if prediction.direction == "BUY":
+            prediction.sl_price = current_price - (sl_pips * pip_val)
+            prediction.tp_price = current_price + (tp_pips * pip_val)
+        else:
+            prediction.sl_price = current_price + (sl_pips * pip_val)
+            prediction.tp_price = current_price - (tp_pips * pip_val)
+
 _laplace_instance: Optional[LaplaceDemonCore] = None
 def get_laplace_demon(symbol: str = "GBPUSD") -> LaplaceDemonCore:
     global _laplace_instance

@@ -398,7 +398,7 @@ class WeekendGapPredictor:
         """
         if df is None or len(df) < 7:
             return {
-                'prediction': 'INSUFFICIENT_DATA',
+                'prediction': {'direction': 'UNKNOWN', 'expected_gap_pct': 0.0},
                 'confidence': 0.0,
                 'recommendation': 'WAIT'
             }
@@ -588,7 +588,13 @@ class WeekendGapPredictor:
             Resultado da deliberação
         """
         # Prefere D1 para análise de gaps, fallback para H4 ou M5
-        df = data_map.get('D1') or data_map.get('H4') or data_map.get('M5')
+        def _get_valid(key):
+            d = data_map.get(key)
+            return d if d is not None and not d.empty else None
+            
+        df = _get_valid('D1')
+        if df is None: df = _get_valid('H4')
+        if df is None: df = _get_valid('M5')
         
         if df is None:
             return {

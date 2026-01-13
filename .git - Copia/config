@@ -1,0 +1,46 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/jokerofcassinos/Atl4s_f0rex_secret
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main
+	vscode-merge-base = origin/main
+[branch "v2.0"]
+	vscode-merge-base = origin/main
+	remote = origin
+	merge = refs/heads/v2.0
+[branch "v3.0"]
+	vscode-merge-base = origin/v2.0
+[branch "v4.0"]
+	vscode-merge-base = origin/main
+[branch "v5.0"]
+	vscode-merge-base = origin/main
+	remote = origin
+	merge = refs/heads/v5.0
+[branch "AGI-Beta-v0.5"]
+	vscode-merge-base = origin/v5.0
+	remote = origin
+	merge = refs/heads/AGI-Beta-v0.5
+[branch "agi-beta-v1.0"]
+	vscode-merge-base = origin/AGI-Beta-v0.5
+	remote = origin
+	merge = refs/heads/agi-beta-v1.0
+[branch "agi-alpha-v0.5"]
+	vscode-merge-base = origin/agi-beta-v1.0
+	remote = origin
+	merge = refs/heads/agi-alpha-v0.5
+[branch "agi-alpha-v0.8"]
+	vscode-merge-base = origin/agi-alpha-v0.5
+	remote = origin
+	merge = refs/heads/agi-alpha-v0.8
+[branch "laplace-v0.1"]
+	vscode-merge-base = origin/agi-alpha-v0.8
+	remote = origin
+	merge = refs/heads/laplace-v0.1

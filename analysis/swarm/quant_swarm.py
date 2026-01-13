@@ -6,6 +6,7 @@ import numpy as np
 
 from core.interfaces import SubconsciousUnit, SwarmSignal
 from core.agi.swarm_thought_adapter import AGISwarmAdapter, SwarmThoughtResult
+from signals.momentum import MomentumAnalyzer
 
 logger = logging.getLogger("QuantSwarm")
 
@@ -17,6 +18,7 @@ class QuantSwarm(SubconsciousUnit):
     def __init__(self):
         super().__init__("Quant_Swarm")
         self.agi_adapter = AGISwarmAdapter("Quant_Swarm")
+        self.momentum = MomentumAnalyzer()
 
     async def process(self, context: Dict[str, Any]) -> SwarmSignal:
         df_m5 = context.get('df_m5')
@@ -37,15 +39,25 @@ class QuantSwarm(SubconsciousUnit):
         confidence = 0.0
         reason = ""
         
+        # 2. Momentum Analysis
+        mom_res = self.momentum.analyze(df_m5)
+        rsi = mom_res.get('rsi', 50.0)
+
         # Extreme Extension -> Reversion Likely
         if z_score > 3.0:
             signal = "SELL"
             confidence = 85.0
-            reason = f"Z-Score Extreme (+{z_score:.2f}) - Statistical Reversion"
+            reason = f"Z-Score Extreme (+{z_score:.2f})"
+            if rsi > 70: 
+                confidence = 95.0
+                reason += " + RSI OB"
         elif z_score < -3.0:
             signal = "BUY"
             confidence = 85.0
-            reason = f"Z-Score Extreme ({z_score:.2f}) - Statistical Reversion"
+            reason = f"Z-Score Extreme ({z_score:.2f})"
+            if rsi < 30:
+                confidence = 95.0
+                reason += " + RSI OS"
             
         # 2. Volatility Breakout (Expansion)
         # If Z-Score is just starting to expand (e.g. 1.5) AND volume is high -> Continuation

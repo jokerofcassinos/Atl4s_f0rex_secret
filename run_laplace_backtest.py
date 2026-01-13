@@ -19,12 +19,17 @@ import os
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Tuple
+import sys # Added for logging handlers
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO, # Phase 5: Production Mode
     format='%(asctime)s | %(levelname)s | %(name)s | %(message)s',
-    datefmt='%H:%M:%S'
+    datefmt='%H:%M:%S',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler("laplace_backtest.log")
+    ]
 )
 logger = logging.getLogger("Laplace-Backtest")
 
@@ -178,7 +183,7 @@ class LaplaceBacktestRunner:
             slice_h4 = self.df_h4[self.df_h4.index <= current_time]
             
             # Slice M1 for M8 generation (Last 300 minutes ~ 300 rows is fast enough)
-            if not use_m5 and hasattr(self, 'df_m1'):
+            if hasattr(self, 'df_m1') and self.df_m1 is not None:
                  # Ensure we have M1 data loaded
                  slice_m1 = self.df_m1.loc[current_time - pd.Timedelta(minutes=300):current_time]
             else:
@@ -234,7 +239,7 @@ class LaplaceBacktestRunner:
                     
                     if trade:
                         last_signal_time = i
-                        logger.debug(
+                        logger.info( # Changed to INFO to be visible in Production Mode
                             f"TRADE #{trade.id}: {direction.value} @ {current_price:.5f} | "
                             f"SL: {prediction.sl_pips}p | TP: {prediction.tp_pips}p | "
                             f"Conf: {prediction.confidence:.0f}%"
@@ -487,13 +492,27 @@ async def main():
     print(f"   Date Range: {runner.df_m5.index[0]} to {runner.df_m5.index[-1]}")
     print()
     
-    # Filter for last 30 days for validation
+    # Run backtest (Last 10 Days per User Request)
     if runner.df_m5 is not None and len(runner.df_m5) > 0:
         end_date = runner.df_m5.index[-1]
-        start_date = end_date - timedelta(days=30)
+        start_date = end_date - timedelta(days=10)
         mask = runner.df_m5.index >= start_date
         runner.df_m5 = runner.df_m5.loc[mask]
+        
+        # Apply the same filter to other dataframes to maintain consistency
+        if runner.df_m1 is not None:
+            runner.df_m1 = runner.df_m1.loc[runner.df_m1.index >= start_date]
+        if runner.df_h1 is not None:
+            runner.df_h1 = runner.df_h1.loc[runner.df_h1.index >= start_date]
+        if runner.df_h4 is not None:
+            runner.df_h4 = runner.df_h4.loc[runner.df_h4.index >= start_date]
+        if runner.df_d1 is not None:
+            runner.df_d1 = runner.df_d1.loc[runner.df_d1.index >= start_date]
+
         print(f"📉 Filtered data to last 30 days: {len(runner.df_m5)} candles ({runner.df_m5.index[0]} to {runner.df_m5.index[-1]})")
+    
+    # Limit data for speed if needed (e.g. last 50000 candles)
+    # runner.df_m1 = runner.df_m1.iloc[-50000:]
     
     # Run backtest (✅ BACKTEST FIX: Added await)
     result = await runner.run_backtest(use_m5=True)

@@ -41,11 +41,11 @@ class FractalVision:
         Identifies Fractal Highs and Lows (Bill Williams style or Pivot).
         A fractal high is a high surrounded by 'length' lower highs on both sides.
         """
-        if df is None or len(df) < length * 2 + 1:
-            return df
-            
         df['is_swing_high'] = False
         df['is_swing_low'] = False
+
+        if df is None or len(df) < length * 2 + 1:
+            return df
         
         # Vectorized approach using rolling window? 
         # Or simple shift comparison.

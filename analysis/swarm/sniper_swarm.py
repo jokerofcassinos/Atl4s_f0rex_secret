@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 
 from core.interfaces import SubconsciousUnit, SwarmSignal
 from core.agi.swarm_thought_adapter import AGISwarmAdapter, SwarmThoughtResult
+from signals.structure import SMCAnalyzer
 
 logger = logging.getLogger("SniperSwarm")
 
@@ -19,6 +20,7 @@ class SniperSwarm(SubconsciousUnit):
             self._agent_imbalance_filler
         ]
         self.agi_adapter = AGISwarmAdapter("Sniper_Swarm")
+        self.smc = SMCAnalyzer()
         
     async def process(self, context: Dict[str, Any]) -> SwarmSignal:
         df_m1 = context.get('df_m1')
@@ -32,6 +34,16 @@ class SniperSwarm(SubconsciousUnit):
         for agent in self.sub_agents:
             vote = agent(df_m1, tick)
             if vote: votes.append(vote)
+            
+        # Run SMC Agent (Structure)
+        df_m5 = context.get('df_m5')
+        if df_m5 is not None and len(df_m5) > 50:
+             current_price = tick.get('bid', df_m5.iloc[-1]['close'])
+             smc_res = self.smc.analyze(df_m5, current_price)
+             if smc_res and smc_res.get('zone_type') and smc_res.get('zone_type') != "NONE":
+                 z_type = smc_res['zone_type']
+                 sig = "BUY" if "BUY" in z_type else "SELL"
+                 votes.append({'type': sig, 'confidence': 80.0, 'reason': f"SMC: {z_type}"})
             
         if not votes:
             # logger.debug("Sniper Scan: No patterns found.")
