@@ -74,7 +74,8 @@ class TelegramNotifier:
                         logger.debug("Telegram message sent")
                         return True
                     else:
-                        logger.error(f"Telegram error: {response.status}")
+                        error_text = await response.text()
+                        logger.error(f"Telegram error: {response.status} - {error_text}")
                         return False
         except Exception as e:
             logger.error(f"Telegram send error: {e}")
@@ -100,14 +101,18 @@ class TelegramNotifier:
         """Notify trade entry"""
         emoji = "🟢" if direction == "BUY" else "🔴"
         
+        # Escape for Markdown (Legacy)
+        safe_symbol = str(symbol).replace("_", "\\_")
+        safe_setup = str(setup).replace("_", "\\_")
+        
         message = f"""
 {emoji} *NEW TRADE - {direction}*
 
-📊 *{symbol}*
+📊 *{safe_symbol}*
 Entry: `{entry:.5f}`
 SL: `{sl:.5f}`
 TP: `{tp:.5f}`
-🎯 Setup: `{setup}`
+🎯 Setup: `{safe_setup}`
 🔥 Conf: `{confidence:.1f}%`
 """
         await self.send_message(message)
@@ -117,13 +122,17 @@ TP: `{tp:.5f}`
         """Notify trade exit"""
         emoji = "💰" if pnl_dollars > 0 else "❌"
         
+        # Escape for Markdown
+        safe_symbol = symbol.replace("_", "\\_")
+        safe_source = source.replace("_", "\\_")
+        
         message = f"""
-{emoji} *TRADE CLOSED - {symbol}*
+{emoji} *TRADE CLOSED - {safe_symbol}*
 
 Entry: `{entry:.5f}`
 Exit: `{exit:.5f}`
 Result: `${pnl_dollars:+.2f}` ({pnl_pips:+.1f} pips)
-🎯 Setup: `{source}`
+🎯 Setup: `{safe_source}`
 🚪 Reason: `{reason}`
 """
         await self.send_message(message)

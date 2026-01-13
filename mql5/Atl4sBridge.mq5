@@ -744,7 +744,14 @@ public:
     
     bool IsSafe() {
         double current_spread = (SymbolInfoDouble(_Symbol, SYMBOL_ASK) - SymbolInfoDouble(_Symbol, SYMBOL_BID));
-        if(avg_spread > 0 && current_spread > avg_spread * 3.0) {
+        double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+        double min_floor = point * 20.0; // 2.0 pips (20 points) floor
+        
+        // If current spread is below 2 pips, it's always safe
+        if(current_spread <= min_floor) return true;
+        
+        // If spread is above floor, check if it's a massive spike (100x avg)
+        if(avg_spread > 0 && current_spread > avg_spread * 100.0) {
             Print("REFLEX GUARD: Spread Spike Detected! ", current_spread, " vs ", avg_spread);
             return false;
         }
@@ -897,35 +904,33 @@ void OnTick() {
     SocketSend(socket_handle, req, len);
     
     // Send TRADES_JSON for Python VSL/VTP checks
-    if(PositionsTotal() > 0) {
-        string trades_json = "TRADES_JSON|[";
-        bool first = true;
-        
-        for(int i = 0; i < PositionsTotal(); i++) {
-            ulong ticket = PositionGetTicket(i);
-            if(PositionSelectByTicket(ticket)) {
-                string sym = PositionGetString(POSITION_SYMBOL);
-                int type = (int)PositionGetInteger(POSITION_TYPE);
-                double profit = PositionGetDouble(POSITION_PROFIT);
-                double open_price = PositionGetDouble(POSITION_PRICE_OPEN);
-                double sl = PositionGetDouble(POSITION_SL);
-                double tp = PositionGetDouble(POSITION_TP);
-                double volume = PositionGetDouble(POSITION_VOLUME);
-                
-                if(!first) trades_json += ",";
-                first = false;
-                
-                trades_json += StringFormat("{\"ticket\":%I64u,\"symbol\":\"%s\",\"type\":%d,\"profit\":%.2f,\"open_price\":%.5f,\"sl\":%.5f,\"tp\":%.5f,\"volume\":%.2f}",
-                                            ticket, sym, type, profit, open_price, sl, tp, volume);
-            }
+    string trades_json = StringFormat("TRADES_JSON|%s|[", _Symbol);
+    bool first = true;
+    
+    for(int i = 0; i < PositionsTotal(); i++) {
+        ulong ticket = PositionGetTicket(i);
+        if(PositionSelectByTicket(ticket)) {
+            string sym = PositionGetString(POSITION_SYMBOL);
+            int type = (int)PositionGetInteger(POSITION_TYPE);
+            double profit = PositionGetDouble(POSITION_PROFIT);
+            double open_price = PositionGetDouble(POSITION_PRICE_OPEN);
+            double sl = PositionGetDouble(POSITION_SL);
+            double tp = PositionGetDouble(POSITION_TP);
+            double volume = PositionGetDouble(POSITION_VOLUME);
+            
+            if(!first) trades_json += ",";
+            first = false;
+            
+            trades_json += StringFormat("{\"ticket\":%I64u,\"symbol\":\"%s\",\"type\":%d,\"profit\":%.2f,\"open_price\":%.5f,\"sl\":%.5f,\"tp\":%.5f,\"volume\":%.2f}",
+                                        ticket, sym, type, profit, open_price, sl, tp, volume);
         }
-        trades_json += "]\n";
-        
-        uchar trades_req[];
-        StringToCharArray(trades_json, trades_req);
-        int trades_len = StringLen(trades_json);
-        SocketSend(socket_handle, trades_req, trades_len);
     }
+    trades_json += "]\n";
+    
+    uchar trades_req[];
+    StringToCharArray(trades_json, trades_req);
+    int trades_len = StringLen(trades_json);
+    if(trades_len > 0) SocketSend(socket_handle, trades_req, trades_len);
     
     ReadCommands();
 }

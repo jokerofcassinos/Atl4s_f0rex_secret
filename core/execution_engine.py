@@ -39,8 +39,12 @@ class ExecutionEngine:
         self.pending_sources = deque(maxlen=50) # Queue of {'symbol', 'time', 'source'}
         
         # Persistence Path
+        # Persistence Path
         self.context_path = "data/trade_context.json"
         self._load_context()
+        
+        # Phase 120: Startup Sync Flag
+        self.startup_synced = False
 
     def register_learning_engine(self, engine):
         """Connects the History/Learning Engine for outcome tracking."""
@@ -64,15 +68,19 @@ class ExecutionEngine:
                 json.dump(serializable_sources, f, indent=4)
         except Exception as e:
             logger.error(f"Failed to save trade context: {e}")
-
     def _load_context(self):
         """Loads trade context from disk on startup."""
         try:
             if os.path.exists(self.context_path):
                 with open(self.context_path, 'r') as f:
                     data = json.load(f)
-                    # Convert back to int keys
-                    self.trade_sources = {int(k): v for k, v in data.items()}
+                    # Convert back to int keys, skip non-ints
+                    self.trade_sources = {}
+                    for k, v in data.items():
+                        try:
+                            self.trade_sources[int(k)] = v
+                        except ValueError:
+                            logger.warning(f"Skipping invalid ticket key in context: {k}")
                     logger.info(f"TRADE CONTEXT: Recovered {len(self.trade_sources)} trade sources from disk.")
         except Exception as e:
             logger.error(f"Failed to load trade context: {e}")
@@ -90,6 +98,28 @@ class ExecutionEngine:
             pass
             
         current_tickets = {t.get('ticket') for t in trades}
+        
+        # ------------------------------------------------------------------
+        # STARTUP SYNC: Silently remove stale trades closed while offline
+        # ------------------------------------------------------------------
+        if not self.startup_synced:
+            # We have received a valid tick (proof of connection), so current_tickets is Truth.
+            stale_tickets = []
+            for ticket in list(self.trade_sources.keys()): # Copy keys safely
+                if ticket not in current_tickets:
+                    stale_tickets.append(ticket)
+            
+            for t in stale_tickets:
+                logger.info(f"🔄 STARTUP SYNC: Removing Stale Trade {t} (Closed while offline)")
+                if t in self.trade_sources:
+                    del self.trade_sources[t]
+                self.closed_tickets_cache.add(t)
+            
+            self.startup_synced = True
+            self._save_context()
+            # We proceed to normal logic. Since we deleted them from trade_sources, 
+            # the loop below won't see them and won't trigger "TRADE CLOSED" notifications.
+            
         
         # Phase 4.3: Detect Closed Trades (Inference)
         # Check if any previously known trade is missing
@@ -125,16 +155,8 @@ class ExecutionEngine:
                      )
                      
                      # 2. Record Experience (Cortex Memory)
-                     # We need features. If not stored, we approximate using current tick?
-                     # Ideal: We stored features in trade_sources.
-                     # Fallback: Capture current state features (Better than nothing)
-                     
-                     outcome = 1.0 if approx_pnl > 0 else -1.0
-                     # Placeholder features: [RSI, Volatility, ROC, Hour]. 
-                     # Accessing via history_engine.learning_module ?
                      # We will dispatch the outcome and let Laplace handle feature extraction if possible.
-                     
-                     # Using a simplified feature set [Confidence, Hour, PnL_Sign] if real features missing
+                     outcome = 1.0 if approx_pnl > 0 else -1.0
                      features = [details.get('confidence', 50)/100.0, 0.5, 0.5, 0.5] 
                      
                      if hasattr(self.history_engine, 'record_experience'):
@@ -142,8 +164,12 @@ class ExecutionEngine:
                 
                 # 3. Notify User (Telegram)
                 if self.notifier:
-                     pips = price_diff / 0.0001 # Assuming standard forex
-                     asyncio.create_task(self.notifier.notify_trade_exit(
+                     # Calculate pips using correct scale (GBPUSDm vs JPY)
+                     pip_unit = 0.0001
+                     if "JPY" in details.get('symbol', ''): pip_unit = 0.01
+                     pips = price_diff / pip_unit
+                     
+                     await self.notifier.notify_trade_exit(
                          symbol=details.get('symbol', 'UNKNOWN'),
                          entry=entry_price,
                          exit=exit_price,
@@ -151,9 +177,9 @@ class ExecutionEngine:
                          pnl_pips=pips,
                          reason="MARKET_EXIT (TP/SL/Manual)",
                          source=details.get('source', 'UNKNOWN')
-                     ))
+                     )
                 
-                logger.info(f"💰 TRADE CLOSED | Ticket: {ticket} | Profit: ${approx_pnl:.2f}")
+                logger.info(f"💰 TRADE CLOSED | Ticket: {ticket} | Profit: ${approx_pnl:.2f} ({pips:+.1f} pips)")
                 
                 crashed_tickets.append(ticket)
                 self.closed_tickets_cache.add(ticket)
@@ -184,6 +210,9 @@ class ExecutionEngine:
                 if matcher is not None:
                     # Remove from pending (consumed)
                     del self.pending_sources[matcher]
+                    logger.info(f"MATCHED PENDING: Ticket {ticket} -> {found_data.get('source')}")
+                else:
+                    logger.debug(f"NEW TRADE: Ticket {ticket} on {symbol} (No pending match found)")
                 
                 # Store vital stats for PnL calc on closure
                 type_int = trade.get('type')
@@ -194,10 +223,11 @@ class ExecutionEngine:
                 found_data['direction'] = direction
                 found_data['entry_price'] = entry_price
                 found_data['lots'] = lots
+                found_data['symbol'] = symbol
                     
                 self.trade_sources[ticket] = found_data
                 self._save_context() # Force save on detection
-                logger.debug(f"TRADE SOURCE MAPPED: Ticket {ticket} -> {found_data.get('source')}")
+                logger.info(f"✅ TRADE REGISTERED: Ticket {ticket} | {direction} {lots} {symbol} @ {entry_price}")
         
         # 1. Config Thresholds
         v_tp = self.config.get('virtual_tp', 2.0)
@@ -475,6 +505,67 @@ class ExecutionEngine:
         else:
             logger.warning("NO BRIDGE - Order not sent!")
              
+        return "SENT"
+
+    async def execute_trade(self, symbol: str, direction: str, lots: float, sl_pips: float, tp_pips: float, comment: str = "LAPLACE"):
+        """
+        Simplified execution interface for main_laplace.py.
+        Converts pips to prices and sends to bridge.
+        """
+        if not self.bridge:
+            logger.error("EXECUTION: No bridge connected!")
+            return None
+            
+        tick = self.bridge.get_tick()
+        if not tick:
+            logger.error("EXECUTION: No tick data available for execution.")
+            return None
+            
+        bid = tick.get('bid')
+        ask = tick.get('ask')
+        if not bid or not ask:
+            logger.error("EXECUTION: Invalid price data.")
+            return None
+            
+        # Determine entry price and side
+        side = 0 if direction == "BUY" else 1
+        entry_price = ask if side == 0 else bid
+        
+        # Calculate SL/TP prices from pips (assuming 4/5 digit precision)
+        pip_unit = 0.0001 # Standard for GBPUSD
+        if "JPY" in symbol: pip_unit = 0.01
+        
+        sl_price = entry_price - (sl_pips * pip_unit) if side == 0 else entry_price + (sl_pips * pip_unit)
+        tp_price = entry_price + (tp_pips * pip_unit) if side == 0 else entry_price - (tp_pips * pip_unit)
+        
+        # Force 5 decimal places for bridge consistency
+        params = [symbol, side, lots, f"{sl_price:.5f}", f"{tp_price:.5f}", 100.0] # 100 confidence for manual/forced
+        
+        # Phase 4.2: Track Source for when trade appears
+        self.pending_sources.append({
+            'symbol': symbol,
+            'time': time.time(),
+            'source': comment,
+            'confidence': 100.0,
+            'direction': direction,
+            'entry_price': entry_price,
+            'lots': lots
+        })
+        
+        # 3. Notify User (Entry)
+        if self.notifier:
+            await self.notifier.notify_trade_entry(
+                direction=direction,
+                symbol=symbol,
+                entry=entry_price,
+                sl=sl_price,
+                tp=tp_price,
+                confidence=100.0,
+                setup=comment
+            )
+        
+        self.bridge.send_command("OPEN_TRADE", params)
+        logger.info(f"⚡ ORDER SENT: {direction} {lots} {symbol} @ {entry_price:.5f} | SL: {sl_price:.5f} | TP: {tp_price:.5f}")
         return "SENT"
 
     async def execute_hydra_burst(

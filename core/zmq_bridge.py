@@ -15,53 +15,38 @@ class ZmqBridge:
     def __init__(self, port=5558):
         self.port = port
         self.host = "0.0.0.0"
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.running = True
+        
         try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.server_socket.bind((self.host, self.port))
-            self.server_socket.listen(5) # Allow backlog
-            self.server_socket.setblocking(False) # Non-blocking accept
+            self.server_socket.listen(5)
+            self.server_socket.setblocking(False)
             logger.info(f"Bridge Server started on {self.host}:{self.port}")
         except Exception as e:
             logger.critical(f"FATAL: FAILED TO BIND PORT {self.port}: {e}")
-            logger.critical("There is likely a ZOMBIE process running.")
-            logger.critical("Please CLOSE ALL python windows and try again.")
             raise SystemExit("ZOMBIE_PORT_CONFLICT")
 
-        # Client Registry: Symbol -> Socket
-        self.clients = {} 
-        self.socket_map = {} # Socket -> Symbol (reverse lookup)
-        
         self.conn_lock = threading.Lock()
+        self.clients = {}  # Symbol -> Socket
+        self.socket_map = {} # Socket -> Symbol
         
         self.latest_tick = None
-        self.latest_trades = [] # Store open trades buffer
-        self.buffer = ""
-        self.running = True
+        self.latest_trades = {}  # Symbol -> List of Trades
+        self.global_latest_trades = []
         
-        # We need to handle multiple clients, so a single buffer won't work perfectly if interleaved.
-        # But MQL5 sends whole lines mostly.
-        # Ideally we spawn a thread per client.
-        
-        # Background Accept Loop
         self.thread = threading.Thread(target=self._server_loop, daemon=True)
         self.thread.start()
 
     def _server_loop(self):
-        # We use select or just simple loop for now since we expect < 5 clients
-        # Actually, handling multiple sockets in one thread without select is hard.
-        # Let's use a simple per-client thread approach.
-        
         while self.running:
             try:
                 client, addr = self.server_socket.accept()
                 logger.info(f"MQL5 Client Connected: {addr}")
-                client.setblocking(False) # Non-blocking for select-style handling if needed
-                
-                # Spawn Handler Thread
+                client.setblocking(False)
                 ct = threading.Thread(target=self._client_handler, args=(client, addr), daemon=True)
                 ct.start()
-                
             except BlockingIOError:
                 time.sleep(0.1)
             except Exception as e:
@@ -69,13 +54,8 @@ class ZmqBridge:
                 time.sleep(1)
 
     def _client_handler(self, sock, addr):
-        """
-        Handles a single MQL5 connection.
-        """
-        # We don't know the symbol yet.
         detected_symbol = None
         buffer = ""
-        
         try:
             while self.running:
                 try:
@@ -83,43 +63,47 @@ class ZmqBridge:
                 except BlockingIOError:
                     time.sleep(0.01)
                     continue
-                    
                 if not data: break
                 
-                text = data.decode('utf-8', errors='ignore')
-                # logger.debug(f"RAW RECEIVED: {text.strip()}") # SILENCED
-                buffer += text
-                
+                buffer += data.decode('utf-8', errors='ignore')
                 while '\n' in buffer:
                     line, buffer = buffer.split('\n', 1)
                     line = line.strip()
                     if not line: continue
                     
-                    # Parse
                     fields = self._parse_line(line)
-                    
-                    # Process TRADES_JSON separately (no symbol field)
-                    if fields and fields.get('type') == 'TRADES_JSON':
-                        self.latest_trades = fields.get('trades', [])
+                    if not fields: continue
+
+                    if fields.get('type') == 'TRADES_JSON':
+                        trades = fields.get('trades', [])
+                        sym = fields.get('symbol')
+                        if sym:
+                            self.latest_trades[sym] = trades
+                            # If we don't have a detected_symbol yet, use this one
+                            if not detected_symbol:
+                                detected_symbol = sym
+                                with self.conn_lock:
+                                    self.clients[sym] = sock
+                                    self.socket_map[sock] = sym
+                        else:
+                            # Fallback for old format
+                            if detected_symbol:
+                                self.latest_trades[detected_symbol] = trades
+                            self.global_latest_trades = trades
                         continue
                     
-                    if fields and 'symbol' in fields:
+                    if 'symbol' in fields:
                         sym = fields['symbol']
-                        
-                        # Register if new
                         if detected_symbol != sym:
                             detected_symbol = sym
                             with self.conn_lock:
                                 self.clients[sym] = sock
                                 self.socket_map[sock] = sym
                                 logger.info(f"Registered Socket for {sym}")
-                                
-                        # Process Data (Update internal state)
+                        
                         if fields.get('type') == 'TICK':
                             self.latest_tick = fields
                             
-        except ConnectionResetError:
-            logger.warning(f"Connection Reset: {detected_symbol}")
         except Exception as e:
             logger.error(f"Client Error {detected_symbol}: {e}")
         finally:
@@ -132,7 +116,6 @@ class ZmqBridge:
             logger.info(f"Detailed Disconnect: {detected_symbol}")
 
     def _parse_line(self, line):
-        # ... (Same as before)
         try:
             if line.startswith("TICK"):
                 parts = line.split('|')
@@ -145,146 +128,90 @@ class ZmqBridge:
                         'ask': float(parts[4]),
                         'volume': int(parts[5])
                     }
-                    if len(parts) >= 8:
-                        tick['equity'] = float(parts[6])
-                        tick['positions'] = int(parts[7])
-                    if len(parts) >= 9:
-                        tick['profit'] = float(parts[8])
+                    if len(parts) >= 8: tick['equity'], tick['positions'] = float(parts[6]), int(parts[7])
+                    if len(parts) >= 9: tick['profit'] = float(parts[8])
                     if len(parts) >= 11:
-                        raw_best_profit = float(parts[9])
-                        if raw_best_profit < -990000:
-                            raw_best_profit = 0.0
-                        tick['best_profit'] = raw_best_profit
+                        tick['best_profit'] = float(parts[9]) if float(parts[9]) > -990000 else 0.0
                         tick['best_ticket'] = int(parts[10])
-                    
-                    if len(parts) >= 14:
-                         tick['indicator_val'] = float(parts[12])
-                         
+                    if len(parts) >= 14: tick['indicator_val'] = float(parts[12])
                     return tick
-                    
             elif line.startswith("TRADES_JSON"):
-                try:
-                    parts = line.split('|', 1)
-                    if len(parts) == 2:
-                        data = json.loads(parts[1])
-                        return {
-                            'type': 'TRADES_JSON',
-                            'trades': data
-                        }
-                except Exception as e:
-                    logger.error(f"JSON Parse Error: {e}")
-                    return None
-                    
-            return None
-        except:
-            return None
+                parts = line.split('|')
+                if len(parts) == 3:
+                    # New Format: TRADES_JSON|SYMBOL|[...]
+                    return {'type': 'TRADES_JSON', 'symbol': parts[1], 'trades': json.loads(parts[2])}
+                elif len(parts) == 2:
+                    # Old Format: TRADES_JSON|[...]
+                    return {'type': 'TRADES_JSON', 'trades': json.loads(parts[1])}
+        except Exception as e:
+            logger.error(f"Parse Error: {e}")
+        return None
 
     def get_tick(self):
-        t = self.latest_tick
-        if t:
-            t['trades_json'] = self.latest_trades
-        return t
+        """Returns the latest tick + injected trades for that symbol"""
+        tick = self.latest_tick.copy() if self.latest_tick else None
+        if tick:
+            sym = tick.get('symbol')
+            tick['trades_json'] = self.latest_trades.get(sym, self.global_latest_trades)
+        return tick
 
     def send_command(self, action, params=None):
-        """
-        Sends command to MQL5.
-        Tries to route to the correct symbol if 'symbol' is in params.
-        """
-        # USER REQUEST: REMOVE VISUALS
-        if "DRAW" in action:
-            return
-
+        if "DRAW" in action: 
+            # Allow DRAW commands now that we have wrapper methods
+            pass
+            # previously: return # Logic to skip visuals
         msg = f"{action}"
-        if params:
-            msg += "|" + "|".join(map(str, params))
+        if params: msg += "|" + "|".join(map(str, params))
         msg += "\n"
         encoded = msg.encode('utf-8')
         
-        # Determine Target
         target_sock = None
         target_sym = None
         
-        # Logic to extract potential symbol from params
-        candidate_symbols = []
-        if params:
-             # Heuristic: Symbols are usually 6 chars (USDJPY) or strings
-             # Priority: First Param is usually Symbol for visual commands
-             if len(params) > 0:
-                 candidate_symbols.append(str(params[0]))
-             
-             for p in params[1:]:
-                 s_p = str(p)
-                 candidate_symbols.append(s_p)
-        
+        # Routing logic
         with self.conn_lock:
-            # 1. Try Exact Match
-            for cand in candidate_symbols:
+            if params and len(params) > 0:
+                cand = str(params[0])
                 if cand in self.clients:
                     target_sock = self.clients[cand]
                     target_sym = cand
-                    break
-            
-            # 2. Try Suffix/Prefix Fuzzy Match (e.g. "USDJPY" vs "USDJPYm")
-            if not target_sock:
-                for cand in candidate_symbols:
+                else:
+                    # Fuzzy match
                     for client_sym, sock in self.clients.items():
                         if client_sym.startswith(cand) or cand.startswith(client_sym):
-                            target_sock = sock
-                            target_sym = client_sym
+                            target_sock, target_sym = sock, client_sym
                             break
-                    if target_sock: break
-
-            # 3. Fallback: If only 1 client, use it (Single Asset Mode)
+            
             if not target_sock and len(self.clients) == 1:
                 target_sym = list(self.clients.keys())[0]
                 target_sock = self.clients[target_sym]
-            
-            # 4. Broadcast Mode (If action implies ALL)
-            if "CLOSE_ALL" in action or "PRUNE" in action or "GET_HISTORY" in action:
-                 if (not target_sock and len(self.clients) > 0) or ("ALL" in params):
-                      # logger.info(f"Broadcasting {action} to all clients.")
-                      for sym, sock in self.clients.items():
-                           try:
-                               sock.sendall(encoded)
-                           except: pass
-                      return
 
-            if target_sock:
-                try:
-                    target_sock.sendall(encoded)
-                    logger.info(f"BRIDGE TX -> {target_sym}: {action} | {params}")
-                except Exception as e:
-                    logger.error(f"Send Error to {target_sym}: {e}")
-            else:
-                 # Only log warning if we actually have clients but couldn't route
-                 if self.clients:
-                     # Filter spammy warnings for draw commands if they fail often
-                     if "DRAW" not in action:
-                         logger.warning(f"Could not route command '{action}' to params {params} (Clients: {list(self.clients.keys())})")
+            # Broadcast Mode
+            if "CLOSE_ALL" in action or "PRUNE" in action:
+                if not target_sock:
+                    for s in self.clients.values(): s.sendall(encoded)
+                    return
 
-    def get_tick(self):
-        return self.latest_tick
+        if target_sock:
+            try:
+                target_sock.sendall(encoded)
+                logger.info(f"BRIDGE TX -> {target_sym}: {action}")
+            except Exception as e:
+                logger.error(f"Send Error to {target_sym}: {e}")
 
     def get_open_trades(self):
-        """
-        Returns the simplified list of open trades.
-        Used by LaplaceDemon to check concurrency limits.
-        """
-        return self.latest_trades
+        # Flatten for convenience of legacy calls
+        all_trades = []
+        for trades in self.latest_trades.values():
+            all_trades.extend(trades)
+        return all_trades if all_trades else self.global_latest_trades
 
-    def send_dashboard(self, state):
-        pass
-
-    # --- VISUALIZATION COMMANDS ---
-    def send_draw_rect(self, symbol, name, p1, p2, t1, t2, color):
-        # DRAW_RECT|NAME|P1|P2|TIME1|TIME2|COLOR
-        # Need to route to symbol
-        self.send_command("DRAW_RECT", [symbol, name, p1, p2, int(t1), int(t2), color])
-
-    def send_draw_line(self, symbol, name, p1, p2, t1, t2, color):
-        # DRAW_LINE|NAME|P1|P2|TIME1|TIME2|COLOR
-        self.send_command("DRAW_LINE", [symbol, name, p1, p2, int(t1), int(t2), color])
+    def send_draw_line(self, symbol, name, price1, price2, time1, time2, color):
+        """Sends a DRAW_LINE command to MT5."""
+        # Command: DRAW_LINE|symbol|name|price1|price2|time1|time2|color
+        self.send_command("DRAW_LINE", [symbol, name, price1, price2, time1, time2, color])
 
     def send_draw_text(self, symbol, name, price, time, text, color):
-        # DRAW_TEXT|NAME|PRICE|TIME|TEXT|COLOR
-        self.send_command("DRAW_TEXT", [symbol, name, price, int(time), text, color])
+        """Sends a DRAW_TEXT command to MT5."""
+        # Command: DRAW_TEXT|symbol|name|price|time|text|color
+        self.send_command("DRAW_TEXT", [symbol, name, price, time, text, color])

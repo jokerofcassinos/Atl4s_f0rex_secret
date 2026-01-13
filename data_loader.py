@@ -374,10 +374,10 @@ class DataLoader:
                 
                 # Validation
                 if df.empty:
-                    logger.warning(f"YFINANCE EMPTY: {ticker} (Attempt {attempt+1})")
+                    logger.debug(f"YFINANCE EMPTY: {ticker} (Attempt {attempt+1})")
                     raise ValueError("Empty Data")
                 
-                logger.info(f"YFINANCE SUCCESS: {ticker} | Rows: {len(df)}")
+                logger.debug(f"YFINANCE SUCCESS: {ticker} | Rows: {len(df)}")
                 return df
                 
             except Exception as e:

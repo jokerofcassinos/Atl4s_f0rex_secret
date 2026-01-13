@@ -15,26 +15,36 @@ class DynamicLeverage:
 
     def calculate_lots(self, equity: float, confidence: float, market_volatility: float) -> float:
         """
-        Hyper-Dynamic Risk Engine (Quantum Sigmoid Scaling).
-        Restored from Backup 'risk_manager.py'.
+        Hyper-Dynamic Risk Engine (Exness Tiers).
         
-        Logic:
-        1. Base Power Law: Equity^0.65 (Diminishing returns but infinite growth).
-        2. Brain Factor: Confidence Score (-100 to 100) boosts/cuts size.
-        3. Entropy Factor: High Chaos (Volatility) -> Lower Size.
-        4. Sigmoid Cap: Smooth limit approaching Max Ceiling.
+        Tiers:
+        1. Equity < $1000: Leverage 1:Unlimited (Simulated 1:1B)
+           -> Aggressive Power Law (Equity^0.75) for rapid compounding.
+        2. Equity >= $1000: Leverage 1:2000
+           -> Standard Power Law (Equity^0.70) with margin cap.
         """
         # Safety for tiny accounts
         if equity < 10: return 0.01
 
-        # 1. Base Power Law Scaling
-        # Example: $5000 ^ 0.65 = 253.
-        # Divisor = 350. -> Base = 0.72 Lots.
-        # Tuned for Cent Accounts or Standard?
-        # Assuming Standard: $30 -> 0.02 lots. 
-        # 30^0.65 = 9.1. 9.1 / 350 = 0.026. MATCHES LEGACY.
-        base_lots = (pow(equity, 0.65)) / 350.0
-        
+        # EXNESS LEVERAGE TIERS
+        if equity < 1000:
+            # TIER 1: UNLIMITED (1:1,000,000,000)
+            # High aggression for small account growth
+            # Ex: $100 -> ~0.15 lots | $500 -> ~0.50 lots
+            lev_tier = "UNLIMITED"
+            # Power law 0.75 is steeper than 0.65
+            base_lots = (pow(equity, 0.75)) / 200.0 
+            MAX_CEILING = 50.0 # Effectively no cap logic
+        else:
+            # TIER 2: HIGH LEVERAGE (1:2000)
+            # Stabilized growth for larger capital
+            # Ex: $2000 -> ~0.70 lots | $10000 -> ~2.5 lots
+            lev_tier = "1:2000"
+            base_lots = (pow(equity, 0.70)) / 300.0
+            # Margin Ceiling: (Equity * 2000) / 100000 = Max Lots allowed by broker
+            # We take 50% of that to leave room for Drawdown
+            MAX_CEILING = ((equity * 2000) / 100000) * 0.5
+
         # 2. Confidence Multiplier (Brain)
         # Score 0 -> 1.0x
         # Score 100 -> 1.5x
@@ -52,9 +62,10 @@ class DynamicLeverage:
         
         raw_lots = base_lots * conf_factor * entropy_factor
         
+        # logger.info(f"Risk Tier {lev_tier}: Eq ${equity:.0f} -> Base {base_lots:.2f} -> Raw {raw_lots:.2f}")
+
         # 4. Sigmoid Soft Cap (Asymptote at MAX_CEILING)
         # Prevents "Infinite Lots" on huge accounts, forces diversification.
-        MAX_CEILING = 5.0 # Increased from 2.5 per user "4.92 lots" comment
         
         # Formula: L = Max * tanh(raw / Max)
         final_lots = MAX_CEILING * math.tanh(raw_lots / MAX_CEILING)

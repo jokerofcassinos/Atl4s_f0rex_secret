@@ -338,21 +338,30 @@ class LaplaceDemonCore:
         swarm_dec = legion_intel.get('swarm_decision', 'WAIT')
         swarm_scr = legion_intel.get('swarm_score', 0.0)
         
-        # Only log if there's something interesting or partially interesting
-        # OR just log concise heartbeat every tick
-        log_msg = (f"🤔 THINKING | Price: {current_price} | "
+        # Determine status flag
+        status_flag = ""
+        if not prediction.execute and (prediction.primary_signal and prediction.primary_signal != "Monitoring"):
+             status_flag = " [VETOED]"
+        elif prediction.execute:
+             status_flag = " [ACTIVE]"
+
+        log_msg = (f"[THINKING] | Price: {current_price} | "
                    f"Legacy: {legacy_result['score']:.1f} | "
                    f"Swarm: {swarm_dec} ({swarm_scr:.1f}%) | "
-                   f"Setup: {prediction.primary_signal if prediction.primary_signal else 'Monitoring'}")
+                   f"Setup: {prediction.primary_signal if prediction.primary_signal else 'Monitoring'}{status_flag}")
         
         if prediction.primary_signal and prediction.primary_signal != "Monitoring":
-             log_msg += f" (Conf: {prediction.confidence:.1f}%)"
-                   
+             # If vetoed, show the original logic score to show potential
+             if not prediction.execute:
+                  log_msg += f" (Logic: {prediction.logic_vector:.1f})"
+             else:
+                  log_msg += f" (Conf: {prediction.confidence:.1f}%)"
+                    
         # Log at INFO level so it shows up in console
         logger.info(log_msg)
 
         if prediction.execute:
-            logger.info(f"🚨 SIGNAL GENERATED: {prediction.direction} | Conf: {prediction.confidence:.1f}% | Reasons: {prediction.reasons}")
+            logger.info(f"[SIGNAL GENERATED] {prediction.direction} | Conf: {prediction.confidence:.1f}% | Reasons: {prediction.reasons}")
             
         return prediction
 

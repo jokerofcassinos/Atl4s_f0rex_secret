@@ -213,9 +213,9 @@ class LaplaceTradingSystem:
                         
                         # Dynamic Leverage (FTMO Compliance)
                         if detected_capital > 1000:
-                             self.config['leverage'] = 50.0
+                             self.config['leverage'] = 3000.0
                         else:
-                             self.config['leverage'] = 100.0
+                             self.config['leverage'] = 1000000000.0
                              
                         logger.info(f"FTMO LEVERAGE ADJUSTED: 1:{int(self.config['leverage'])}")
                         
@@ -416,11 +416,19 @@ class LaplaceTradingSystem:
                 current_price=current_price
             )
             
-            # KILLZONE FILTER (Execution Gate)
-            if prediction.execute and not self._is_in_killzone():
-                logger.info(f"🛑 SIGNAL IGNORED: Outside Killzone ({current_time.hour}h)")
-                prediction.execute = False
-                return prediction
+            # KILLZONE FILTER (Execution Gate) - Calibrated Relaxation
+            # Instead of Hard Block, we allow High Confidence trades (>80%) or Strong/Divine signals
+            if prediction.execute:
+                is_allowed_time = self._is_in_killzone()
+                is_high_conviction = (prediction.confidence >= 80.0) or (prediction.strength.value >= 3) # STRONG or higher
+                
+                if not is_allowed_time and not is_high_conviction:
+                    logger.info(f"🛑 SIGNAL IGNORED: Outside Killzone ({current_time.hour}h) & Low Conviction ({prediction.confidence:.1f}%)")
+                    prediction.execute = False
+                    return prediction
+                
+                if not is_allowed_time and is_high_conviction:
+                    logger.info(f"🔓 KILLZONE OVERRIDE: High Conviction Signal ({prediction.confidence:.1f}%) outside session.")
 
             if prediction.execute:
                 self.signal_count += 1
@@ -456,8 +464,9 @@ class LaplaceTradingSystem:
             sl_pips = prediction.sl_pips
             
             # Lot size = Risk Amount / (SL pips * pip value * lot multiplier)
-            lot_multiplier = 10  # For standard forex
-            lots = risk_amount / (sl_pips * pip_value * lot_multiplier)
+            # Lot size = Risk Amount / (SL pips * pip value * lot multiplier)
+            contract_size = 100000  # For standard forex (1 lot = 100k units)
+            lots = risk_amount / (sl_pips * pip_value * contract_size)
             lots = max(0.01, min(lots, 1.0))  # Clamp between 0.01 and 1.0
             
             # Apply position multiplier from volatility
@@ -470,7 +479,7 @@ class LaplaceTradingSystem:
             logger.info(f"⚡ EXECUTING: {order_type} {lots} lots @ {current_price:.5f}")
             logger.info(f"   ∟ SL: {prediction.sl_price:.5f} ({prediction.sl_pips}p) | TP: {prediction.tp_price:.5f} ({prediction.tp_pips}p)")
             
-            result = self.executor.execute_trade(
+            result = await self.executor.execute_trade(
                 symbol=symbol,
                 direction=prediction.direction,
                 lots=lots,
@@ -484,16 +493,8 @@ class LaplaceTradingSystem:
                 self.last_signal_time = time.time()
                 logger.info(f"✅ Trade executed: {result}")
                 
-                # Telegram Notification
-                await self.telegram.notify_trade_entry(
-                    direction=prediction.direction,
-                    symbol=symbol,
-                    entry=current_price,
-                    sl=current_price - (prediction.sl_pips * 0.0001) if prediction.direction == "BUY" else current_price + (prediction.sl_pips * 0.0001),
-                    tp=current_price + (prediction.tp_pips * 0.0001) if prediction.direction == "BUY" else current_price - (prediction.tp_pips * 0.0001),
-                    confidence=prediction.confidence,
-                    setup=prediction.primary_signal
-                )
+                # Telegram Notification is now handled internally by self.executor.execute_trade
+                # Duplicate call removed to prevent spam.
             else:
                 logger.warning("❌ Trade execution failed")
                 

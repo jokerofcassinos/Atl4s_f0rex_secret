@@ -84,7 +84,7 @@ class RecursiveReasoner:
                 # Check magnitude of disagreement
                 path_delta = (avg_future - last_price) / last_price
                 
-                if abs(path_delta) > 0.0002: # Significant drift (2 bps)
+                if abs(path_delta) > 0.0005: # Significant drift (Relaxed to 5 bps for Aggressive Mode)
                     history.append(f"Iter {i}: Conflict detected. {reason}")
                     history.append("Result: ENLIGHTENED PIVOT. Switching Decision.")
                     
@@ -96,7 +96,7 @@ class RecursiveReasoner:
                     break
                 else:
                     # Weak conflict, just reduce score (Caution)
-                    current_score *= 0.8 
+                    current_score *= 0.95 # Relaxed penalty (was 0.8)
                     history.append(f"Iter {i}: Minor Conflict ({reason}). Reducing confidence.")
                     if current_score < 40:
                          current_decision = "WAIT"

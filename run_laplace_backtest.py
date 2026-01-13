@@ -57,9 +57,10 @@ class LaplaceBacktestRunner:
                   spread_pips: float = 1.5):
         
         # Dynamic Leverage (FTMO Compliance)
-        leverage = 100.0
+        # Dynamic Leverage (Exness Aggressive - Matched to Main)
+        leverage = 1000000.0 # Unlimited for < $1000
         if initial_capital > 1000:
-            leverage = 50.0
+            leverage = 3000.0 # 1:2000 capped for > $1000
             
         self.symbol = symbol
         self.config = BacktestConfig(
@@ -206,6 +207,7 @@ class LaplaceBacktestRunner:
             slice_m5 = self.df_m5.iloc[:i+1] if use_m5 else self.df_m5[self.df_m5.index <= current_time]
             slice_h1 = self.df_h1[self.df_h1.index <= current_time]
             slice_h4 = self.df_h4[self.df_h4.index <= current_time]
+            slice_d1 = self.df_d1[self.df_d1.index <= current_time] if self.df_d1 is not None else None
             
             # Slice M1 for M8 generation (Last 300 minutes ~ 300 rows is fast enough)
             if hasattr(self, 'df_m1') and self.df_m1 is not None:
@@ -330,7 +332,7 @@ class LaplaceBacktestRunner:
                     df_m5=slice_m5,
                     df_h1=slice_h1,
                     df_h4=slice_h4,
-                    df_d1=None,
+                    df_d1=slice_d1,
                     current_time=current_time,
                     current_price=current_price
                 )
