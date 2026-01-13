@@ -886,18 +886,46 @@ class ConsensusEngine:
         
         # 1. HOLOGRAPHIC PRIORITY
         if final_decision != "WAIT":
-            decision = final_decision
-            # APPLY NORMALIZATION HERE for Holographic Score too
-            final_score = min(99.9, final_score * 0.4) 
-            logger.info(f"HOLOGRAPHIC CONSENSUS: {decision} | Reason: {holographic_reason}")
+            # ✅ REFINED NORMALIZATION: Matching Laplace formula (50% base + edge over threshold)
+            # This ensures the 88% and 99% filters correspond to the numbers the user sees.
+            raw_h_score = final_score if final_score > 0 else abs(total_vector)
+            # Formula: 50% + (raw - threshold)
+            normalized_conf = 50 + (raw_h_score - threshold)
+            final_score = min(99.9, max(1.0, normalized_conf))
             
-        # 2. LEGACY FALLBACK (If Holographic matrix was inconclusive)
-        elif final_score > threshold: 
-            # Normalization already applied to final_score (from total_vector) in previous step
-            if total_vector > 0:
-                decision = "BUY"
+            # Apply strict confidence filters (User Requests)
+            if holographic_reason == "Neutral" and final_score < 88.0:
+                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 88%. Silencing.")
+                 decision = "WAIT"
+                 final_score = 0 # ✅ CRITICAL FIX: Zero score to stop Laplace V2
+            elif holographic_reason == "REVERSION_SNIPER" and final_score < 88.0:
+                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 88%. Silencing.")
+                 decision = "WAIT"
+                 final_score = 0 # ✅ CRITICAL FIX
+            elif holographic_reason == "MOMENTUM_BREAKOUT" and final_score < 99.0:
+                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 99%. Silencing.")
+                 decision = "WAIT"
+                 final_score = 0 # ✅ CRITICAL FIX
             else:
-                decision = "SELL"
+                 decision = final_decision
+                 logger.info(f"HOLOGRAPHIC CONSENSUS: {decision} | Reason: {holographic_reason} | Conf: {final_score:.1f}%")
+            
+        # 2. LEGACY FALLBACK (CONSENSUS_VOTE) - ✅ SIGNAL INVERSION (User Request)
+        elif final_score > threshold: 
+            # ✅ REFINED NORMALIZATION: Matching Laplace formula
+            normalized_conf = 50 + (abs(total_vector) - threshold)
+            final_score = min(99.9, max(1.0, normalized_conf))
+            
+            # ✅ SIGNAL INVERSION: If logic fell back here, it's a CONSENSUS_VOTE.
+            if total_vector > 0:
+                decision = "SELL" # Inverted from BUY
+            else:
+                decision = "BUY"  # Inverted from SELL
+            
+            # CONSENSUS_VOTE inversion also applies to total_vector for Laplace (Phase 2 consistency)
+            total_vector = -total_vector
+            holographic_reason = "CONSENSUS_VOTE"
+            logger.info(f"LEGACY CONSENSUS (Inverted): {decision} | Reason: {holographic_reason} | Conf: {final_score:.1f}%")
                 
         # --- PHASE 10: RECURSIVE DEBATE (Chain-of-Thought) ---
         if decision != "WAIT":
@@ -979,5 +1007,10 @@ class ConsensusEngine:
         # Heartbeat Log (Show activity even if WAIT)
         if decision == "WAIT":
             logger.info(f"Consensus Heartbeat: Trend={t_score:.0f} Sniper={s_score:.0f} Quant={q_score:.0f} Vector={total_vector:.2f}")
+            total_vector = 0 # ✅ CRITICAL: Ensure Laplace V2 sees 0 if Consensus says WAIT
+        else:
+            # ✅ Laplace V2 Integration: Return the normalized signed score
+            direction_sign = 1 if decision == "BUY" else -1
+            total_vector = final_score * direction_sign
             
         return decision, total_vector, details

@@ -10,7 +10,7 @@ if (-not (Test-Path ".git")) {
 }
 
 # 2. Checkout Branch
-$branch = "laplace-v0.1.3"
+$branch = "laplace-v0.1.4"
 Write-Host "Checking out branch: $branch"
 git checkout -b $branch 2>$null
 if ($LASTEXITCODE -ne 0) {

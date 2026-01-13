@@ -485,8 +485,8 @@ class LaplaceDemonCore:
         # Get ATR
         atr = ta.volatility.AverageTrueRange(df_m5['high'], df_m5['low'], df_m5['close'], window=14).average_true_range().iloc[-1]
         
-        # SL = 120 pips (Optimized for 30-day rotation)
-        sl_pips = max(120, (atr * 3.0) * 10000)
+        # SL = 200 pips (User Requested: Restore distance)
+        sl_pips = max(200, (atr * 3.5) * 10000)
         
         # TP = Optimized Ratio (User Request: Lower TP for faster rotation)
         tp_pips = sl_pips * 0.8 # 1:0.8 RR (Ensures trades close faster)
