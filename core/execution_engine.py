@@ -2,6 +2,8 @@
 import logging
 import asyncio
 import time
+import json
+import os
 from typing import Dict, Any, Optional, List
 from collections import deque
 
@@ -18,8 +20,9 @@ class ExecutionEngine:
     The Hand of God.
     Executes trades and handles Predictive Exits.
     """
-    def __init__(self, bridge=None):
+    def __init__(self, bridge=None, notifier=None):
         self.bridge = bridge
+        self.notifier = notifier # Telegram Notifier
         # Phase 10: Risk Core AGI-aware filter
         self.risk_filter = GreatFilter()
         self.leverage_manager = DynamicLeverage()
@@ -34,6 +37,10 @@ class ExecutionEngine:
         # Phase 4.2: Win Rate per Module
         self.trade_sources = {} # {ticket: source_id}
         self.pending_sources = deque(maxlen=50) # Queue of {'symbol', 'time', 'source'}
+        
+        # Persistence Path
+        self.context_path = "data/trade_context.json"
+        self._load_context()
 
     def register_learning_engine(self, engine):
         """Connects the History/Learning Engine for outcome tracking."""
@@ -46,6 +53,29 @@ class ExecutionEngine:
 
     def _get_current_time_msc(self):
         return int(time.time_ns() / 1_000_000)
+
+    def _save_context(self):
+        """Phase 10: Intelligent Verification. Persistence across restarts."""
+        try:
+            os.makedirs(os.path.dirname(self.context_path), exist_ok=True)
+            # Convert keys to string for JSON
+            serializable_sources = {str(k): v for k, v in self.trade_sources.items()}
+            with open(self.context_path, 'w') as f:
+                json.dump(serializable_sources, f, indent=4)
+        except Exception as e:
+            logger.error(f"Failed to save trade context: {e}")
+
+    def _load_context(self):
+        """Loads trade context from disk on startup."""
+        try:
+            if os.path.exists(self.context_path):
+                with open(self.context_path, 'r') as f:
+                    data = json.load(f)
+                    # Convert back to int keys
+                    self.trade_sources = {int(k): v for k, v in data.items()}
+                    logger.info(f"TRADE CONTEXT: Recovered {len(self.trade_sources)} trade sources from disk.")
+        except Exception as e:
+            logger.error(f"Failed to load trade context: {e}")
         
         
     async def monitor_positions(self, tick: Dict, agi_context: Dict = None):
@@ -110,8 +140,24 @@ class ExecutionEngine:
                      if hasattr(self.history_engine, 'record_experience'):
                          self.history_engine.record_experience(ticket, outcome, features)
                 
+                # 3. Notify User (Telegram)
+                if self.notifier:
+                     pips = price_diff / 0.0001 # Assuming standard forex
+                     asyncio.create_task(self.notifier.notify_trade_exit(
+                         symbol=details.get('symbol', 'UNKNOWN'),
+                         entry=entry_price,
+                         exit=exit_price,
+                         pnl_dollars=approx_pnl,
+                         pnl_pips=pips,
+                         reason="MARKET_EXIT (TP/SL/Manual)",
+                         source=details.get('source', 'UNKNOWN')
+                     ))
+                
+                logger.info(f"💰 TRADE CLOSED | Ticket: {ticket} | Profit: ${approx_pnl:.2f}")
+                
                 crashed_tickets.append(ticket)
                 self.closed_tickets_cache.add(ticket)
+                self._save_context() # Force save on closure
         
         # Cleanup closed
         for t in crashed_tickets:
@@ -150,7 +196,8 @@ class ExecutionEngine:
                 found_data['lots'] = lots
                     
                 self.trade_sources[ticket] = found_data
-                # logger.info(f"TRADE SOURCE MAPPED: Ticket {ticket} -> {found_source}")
+                self._save_context() # Force save on detection
+                logger.debug(f"TRADE SOURCE MAPPED: Ticket {ticket} -> {found_data.get('source')}")
         
         # 1. Config Thresholds
         v_tp = self.config.get('virtual_tp', 2.0)

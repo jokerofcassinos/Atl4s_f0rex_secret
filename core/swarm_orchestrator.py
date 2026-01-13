@@ -236,6 +236,7 @@ class SwarmOrchestrator:
 
         logger.info(f"Swarm Initialized with {len(self.active_agents)} Cognitive Sub-Units.")
         self.state = "CONSCIOUS"
+        self.adapters = {} # Cache for AGISwarmAdapters
 
     async def process_tick(self, tick: Dict[str, Any], data_map: Dict[str, pd.DataFrame], config: Dict = None, agi_context: Dict = None) -> Tuple[str, float, Dict[str, Any]]:
         """
@@ -303,7 +304,10 @@ class SwarmOrchestrator:
             if signal:
                 # Phase 9: Global AGI hook for ALL swarms (no file left behind)
                 try:
-                    adapter = AGISwarmAdapter(agent.name)
+                    if agent.name not in self.adapters:
+                         self.adapters[agent.name] = AGISwarmAdapter(agent.name)
+                         
+                    adapter = self.adapters[agent.name]
                     swarm_output = {
                         "decision": signal.signal_type,
                         "score": signal.confidence,

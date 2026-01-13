@@ -1,0 +1,18 @@
+{
+    "12345": {
+        "source": "MOMENTUM_BREAKOUT",
+        "confidence": 99.0,
+        "direction": "BUY",
+        "entry_price": 1.25,
+        "lots": 0.1,
+        "symbol": "GBPUSD"
+    },
+    "99999": {
+        "source": "SNIPER_GOLDEN_GATE",
+        "confidence": 85.0,
+        "direction": "SELL",
+        "entry_price": 1.26,
+        "lots": 0.05,
+        "symbol": "GBPUSD"
+    }
+}

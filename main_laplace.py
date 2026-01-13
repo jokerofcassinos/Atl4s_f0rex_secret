@@ -17,6 +17,7 @@ import datetime
 import time
 import pandas as pd
 import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from typing import Optional, Dict, Any
 
@@ -61,6 +62,21 @@ logging.basicConfig(
 logging.getLogger("yfinance").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+# --- SILENCE AGI NOISE (The "Holographic" Garbage) ---
+NOISY_LOGGERS = [
+    "RecursiveReflection", "InfiniteWhyEngine", "HolographicMemory", 
+    "HolographicPlateUltra", "AGISwarmAdapter", "MCTS_Planner", 
+    "HealthMonitor", "UnifiedReasoning", "NeuroPlasticity", 
+    "EvolutionEngine", "MemoryIntegration", "CortexMemory",
+    "NeuralOracle", "Consensus", "ZmqBridge", "ExecutionEngine",
+    "CausalGraph", "SwarmOrchestrator"
+]
+for log_name in NOISY_LOGGERS:
+    logging.getLogger(log_name).setLevel(logging.WARNING)
+
+# Full Silence for Reflection Warnings
+logging.getLogger("RecursiveReflection").setLevel(logging.ERROR)
 
 logger = logging.getLogger("LaplaceDemon")
 
@@ -115,10 +131,13 @@ class LaplaceTradingSystem:
             'mode': 'LAPLACE'
         }
         
+        # Analytics
+        self.telegram = get_notifier()
+        
         # Core components
         self.bridge = ZmqBridge(port=zmq_port)
         self.data_loader = DataLoader()
-        self.executor = ExecutionEngine(self.bridge)
+        self.executor = ExecutionEngine(self.bridge, notifier=self.telegram)
         self.executor.set_config(self.config)
         
         # Laplace Demon - The Brain
@@ -141,9 +160,6 @@ class LaplaceTradingSystem:
         self.tick_count: int = 0
         self.signal_count: int = 0
         self.trade_count: int = 0
-        
-        # Analytics
-        self.telegram = get_notifier()
         
         logger.info(f"LAPLACE DEMON INITIALIZED | Symbol: {symbol}")
     
@@ -452,6 +468,7 @@ class LaplaceTradingSystem:
             order_type = prediction.direction
             
             logger.info(f"⚡ EXECUTING: {order_type} {lots} lots @ {current_price:.5f}")
+            logger.info(f"   ∟ SL: {prediction.sl_price:.5f} ({prediction.sl_pips}p) | TP: {prediction.tp_price:.5f} ({prediction.tp_pips}p)")
             
             result = self.executor.execute_trade(
                 symbol=symbol,

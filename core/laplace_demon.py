@@ -158,6 +158,11 @@ class LaplaceDemonCore:
 
         # --- 7. TIER 4 DEEP LEARNING (Neural Oracle) ---
         self.neural_hub = ModelHub()
+        
+        # --- 8. CONFIGURATION ---
+        self.params = {
+            'threshold': 20.0  # Base threshold for trade execution
+        }
 
     def record_trade(self, ticket: int, pnl: float, details: Dict):
         """
@@ -329,7 +334,6 @@ class LaplaceDemonCore:
         # 3. SYNTHESIS
         prediction = self._synthesize_master_decision(legacy_result, legion_intel, details, current_price, df_m5)
         
-        # --- CONSCIOUSNESS STREAM (User Feedback) ---
         # Log the internal state so the user sees the "Mind" at work
         swarm_dec = legion_intel.get('swarm_decision', 'WAIT')
         swarm_scr = legion_intel.get('swarm_score', 0.0)
@@ -340,6 +344,9 @@ class LaplaceDemonCore:
                    f"Legacy: {legacy_result['score']:.1f} | "
                    f"Swarm: {swarm_dec} ({swarm_scr:.1f}%) | "
                    f"Setup: {prediction.primary_signal if prediction.primary_signal else 'Monitoring'}")
+        
+        if prediction.primary_signal and prediction.primary_signal != "Monitoring":
+             log_msg += f" (Conf: {prediction.confidence:.1f}%)"
                    
         # Log at INFO level so it shows up in console
         logger.info(log_msg)
