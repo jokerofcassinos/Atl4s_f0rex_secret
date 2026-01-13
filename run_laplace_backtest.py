@@ -61,7 +61,7 @@ class LaplaceBacktestRunner:
             initial_capital=initial_capital,
             leverage=3000.0,  # Unlimited
             risk_per_trade_pct=risk_per_trade,
-            max_concurrent_trades=3,
+            max_concurrent_trades=15,
             spread_pips=spread_pips,
             slippage_pips=0.5,
             symbol=symbol
@@ -207,6 +207,7 @@ class LaplaceBacktestRunner:
             # Check active trades first
             for trade in self.engine.active_trades[:]:
                 exit_reason = self.engine.update_trade(trade, current_price, current_time)
+                
                 if exit_reason:
                     # Simulate proper exit price
                     if exit_reason == "SL_HIT":
@@ -537,8 +538,8 @@ async def main():
                 return
     
     # Verify we have enough data
-    if runner.df_m5 is None or len(runner.df_m5) < 300:
-        logger.error(f"Insufficient M5 data. Need at least 300 candles, got: {len(runner.df_m5) if runner.df_m5 is not None else 0}")
+    if runner.df_m5 is None or len(runner.df_m5) < 100: # Temporary reduction for data gaps
+        logger.error(f"Insufficient M5 data. Need at least 100 candles, got: {len(runner.df_m5) if runner.df_m5 is not None else 0}")
         return
     
     print(f"\n✅ Data loaded successfully!")
@@ -554,7 +555,7 @@ async def main():
         if hasattr(end_date, 'tzinfo') and end_date.tzinfo is not None:
              end_date = end_date.replace(tzinfo=None)
              
-        start_date = end_date - timedelta(days=6)
+        start_date = end_date - timedelta(days=30)
         mask = runner.df_m5.index >= start_date
         runner.df_m5 = runner.df_m5.loc[mask]
         

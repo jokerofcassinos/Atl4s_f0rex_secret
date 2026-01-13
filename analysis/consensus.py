@@ -778,7 +778,7 @@ class ConsensusEngine:
              # Check alignment
              if (v_structure * mom_dir) >= 0: # Structure doesn't oppose
                  if (v_reversion * mom_dir) > -30: # Reversion doesn't excessively oppose
-                     final_decision = "BUY" if mom_dir == 1 else "SELL"
+                     final_decision = "SELL" if mom_dir == 1 else "BUY"
                      final_score = abs(v_momentum) + abs(v_structure)
                      holographic_reason = "MOMENTUM_BREAKOUT"
 
@@ -788,7 +788,8 @@ class ConsensusEngine:
         if abs(v_reversion) > 25:
              rev_dir = 1 if v_reversion > 0 else -1
              if (v_structure * rev_dir) > 20: # Structure MUST support Reversion (Confluence)
-                 final_decision = "BUY" if rev_dir == 1 else "SELL"
+                 # ✅ SIGNAL INVERSION (User Request): Revert the Reversion
+                 final_decision = "SELL" if rev_dir == 1 else "BUY"
                  final_score = abs(v_reversion) + abs(v_structure)
                  holographic_reason = "REVERSION_SNIPER"
                  
@@ -804,6 +805,12 @@ class ConsensusEngine:
                  
         # Override with Golden Setups (The Royal Flush) logic preserved below...
         total_vector = v_momentum + v_reversion + v_structure # Legacy compatibility
+        
+        # ✅ SIGNAL INVERSION (User Request): If we are in REVERSION_SNIPER or MOMENTUM_BREAKOUT, 
+        # we must invert the numeric vector so LaplaceDemon (V2) sees the correct direction.
+        if holographic_reason in ["REVERSION_SNIPER", "MOMENTUM_BREAKOUT"]:
+             total_vector = -total_vector
+             
         details['Vectors'] = {
             'Momentum': v_momentum,
             'Reversion': v_reversion,
