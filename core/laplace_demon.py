@@ -622,7 +622,26 @@ class LaplaceDemonCore:
                  vetoes.append(f"Regime Lock: {setup} invalid in Chop")
                  execute = False
                  hard_veto = True
-             
+                 
+             # REVERSION SAFETY: Force Wick Confirmation in Chop.
+             # Don't catch falling knives. Wait for the wick.
+             if setup == "REVERSION_SNIPER" and toxic_flow:
+                  micro = details.get('Micro', {})
+                  rejection = micro.get('rejection', 'NEUTRAL')
+                  
+                  if score > 0 and rejection == "BEARISH_REJECTION":
+                       reasons.append("Wick Filter: Vetoing Buy (Bearish Rejection Detected)")
+                       vetoes.append("Wick Filter: Knife Catching Prevented")
+                       execute = False
+                       hard_veto = True
+                  elif score < 0 and rejection == "BULLISH_REJECTION":
+                       reasons.append("Wick Filter: Vetoing Sell (Bullish Rejection Detected)")
+                       vetoes.append("Wick Filter: Rocket Catching Prevented")
+                       execute = False
+                       hard_veto = True
+              
+             # MATH RESTORE: Reverting to 80.0 Cap (99% Conf) per user request.
+             reasons.append(f"Toxic Flow: Compression Detected (Capping Score to 80)")
              if abs(score) > 80:
                   score = 80.0 if score > 0 else -80.0
              
@@ -632,7 +651,42 @@ class LaplaceDemonCore:
                   execute = False 
                   hard_veto = True 
 
-        # 4. SNR Walls (Tier 3)
+             if abs(score) < 40: 
+                  vetoes.append("Toxic Flow: Weak Signal in Chop")
+                  execute = False 
+                  hard_veto = True 
+
+        # --- 4. DEEP FORENSIC ANALYSIS (Toxic Drift 2.0) ---
+        # User Feedback: "Massive Errors in specific scenario".
+        # Diagnosis: Algorithmic Drift (Iceberg) -> Low Entropy + High OFI.
+        # Fix: Veto Reversion if Entropy is low (Structured Move) or OFI opposes trade.
+        
+        micro = details.get('Micro', {})
+        entropy = micro.get('entropy', 1.0)
+        ofi = micro.get('ofi', 0)
+        
+        # A. ENTROPY SHIELD (Anti-Iceberg)
+        # If Entropy < 0.6, the move is highly structured (Algo). Do not fade it.
+        if entropy < 0.6 and setup == "REVERSION_SNIPER":
+             reasons.append(f"ENTROPY SHIELD: Vetoing Reversion in Structured Drift (Entropy {entropy:.2f})")
+             vetoes.append("Entropy Shield: Iceberg Detected")
+             execute = False
+             hard_veto = True
+             
+        # B. OFI GUARD (Order Flow Imbalance)
+        # Don't Buy if Net Order Flow is massively Selling.
+        if score > 0 and ofi < -50:
+             reasons.append(f"OFI GUARD: Vetoing BUY against Sell Pressure (OFI {ofi})")
+             vetoes.append("OFI Guard: Tape Reading Sell Pressure")
+             execute = False
+             hard_veto = True
+        elif score < 0 and ofi > 50:
+             reasons.append(f"OFI GUARD: Vetoing SELL against Buy Pressure (OFI {ofi})")
+             vetoes.append("OFI Guard: Tape Reading Buy Pressure")
+             execute = False
+             hard_veto = True
+
+        # 5. SNR Walls (Tier 3)
         snr_data = details.get('SNR', {})
         if snr_data:
              res_dist = snr_data.get('res_dist', 999.0)
@@ -753,6 +807,7 @@ class LaplaceDemonCore:
 
         # --- OMEGA MULTIPLIER LOGIC ---
         lot_multiplier = 1.0
+        
         if execute:
             if setup in ["KINETIC_BOOM", "LEGION_KNIFE_SCALP", "LION_PROTOCOL", "REVERSION_SNIPER"]:
                 lot_multiplier = 5.0

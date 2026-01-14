@@ -163,8 +163,13 @@ class TrendArchitect:
             else:
                 score += 20 # Boost for aligning with River
         
-        # If Regime is RANGING, we ignore the River and trust the M5 Reversals ( handled by Quant mostly)
-        # But Trend Architect just reports what it sees on M5.
+        # If Regime is RANGING (ADX < 25), Trend Logic is flawed.
+        # FIX: "Deep Logic Analysis". If ADX < 20 (Severe Chop), Force Neutrality.
+        if adx < 20.0:
+             score = 0
+             direction = 0
+             regime = "CHOP (ADX < 20)"
+             # logger.debug("Tremd Module Silenced: ADX < 20 (Chop Detected)")
  
         raw_output: Dict[str, Any] = {
             "score": min(score, 100),

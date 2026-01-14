@@ -93,9 +93,10 @@ class SMCAnalyzer:
         self.liquidity_pools: List[LiquidityPool] = []
         self.structure_trend: StructureType = StructureType.RANGING
         
-    def analyze(self, df: pd.DataFrame, current_price: float = None) -> Dict:
+    def analyze(self, df: pd.DataFrame, current_price: float = None, adx: float = 25.0) -> Dict:
         """
         Robust SMC Analysis. Returns SAFE defaults on error.
+        Accepts ADX to penalize weak structures in Chop.
         """
         # SAFE DEFAULT RETURN
         empty_result = {
@@ -139,7 +140,7 @@ class SMCAnalyzer:
             self._update_fvg_fill(current_price)
             
             # 6. Find Entry
-            entry = self._find_entry_signal(df, current_price)
+            entry = self._find_entry_signal(df, current_price, adx)
             
             return {
                 'trend': self.structure_trend.value if self.structure_trend else 'RANGING',
@@ -476,7 +477,7 @@ class SMCAnalyzer:
                     filled = current_price - fvg.bottom
                     fvg.filled_pct = (filled / gap_size) * 100
     
-    def _find_entry_signal(self, df: pd.DataFrame, current_price: float) -> Dict:
+    def _find_entry_signal(self, df: pd.DataFrame, current_price: float, adx: float = 25.0) -> Dict:
         """Find optimal entry based on SMC confluence."""
         signal = {
             'direction': None,
@@ -502,14 +503,23 @@ class SMCAnalyzer:
                     if fvg.type == ob.type:
                         overlap = max(0, min(ob.top, fvg.top) - max(ob.bottom, fvg.bottom))
                         if overlap > 0:
-                            signal = {
-                                'direction': 'BUY' if ob.type == "BULLISH" else 'SELL',
-                                'confidence': min(90, 50 + ob.strength * 0.3 + (100 - fvg.filled_pct) * 0.2),
-                                'sl_price': ob.bottom - 0.0010 if ob.type == "BULLISH" else ob.top + 0.0010,
-                                'tp_price': None,  # Calculate based on structure
-                                'reason': f'{ob.type} OB + FVG confluence'
-                            }
-                            break
+                            # Dynamic Confidence Calculation
+                            base_conf = 50 + ob.strength * 0.3 + (100 - fvg.filled_pct) * 0.2
+                            
+                            # CHOP PENALTY: If ADX < 20 (Toxic Flow), reducing confidence.
+                            # Weak OBs in Chop get eaten.
+                            if adx < 20.0:
+                                base_conf -= 20.0
+                                
+                            if base_conf > 50: # Only if it survives the penalty
+                                signal = {
+                                    'direction': 'BUY' if ob.type == "BULLISH" else 'SELL',
+                                    'confidence': min(90, base_conf),
+                                    'sl_price': ob.bottom - 0.0010 if ob.type == "BULLISH" else ob.top + 0.0010,
+                                    'tp_price': None, # Calculate based on structure
+                                    'reason': f'{ob.type} OB + FVG confluence'
+                                }
+                                break
         
         return signal
 

@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+import ta
 from typing import Dict, Any, Tuple
 from signals.structure import SMCAnalyzer
 from core.agi.module_thought_adapter import AGIModuleAdapter, ModuleThoughtResult
@@ -39,9 +40,17 @@ class Sniper:
 
         current_price = float(df['close'].iloc[-1])
         
-        # 1. Execute Unified SMC Analysis
+        # 1. Calculate Regime (ADX) for Context
+        try:
+            adx_indicator = ta.trend.ADXIndicator(df['high'], df['low'], df['close'], window=14)
+            adx = adx_indicator.adx().iloc[-1]
+        except:
+            adx = 25.0 # Default to neutral/trend if error
+            
+        # 1. Execute Unified SMC Analysis with Context
         # This detects FVG, Order Blocks, Liquidity Pools, and Entries
-        smc_result = self.smc_analyzer.analyze(df, current_price)
+        # We pass ADX to penalize weak structures in Chop.
+        smc_result = self.smc_analyzer.analyze(df, current_price, adx=adx)
         
         # 2. Extract Signal
         entry_signal = smc_result.get('entry_signal', {})

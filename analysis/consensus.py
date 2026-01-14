@@ -995,8 +995,8 @@ class ConsensusEngine:
                  logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 88%. Silencing.")
                  decision = "WAIT"
                  final_score = 0 # ✅ CRITICAL FIX
-            elif holographic_reason == "MOMENTUM_BREAKOUT" and final_score < 99.0:
-                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 99%. Silencing.")
+            elif holographic_reason == "MOMENTUM_BREAKOUT" and final_score < 75.0:
+                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 75%. Silencing.")
                  decision = "WAIT"
                  final_score = 0 # ✅ CRITICAL FIX
             else:

@@ -326,6 +326,35 @@ class LaplaceBacktestRunner:
             if len(self.engine.active_trades) >= self.config.max_concurrent_trades:
                 continue
             
+            # --- SYNTHETIC TICK FEED (Deep Forensic Analysis) ---
+            # Simulate M1 ticks to feed MicroStructure (Entropy/OFI)
+            try:
+                if len(slice_m1) > 0:
+                    last_m1 = slice_m1.iloc[-1]
+                    # Create 4 synthetic ticks: Open -> High -> Low -> Close
+                    vol_per_tick = max(1, last_m1['volume'] // 4)
+                    base_time = last_m1.name.timestamp() * 1000 if hasattr(last_m1.name, 'timestamp') else time.time() * 1000
+                    
+                    ticks = [
+                        {'time': base_time, 'last': last_m1['open'], 'volume': vol_per_tick, 'flags': 0},
+                        {'time': base_time+15000, 'last': last_m1['high'], 'volume': vol_per_tick, 'flags': 0},
+                        {'time': base_time+30000, 'last': last_m1['low'], 'volume': vol_per_tick, 'flags': 0},
+                        {'time': base_time+45000, 'last': last_m1['close'], 'volume': vol_per_tick, 'flags': 0}
+                    ]
+                    
+                    # Sort High/Low based on candle color for realism
+                    if last_m1['close'] > last_m1['open']:
+                        # Bullish: Open -> Low -> High -> Close
+                        ticks[1]['last'] = last_m1['low']
+                        ticks[2]['last'] = last_m1['high']
+                    
+                    for t in ticks:
+                         self.laplace.micro.on_tick(t)
+            except Exception as e:
+                # logger.error(f"Tick synthesis error: {e}")
+                pass
+            # ----------------------------------------------------
+
             # Get Laplace Demon prediction (✅ BACKTEST FIX: Added await)
             try:
                 prediction = await self.laplace.analyze(
