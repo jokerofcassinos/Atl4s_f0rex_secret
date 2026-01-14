@@ -328,7 +328,6 @@ class LaplaceDemonCore:
         # --- TIER 2 SIGNALS (SMC / M8 / Toxic) ---
         details['SMC'] = self.smc_signal.analyze(df_m5, current_price)
         details['ToxicFlow'] = self.toxic_flow.detect_compression(df_m5)
-        details['ToxicFlow'] = self.toxic_flow.detect_compression(df_m5)
         details['Flux'] = flux_metrics
         
         # Liquidator Analysis

@@ -111,6 +111,9 @@ class ConsensusEngine:
             'threshold': 15,  # Aggressive Base Threshold (was 25)
             'chaos_threshold': 3.5 
         }
+        
+        # Phase 6 Performance Optimization: Semantic De-Duplication
+        self.last_module_states = {} # module_name -> state_hash
 
     def update_parameters(self, new_params):
         """Update weights and thresholds for optimization"""
@@ -233,6 +236,19 @@ class ConsensusEngine:
             decision = result.get('decision', 'WAIT') if isinstance(result, dict) else 'WAIT'
             score = result.get('score', 0.0) if isinstance(result, dict) else 0.0
             reasoning = result.get('reason', '') if isinstance(result, dict) else ''
+            
+            # Phase 6 Optimization: Semantic De-Duplication
+            # If the module's decision state (Decision + Score) hasn't changed,
+            # we skip the expensive Thought Tree generation.
+            # We include the first 50 chars of reasoning to catch subtle changes.
+            state_key = f"{decision}:{score:.2f}:{str(reasoning)[:50]}"
+            last_state = self.last_module_states.get(module_name)
+            
+            if state_key == last_state:
+                # Nothing changed, skip expensive Thought Tree operations
+                continue
+                
+            self.last_module_states[module_name] = state_key
             
             # Cria nó de pensamento raiz
             root_node_id = tree.create_node(
