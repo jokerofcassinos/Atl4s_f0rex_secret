@@ -51,7 +51,7 @@ class LaplaceBacktestRunner:
     """
     
     def __init__(self,
-                 initial_capital: float = 30.0,
+                 initial_capital: float = 5000.0,
                  risk_per_trade: float = 2.0,
                  symbol: str = "GBPUSD",
                   spread_pips: float = 1.5):
@@ -551,7 +551,7 @@ async def main():
     # Initialize runner
     symbol = "GBPUSD"
     runner = LaplaceBacktestRunner(
-        initial_capital=30.0,
+        initial_capital=5000.0,
         risk_per_trade=2.0,
         symbol=symbol,
         spread_pips=1.5
