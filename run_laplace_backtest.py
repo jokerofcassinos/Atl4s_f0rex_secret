@@ -695,7 +695,13 @@ async def main():
     # runner.df_m1 = runner.df_m1.iloc[-50000:]
     
     # Run backtest (✅ BACKTEST FIX: Added await)
-    result = await runner.run_backtest(use_m5=True)
+    # Run backtest with graceful exit
+    try:
+        result = await runner.run_backtest(use_m5=True)
+    except KeyboardInterrupt:
+        logger.warning("\n⚠️ Backtest interrupted by user! Generating report for partial results...")
+        # Force calculate results from current state
+        result = runner.engine._calculate_results()
     
     if result:
         # Generate report

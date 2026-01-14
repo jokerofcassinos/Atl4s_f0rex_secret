@@ -724,11 +724,11 @@ class LaplaceDemonCore:
         # Get ATR
         atr = ta.volatility.AverageTrueRange(df_m5['high'], df_m5['low'], df_m5['close'], window=14).average_true_range().iloc[-1]
         
-        # SL = 200 pips (User Requested "Even More Distant" - Safety Net)
-        sl_pips = max(200.0, (atr * 10.0) * 10000)
+        # SL = 40.0 pips (Fixed per Balance Optimization)
+        sl_pips = 40.0 
         
-        # TP = 16 pips (User: "o tp estava otimo" - Back to 16p baseline)
-        tp_pips = 16.0 
+        # TP = 20.0 pips (Balanced Scalp Profile)
+        tp_pips = 20.0 
 
         
         prediction.sl_pips = sl_pips
