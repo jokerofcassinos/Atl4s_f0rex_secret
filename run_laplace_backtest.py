@@ -70,7 +70,8 @@ class LaplaceBacktestRunner:
             max_concurrent_trades=100, # Increased for Split Fire (Swarm needs space)
             spread_pips=spread_pips,
             slippage_pips=0.5,
-            symbol=symbol
+            symbol=symbol,
+            fixed_lots=50.0 # [FIXED LOT MODE] Stabilizes Profit Curve
         )
         
         # Initialize components

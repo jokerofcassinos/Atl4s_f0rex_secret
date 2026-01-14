@@ -88,6 +88,7 @@ class BacktestConfig:
     
     # Risk Management
     risk_per_trade_pct: float = 2.0  # 2% risk per trade
+    fixed_lots: Optional[float] = None # Fixed lot size overrides percentage risk
     max_concurrent_trades: int = 3
     
     # Virtual Stops (Phase 7 - User Request)
@@ -205,6 +206,11 @@ class BacktestEngine:
         """
         if sl_pips <= 0:
             return 0.01  # Minimum lot
+            
+        # FIXED LOT MODE (Stabilizer)
+        if self.config.fixed_lots is not None:
+             return self.config.fixed_lots
+
             
         risk_amount = self.balance * (self.config.risk_per_trade_pct / 100)
         lot_size = risk_amount / (sl_pips * self.config.pip_value)
