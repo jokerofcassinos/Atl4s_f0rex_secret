@@ -68,6 +68,7 @@ class ThoughtTree:
         self.max_depth = max_depth
         self.nodes: Dict[str, ThoughtNode] = {}
         self.root_nodes: List[str] = []  # IDs dos nós raiz
+        self.node_order: List[str] = []  # Chronological order of node IDs
         self._max_depth_warned = False  # Flag to only warn once
         
     def create_node(self, question: str, parent_id: Optional[str] = None, 
@@ -107,6 +108,7 @@ class ThoughtTree:
         )
         
         self.nodes[node_id] = node
+        self.node_order.append(node_id)
         
         # Se é nó raiz, adiciona à lista
         if parent_id is None:
@@ -184,17 +186,11 @@ class ThoughtTree:
     
     def get_recent_thoughts(self, limit: int = 10) -> List[ThoughtNode]:
         """
-        Obtém os pensamentos mais recentes.
-        
-        Args:
-            limit: Número máximo de pensamentos
-            
-        Returns:
-            Lista de nós ordenados por timestamp (mais recentes primeiro)
+        Obtém os pensamentos mais recentes (O(limit)).
         """
-        all_nodes = list(self.nodes.values())
-        all_nodes.sort(key=lambda n: n.timestamp, reverse=True)
-        return all_nodes[:limit]
+        recent_ids = self.node_order[-limit:]
+        recent_ids.reverse()
+        return [self.nodes[nid] for nid in recent_ids if nid in self.nodes]
     
     def get_unanswered_questions(self) -> List[ThoughtNode]:
         """
@@ -836,6 +832,10 @@ class TreeCompressor:
         # Remove from root nodes if applicable
         if node_id in tree.root_nodes:
             tree.root_nodes.remove(node_id)
+            
+        # Remove from node_order
+        if node_id in tree.node_order:
+            tree.node_order.remove(node_id)
         
         # Reparent children to grandparent (or make them roots)
         for child_id in node.children_ids:
