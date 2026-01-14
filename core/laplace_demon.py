@@ -565,11 +565,18 @@ class LaplaceDemonCore:
         # I need the direction.
         # Implied direction: Iceberg Buy -> BUY.
              if "Buy Detected" in eh_meta.get('reason', ''):
-                  if score < 0: score = 60 # Strong Flip
-                  else: score += 50
+                  # If Toxic Flow, we reduce the boost drastically
+                  boost = 50
+                  if toxic_flow: boost = 10 
+                  
+                  if score < 0: score = 60 # Strong Flip (still valid if not toxic)
+                  else: score += boost
              elif "Sell Detected" in eh_meta.get('reason', ''):
-                   if score > 0: score = -60
-                   else: score -= 50
+                  boost = 50
+                  if toxic_flow: boost = 10
+                  
+                  if score > 0: score = -60
+                  else: score -= boost
 
         # 7. Final Confidence Adjustment
              if "BUY" in zone and score > -10:
@@ -606,6 +613,16 @@ class LaplaceDemonCore:
              # HOWEVER, we must reduce the score to prevent it from bypassing the Neural Oracle.
              # A 100.0 Score in Toxic Flow is suspicious. Let's cap it at 80.
              reasons.append(f"Toxic Flow: Compression Detected (Capping Score to 80)")
+             
+             # REGIME LOCK: In Toxic Chop, Momentum Strategies are suicide.
+             # Only Reversion Snipers are mathematically viable.
+             momentum_strategies = ["MOMENTUM_BREAKOUT", "CONSENSUS_VOTE", "KINETIC_BOOM", "LION_PROTOCOL"]
+             if setup in momentum_strategies:
+                 reasons.append(f"REGIME LOCK: Vetoing {setup} in Toxic Flow (Momentum fails in Chop)")
+                 vetoes.append(f"Regime Lock: {setup} invalid in Chop")
+                 execute = False
+                 hard_veto = True
+             
              if abs(score) > 80:
                   score = 80.0 if score > 0 else -80.0
              
@@ -627,11 +644,27 @@ class LaplaceDemonCore:
                  vetoes.append(f"SNR Wall Veto: Resistance Ahead ({res_dist:.5f})")
                  if not setup: setup = "BLOCKED_BY_WALL"
                  
-             # VETO SELL into Support
-             if score < 0 and sup_dist < 0.0005:
                  score *= 0.1
                  vetoes.append(f"SNR Wall Veto: Support Ahead ({sup_dist:.5f})")
                  if not setup: setup = "BLOCKED_BY_WALL"
+
+        # 4.5 KINETIC SHIELD (The "13 Stops" Fix)
+        # If Kinematics is screaming REVERSAL, we must listen.
+        # Boom Up (0-90) vs Sell Signal
+        # Boom Down (180-270) vs Buy Signal
+        kin_data = details.get('Kinematics', {})
+        k_angle = kin_data.get('angle', 0)
+        
+        if score > 0 and (180 <= k_angle <= 270):
+             reasons.append(f"KINETIC SHIELD: Vetoing BUY against Downward Acceleration ({k_angle:.0f}°)")
+             vetoes.append("Kinetic Shield: Buying into a Crash")
+             execute = False
+             hard_veto = True
+        elif score < 0 and (0 <= k_angle <= 90):
+             reasons.append(f"KINETIC SHIELD: Vetoing SELL against Upward Acceleration ({k_angle:.0f}°)")
+             vetoes.append("Kinetic Shield: Selling into a Rocket")
+             execute = False
+             hard_veto = True
 
         # 5. Neural Oracle (Tier 4 - Experimental)
         neural_pred = details.get('Neural')
@@ -699,6 +732,12 @@ class LaplaceDemonCore:
             
             threshold = 0.60 # Increased from 0.40
             bypass_score = 85.0 # Restored to 85.0 (Allows Trade #96 Sniper to pass)
+            
+            # Special Case: If Toxic Flow is active, we demand stricter confirmation.
+            # Trade #83 (76%) failed here.
+            if toxic_flow:
+                threshold = 0.85
+                reasons.append(f"Toxic Flow Active: Raising Neural Threshold to {threshold:.2f}")
             
             # Special Case: If Toxic Flow is active, we ALREADY handled strictness above.
             # No need to double penalize here for Snipers.
