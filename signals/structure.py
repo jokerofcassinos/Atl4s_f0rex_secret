@@ -506,8 +506,20 @@ class SMCAnalyzer:
                             # Dynamic Confidence Calculation
                             base_conf = 50 + ob.strength * 0.3 + (100 - fvg.filled_pct) * 0.2
                             
+                            # STRUCTURE VETO (Deep Forensic Fix)
+                            # User feedback: "Bot sells into uptrend".
+                            # logic: If Order Block opposes the Macro Structure (Higher Highs), VETO it.
+                            if ob.type == "BEARISH" and self.structure_trend == StructureType.BULLISH:
+                                base_conf = 0
+                                logger.info(f"Structure Veto: Blocking SELL. Structure={self.structure_trend}")
+                            elif ob.type == "BULLISH" and self.structure_trend == StructureType.BEARISH:
+                                base_conf = 0
+                                logger.info(f"Structure Veto: Blocking BUY. Structure={self.structure_trend}")
+                            
                             # CHOP PENALTY: If ADX < 20 (Toxic Flow), reducing confidence.
-                            # Weak OBs in Chop get eaten.
+                            
+                            # CHOP PENALTY: (Restored)
+                            # If ADX < 20, reduce confidence.
                             if adx < 20.0:
                                 base_conf -= 20.0
                                 

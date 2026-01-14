@@ -853,17 +853,40 @@ class ConsensusEngine:
         if abs(v_reversion) > 25:
              rev_dir = 1 if v_reversion > 0 else -1
              if (v_structure * rev_dir) > 20: # Structure MUST support Reversion (Confluence)
-                 # ✅ SIGNAL INVERSION (User Request): Revert the Reversion
-                 final_decision = "SELL" if rev_dir == 1 else "BUY"
-                 final_score = abs(v_reversion) + abs(v_structure)
-                 holographic_reason = "REVERSION_SNIPER"
                  
-                 # --- OMEGA SNIPER UPGRADE (User Request) ---
-                 # "Reversion Sniper = Omega Sniper Concept (x5)"
-                 details['lot_multiplier'] = 5.0
-                 details['tp_multiplier'] = 0.5
-                 details['mode'] = "OMEGA_REV_SNIPER"
-                 logger.info(f"OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 5x.")
+                  # --- KINEMATICS PHASE SPACE VETO (Deep Forensic Fix) ---
+                  # User feedback: "Bot sells into accelerating uptrend".
+                  # If Kinematics shows strong acceleration AGAINST our reversion direction, BLOCK.
+                  # k_dir: +1 = Accelerating UP, -1 = Accelerating DOWN.
+                  # rev_dir: +1 = BUY signal from reversion, -1 = SELL signal.
+                  # Inverted logic: rev_dir=1 becomes SELL, rev_dir=-1 becomes BUY (line 857).
+                  # So if final_decision will be SELL, we need rev_dir = +1.
+                  # We want to BLOCK SELL if k_dir = +1 (accelerating UP).
+                  # Simplified: If inverted trade direction opposes kinematics, BLOCK.
+                  
+                  # 'final_decision' for reversion: SELL if rev_dir==1, BUY if rev_dir==-1.
+                  # If final_decision is SELL (rev_dir==1) and k_dir is +1 (UP ROCKET), this is BAD.
+                  # If final_decision is BUY (rev_dir==-1) and k_dir is -1 (DOWN CRASH), this is BAD.
+                  # So: BLOCK if (rev_dir * k_dir) > 0 (same sign means opposing the physics).
+                  
+                  kinematics_opposes = (rev_dir * k_dir) > 0
+                  
+                  # Phase Space Angle > 25 degrees (Weak Acceleration) is enough to kill Reversion.
+                  # Reversion requires DECELERATION (Opposite K-Dir) or FLAT.
+                  if kinematics_opposes and abs(k_score) > 25: 
+                       logger.warning(f"KINEMATICS VETO: Blocking REVERSION (Accelerating against trade). k_dir={k_dir}, k_score={k_score:.1f}")
+                  else:
+                      # ✅ SIGNAL INVERSION (User Request): Revert the Reversion
+                      final_decision = "SELL" if rev_dir == 1 else "BUY"
+                      final_score = abs(v_reversion) + abs(v_structure)
+                      holographic_reason = "REVERSION_SNIPER"
+                      
+                      # --- OMEGA SNIPER UPGRADE (User Request) ---
+                      # "Reversion Sniper = Omega Sniper Concept (x5)"
+                      details['lot_multiplier'] = 5.0
+                      details['tp_multiplier'] = 0.5
+                      details['mode'] = "OMEGA_REV_SNIPER"
+                      logger.info(f"OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 5x.")
                  
         # Logic C: STRUCTURE BOUNCE (Laminar Flow)
         # Structure is Strong + Trend is Laminar Flow (Low Entropy)

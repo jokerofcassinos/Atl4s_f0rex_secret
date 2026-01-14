@@ -594,97 +594,85 @@ class LaplaceDemonCore:
              if m8_boost != 0:
                  reasons.append(f"M8: Golden Gate ({direction})")
              
-        # 3. Toxic Flow Veto (Surgical Correction)
-        # We observed that 'REVERSION_SNIPER' wins in Toxic Flow, but 'Neutral' (Trend follow) fails.
-        # FIX: Only veto 'Neutral' setups if Toxic Flow involves compression.
+        # 3. Toxic Flow Veto (DISABLED - Was killing profits)
+        # Commented out to restore high-volume trades.
         
         is_neutral_setup = any("Setup: Neutral" in r for r in reasons)
         
         hard_veto = False # Persistent veto flag
         
-        if toxic_flow and is_neutral_setup:
-             reasons.append(f"Toxic Flow: VETOING Neutral Setup in Chop")
-             vetoes.append("Toxic Flow: Neutral Setup Unsafe in Compression")
-             execute = False
-             hard_veto = True
-             
-        elif toxic_flow:
-             # For Snipers, we caution but DO NOT VETO immediately.
-             # HOWEVER, we must reduce the score to prevent it from bypassing the Neural Oracle.
-             # A 100.0 Score in Toxic Flow is suspicious. Let's cap it at 80.
-             reasons.append(f"Toxic Flow: Compression Detected (Capping Score to 80)")
-             
-             # REGIME LOCK: In Toxic Chop, Momentum Strategies are suicide.
-             # Only Reversion Snipers are mathematically viable.
-             momentum_strategies = ["MOMENTUM_BREAKOUT", "CONSENSUS_VOTE", "KINETIC_BOOM", "LION_PROTOCOL"]
-             if setup in momentum_strategies:
-                 reasons.append(f"REGIME LOCK: Vetoing {setup} in Toxic Flow (Momentum fails in Chop)")
-                 vetoes.append(f"Regime Lock: {setup} invalid in Chop")
-                 execute = False
-                 hard_veto = True
-                 
-             # REVERSION SAFETY: Force Wick Confirmation in Chop.
-             # Don't catch falling knives. Wait for the wick.
-             if setup == "REVERSION_SNIPER" and toxic_flow:
-                  micro = details.get('Micro', {})
-                  rejection = micro.get('rejection', 'NEUTRAL')
-                  
-                  if score > 0 and rejection == "BEARISH_REJECTION":
-                       reasons.append("Wick Filter: Vetoing Buy (Bearish Rejection Detected)")
-                       vetoes.append("Wick Filter: Knife Catching Prevented")
-                       execute = False
-                       hard_veto = True
-                  elif score < 0 and rejection == "BULLISH_REJECTION":
-                       reasons.append("Wick Filter: Vetoing Sell (Bullish Rejection Detected)")
-                       vetoes.append("Wick Filter: Rocket Catching Prevented")
-                       execute = False
-                       hard_veto = True
+        # DISABLED: Toxic Flow Neutral Veto
+        # if toxic_flow and is_neutral_setup:
+        #      reasons.append(f"Toxic Flow: VETOING Neutral Setup in Chop")
+        #      vetoes.append("Toxic Flow: Neutral Setup Unsafe in Compression")
+        #      execute = False
+        #      hard_veto = True
               
-             # MATH RESTORE: Reverting to 80.0 Cap (99% Conf) per user request.
+        # Keep only score capping (mild, not veto)
+        if toxic_flow:
+             # For Snipers, we caution but DO NOT VETO immediately.
              reasons.append(f"Toxic Flow: Compression Detected (Capping Score to 80)")
              if abs(score) > 80:
                   score = 80.0 if score > 0 else -80.0
-             
-             # Also strict check for low scores
-             if abs(score) < 40: 
-                  vetoes.append("Toxic Flow: Weak Signal in Chop")
-                  execute = False 
-                  hard_veto = True 
+              
+             # DISABLED: Regime Lock
+             # momentum_strategies = ["MOMENTUM_BREAKOUT", "CONSENSUS_VOTE", "KINETIC_BOOM", "LION_PROTOCOL"]
+             # if setup in momentum_strategies:
+             #     reasons.append(f"REGIME LOCK: Vetoing {setup} in Toxic Flow (Momentum fails in Chop)")
+             #     vetoes.append(f"Regime Lock: {setup} invalid in Chop")
+             #     execute = False
+             #     hard_veto = True
+                 
+             # DISABLED: Wick Filter
+             # if setup == "REVERSION_SNIPER" and toxic_flow:
+             #     micro = details.get('Micro', {})
+             #     rejection = micro.get('rejection', 'NEUTRAL')
+             #     if score > 0 and rejection == "BEARISH_REJECTION":
+             #          reasons.append("Wick Filter: Vetoing Buy (Bearish Rejection Detected)")
+             #          vetoes.append("Wick Filter: Knife Catching Prevented")
+             #          execute = False
+             #          hard_veto = True
+             #     elif score < 0 and rejection == "BULLISH_REJECTION":
+             #          reasons.append("Wick Filter: Vetoing Sell (Bullish Rejection Detected)")
+             #          vetoes.append("Wick Filter: Rocket Catching Prevented")
+             #          execute = False
+             #          hard_veto = True
+               
+             # MATH RESTORE: Reverting to 80.0 Cap (99% Conf) per user request.
+             if abs(score) > 80:
+                  score = 80.0 if score > 0 else -80.0
+              
+             # DISABLED: Weak Signal in Chop Veto
+             # if abs(score) < 40: 
+             #     vetoes.append("Toxic Flow: Weak Signal in Chop")
+             #     execute = False 
+             #     hard_veto = True 
 
-             if abs(score) < 40: 
-                  vetoes.append("Toxic Flow: Weak Signal in Chop")
-                  execute = False 
-                  hard_veto = True 
-
-        # --- 4. DEEP FORENSIC ANALYSIS (Toxic Drift 2.0) ---
-        # User Feedback: "Massive Errors in specific scenario".
-        # Diagnosis: Algorithmic Drift (Iceberg) -> Low Entropy + High OFI.
-        # Fix: Veto Reversion if Entropy is low (Structured Move) or OFI opposes trade.
+        # --- 4. DEEP FORENSIC ANALYSIS (DISABLED - Was killing profits) ---
+        # COMMENTED OUT TO RESTORE PROFITABILITY. 
         
-        micro = details.get('Micro', {})
-        entropy = micro.get('entropy', 1.0)
-        ofi = micro.get('ofi', 0)
+        # micro = details.get('Micro', {})
+        # entropy = micro.get('entropy', 1.0)
+        # ofi = micro.get('ofi', 0)
         
-        # A. ENTROPY SHIELD (Anti-Iceberg)
-        # If Entropy < 0.6, the move is highly structured (Algo). Do not fade it.
-        if entropy < 0.6 and setup == "REVERSION_SNIPER":
-             reasons.append(f"ENTROPY SHIELD: Vetoing Reversion in Structured Drift (Entropy {entropy:.2f})")
-             vetoes.append("Entropy Shield: Iceberg Detected")
-             execute = False
-             hard_veto = True
-             
-        # B. OFI GUARD (Order Flow Imbalance)
-        # Don't Buy if Net Order Flow is massively Selling.
-        if score > 0 and ofi < -50:
-             reasons.append(f"OFI GUARD: Vetoing BUY against Sell Pressure (OFI {ofi})")
-             vetoes.append("OFI Guard: Tape Reading Sell Pressure")
-             execute = False
-             hard_veto = True
-        elif score < 0 and ofi > 50:
-             reasons.append(f"OFI GUARD: Vetoing SELL against Buy Pressure (OFI {ofi})")
-             vetoes.append("OFI Guard: Tape Reading Buy Pressure")
-             execute = False
-             hard_veto = True
+        # A. ENTROPY SHIELD (DISABLED)
+        # if entropy < 0.6 and setup == "REVERSION_SNIPER":
+        #      reasons.append(f"ENTROPY SHIELD: Vetoing Reversion in Structured Drift (Entropy {entropy:.2f})")
+        #      vetoes.append("Entropy Shield: Iceberg Detected")
+        #      execute = False
+        #      hard_veto = True
+              
+        # B. OFI GUARD (DISABLED)
+        # if score > 0 and ofi < -50:
+        #      reasons.append(f"OFI GUARD: Vetoing BUY against Sell Pressure (OFI {ofi})")
+        #      vetoes.append("OFI Guard: Tape Reading Sell Pressure")
+        #      execute = False
+        #      hard_veto = True
+        # elif score < 0 and ofi > 50:
+        #      reasons.append(f"OFI GUARD: Vetoing SELL against Buy Pressure (OFI {ofi})")
+        #      vetoes.append("OFI Guard: Tape Reading Buy Pressure")
+        #      execute = False
+        #      hard_veto = True
 
         # 5. SNR Walls (Tier 3)
         snr_data = details.get('SNR', {})
@@ -702,23 +690,21 @@ class LaplaceDemonCore:
                  vetoes.append(f"SNR Wall Veto: Support Ahead ({sup_dist:.5f})")
                  if not setup: setup = "BLOCKED_BY_WALL"
 
-        # 4.5 KINETIC SHIELD (The "13 Stops" Fix)
-        # If Kinematics is screaming REVERSAL, we must listen.
-        # Boom Up (0-90) vs Sell Signal
-        # Boom Down (180-270) vs Buy Signal
-        kin_data = details.get('Kinematics', {})
-        k_angle = kin_data.get('angle', 0)
+        # 4.5 KINETIC SHIELD (DISABLED - Was killing profits)
+        # COMMENTED OUT TO RESTORE PROFITABILITY.
+        # kin_data = details.get('Kinematics', {})
+        # k_angle = kin_data.get('angle', 0)
         
-        if score > 0 and (180 <= k_angle <= 270):
-             reasons.append(f"KINETIC SHIELD: Vetoing BUY against Downward Acceleration ({k_angle:.0f}°)")
-             vetoes.append("Kinetic Shield: Buying into a Crash")
-             execute = False
-             hard_veto = True
-        elif score < 0 and (0 <= k_angle <= 90):
-             reasons.append(f"KINETIC SHIELD: Vetoing SELL against Upward Acceleration ({k_angle:.0f}°)")
-             vetoes.append("Kinetic Shield: Selling into a Rocket")
-             execute = False
-             hard_veto = True
+        # if score > 0 and (180 <= k_angle <= 270):
+        #      reasons.append(f"KINETIC SHIELD: Vetoing BUY against Downward Acceleration ({k_angle:.0f}°)")
+        #      vetoes.append("Kinetic Shield: Buying into a Crash")
+        #      execute = False
+        #      hard_veto = True
+        # elif score < 0 and (0 <= k_angle <= 90):
+        #      reasons.append(f"KINETIC SHIELD: Vetoing SELL against Upward Acceleration ({k_angle:.0f}°)")
+        #      vetoes.append("Kinetic Shield: Selling into a Rocket")
+        #      execute = False
+        #      hard_veto = True
 
         # 5. Neural Oracle (Tier 4 - Experimental)
         neural_pred = details.get('Neural')
