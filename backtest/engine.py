@@ -207,15 +207,22 @@ class BacktestEngine:
         if sl_pips <= 0:
             return 0.01  # Minimum lot
             
-        # FIXED LOT MODE (Stabilizer)
+        # FIXED LOT MODE (With Margin Safety Check)
         if self.config.fixed_lots is not None:
+             # Check if we have enough balance for this fixed lot
+             # Approx margin for 1 lot on 1:3000 leverage is very low, but let's be safe.
+             # Margin = (Lot * 100,000) / Leverage
+             required_margin = (self.config.fixed_lots * 100000) / self.config.leverage
+             if self.balance < required_margin * 1.5: # 150% margin buffer
+                  # Scale down if balance is too low for fixed lot
+                  scaled_lot = (self.balance * 0.9) / (100000 / self.config.leverage)
+                  return max(0.01, round(scaled_lot, 2))
              return self.config.fixed_lots
 
-            
         risk_amount = self.balance * (self.config.risk_per_trade_pct / 100)
         lot_size = risk_amount / (sl_pips * self.config.pip_value)
         
-        # Clamp to reasonable bounds
+        # Clamp to reasonable bounds (Max 100 lots)
         lot_size = max(0.01, min(lot_size, 100.0))
         return round(lot_size, 2)
     
@@ -286,10 +293,15 @@ class BacktestEngine:
         # max_risk_dollars = self.balance * (MAX_RISK_PCT / 100)
         # potential_loss = sl_pips * self.config.pip_value * 0.01  
         
-        # if potential_loss > max_risk_dollars:
-        #     logger.debug(f"RISK TOO HIGH: ${potential_loss:.2f} > ${max_risk_dollars:.2f}")
-        #     adjusted_risk = MAX_RISK_PCT * 0.5  
-        #     self.config.risk_per_trade_pct = adjusted_risk
+        # 3. Check if SL would cost more than 30% of account (Aggressive Safety Cap)
+        MAX_RISK_PCT = 30.0  
+        max_risk_dollars = self.balance * (MAX_RISK_PCT / 100)
+        potential_loss = sl_pips * self.config.pip_value * self.calculate_position_size(sl_pips) 
+        # Note: calculate_position_size calls self.config below, so we need to be careful not to recurse infinitely or double calc logic.
+        # Actually logic is separate.
+        
+        # We need to check potential loss AFTER determining lots.
+        # This will be done below after 'lots' calculation.
         
         # Apply spread and slippage
         entry_price = self.apply_spread(current_price, direction)
@@ -307,6 +319,17 @@ class BacktestEngine:
         
         # Calculate position size with Anti-Ruin limits
         lots = self.calculate_position_size(sl_pips)
+
+        # 4. Final Safety Check: Max Risk Amount
+        potential_loss_dollars = lots * sl_pips * self.config.pip_value
+        max_loss_allowed = self.balance * 0.30 # Max 30% loss allowed per trade
+        
+        if potential_loss_dollars > max_loss_allowed:
+             # Scale down lots to fit max loss
+             # New Lots = Max Loss / (SL * PipVal)
+             new_lots = max_loss_allowed / (sl_pips * self.config.pip_value)
+             # logger.warning(f"Risk Capping: Scaled lots {lots} -> {new_lots:.2f} to limit loss to ${max_loss_allowed:.2f}")
+             lots = max(0.01, round(new_lots, 2))
         
         # Apply Omega Sniper Multiplier (5x, etc)
         if lot_multiplier != 1.0:

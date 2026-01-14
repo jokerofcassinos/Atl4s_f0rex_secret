@@ -588,11 +588,33 @@ class LaplaceDemonCore:
              if m8_boost != 0:
                  reasons.append(f"M8: Golden Gate ({direction})")
              
-        # 3. Toxic Flow Veto
-        if toxic_flow:
-             reasons.append(f"Toxic Flow: Compression Detected (Caution)")
-             if abs(score) < 30: 
-                  score *= 0.5 
+        # 3. Toxic Flow Veto (Surgical Correction)
+        # We observed that 'REVERSION_SNIPER' wins in Toxic Flow, but 'Neutral' (Trend follow) fails.
+        # FIX: Only veto 'Neutral' setups if Toxic Flow involves compression.
+        
+        is_neutral_setup = any("Setup: Neutral" in r for r in reasons)
+        
+        hard_veto = False # Persistent veto flag
+        
+        if toxic_flow and is_neutral_setup:
+             reasons.append(f"Toxic Flow: VETOING Neutral Setup in Chop")
+             vetoes.append("Toxic Flow: Neutral Setup Unsafe in Compression")
+             execute = False
+             hard_veto = True
+             
+        elif toxic_flow:
+             # For Snipers, we caution but DO NOT VETO immediately.
+             # HOWEVER, we must reduce the score to prevent it from bypassing the Neural Oracle.
+             # A 100.0 Score in Toxic Flow is suspicious. Let's cap it at 80.
+             reasons.append(f"Toxic Flow: Compression Detected (Capping Score to 80)")
+             if abs(score) > 80:
+                  score = 80.0 if score > 0 else -80.0
+             
+             # Also strict check for low scores
+             if abs(score) < 40: 
+                  vetoes.append("Toxic Flow: Weak Signal in Chop")
+                  execute = False 
+                  hard_veto = True 
 
         # 4. SNR Walls (Tier 3)
         snr_data = details.get('SNR', {})
@@ -639,6 +661,10 @@ class LaplaceDemonCore:
             execute = True
             confidence = min(99.0, 50 + (abs(score) - self.params['threshold']))
             
+        # ENFORCE HARD VETO (Prevent Resets)
+        if hard_veto:
+            execute = False
+            
         # --- GAME THEORY VETO (Nash) ---
         # Don't buy if far above Nash, Don't sell if far below
         nash_price = self.game.calculate_nash_equilibrium(df_m5)['equilibrium_price']
@@ -673,7 +699,10 @@ class LaplaceDemonCore:
             # We enforce stricter thresholds: WinProb > 60% and High Bypass Bar (85.0)
             
             threshold = 0.60 # Increased from 0.40
-            bypass_score = 85.0 # Increased from 45.0 (Force high-confidence trades to pass Neural check)
+            bypass_score = 85.0 # Restored to 85.0 (Allows Trade #96 Sniper to pass)
+            
+            # Special Case: If Toxic Flow is active, we ALREADY handled strictness above.
+            # No need to double penalize here for Snipers.
             
             if win_prob < threshold and abs(score) < bypass_score:
                 execute = False
