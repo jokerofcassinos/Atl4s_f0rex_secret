@@ -690,6 +690,31 @@ class LaplaceDemonCore:
                  vetoes.append(f"SNR Wall Veto: Support Ahead ({sup_dist:.5f})")
                  if not setup: setup = "BLOCKED_BY_WALL"
 
+        # --- GLOBAL SNIPER CONFLICT VETO (Trade #109 Fix) ---
+        # If Sniper strongly says one direction (>70) but we're going opposite, BLOCK.
+        # This applies to ALL setups (Neutral, MOMENTUM_BREAKOUT, REVERSION_SNIPER, etc)
+        # FIX: details['Sniper'] = {'score': s_score, 'dir': s_dir} (dir, NOT direction!)
+        sniper_data = details.get('Sniper', {})
+        sniper_dir = sniper_data.get('dir', 0) if isinstance(sniper_data, dict) else 0  # +1 = BUY, -1 = SELL
+        sniper_score = sniper_data.get('score', 0) if isinstance(sniper_data, dict) else 0
+        
+        decision_dir = "BUY" if score > 0 else "SELL" if score < 0 else "WAIT"
+        
+        # Sniper dir: +1 = BUY, -1 = SELL
+        if decision_dir == "BUY" and sniper_dir == -1 and sniper_score > 70:
+            reasons.append(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
+            vetoes.append(f"Sniper Conflict: Sniper SELL {sniper_score:.0f}% opposes BUY")
+            execute = False
+            hard_veto = True
+            logger.warning(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper SELL {sniper_score:.1f})")
+            
+        elif decision_dir == "SELL" and sniper_dir == 1 and sniper_score > 70:
+            reasons.append(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper says BUY {sniper_score:.1f})")
+            vetoes.append(f"Sniper Conflict: Sniper BUY {sniper_score:.0f}% opposes SELL")
+            execute = False
+            hard_veto = True
+            logger.warning(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper BUY {sniper_score:.1f})")
+
         # 4.5 KINETIC SHIELD (DISABLED - Was killing profits)
         # COMMENTED OUT TO RESTORE PROFITABILITY.
         # kin_data = details.get('Kinematics', {})
