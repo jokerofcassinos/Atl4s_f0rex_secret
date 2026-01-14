@@ -41,29 +41,37 @@ class FractalVision:
         Identifies Fractal Highs and Lows (Bill Williams style or Pivot).
         A fractal high is a high surrounded by 'length' lower highs on both sides.
         """
-        df['is_swing_high'] = False
-        df['is_swing_low'] = False
-
-        if df is None or len(df) < length * 2 + 1:
+        # FIX: Check for None/empty BEFORE accessing columns
+        if df is None or df.empty or len(df) < length * 2 + 1:
+            # Return empty DataFrame with required columns
+            if df is None:
+                df = pd.DataFrame()
+            df['is_swing_high'] = False
+            df['is_swing_low'] = False
             return df
         
-        # Vectorized approach using rolling window? 
-        # Or simple shift comparison.
-        # High > High[i-1] and High > High[i+1] ...
-        
-        # Let's use a simple pivot detection
-        # Pivot High
-        is_high = pd.Series(True, index=df.index)
-        is_low = pd.Series(True, index=df.index)
-        
-        for i in range(1, length + 1):
-            is_high &= (df['high'] > df['high'].shift(i)) & (df['high'] > df['high'].shift(-i))
-            is_low &= (df['low'] < df['low'].shift(i)) & (df['low'] < df['low'].shift(-i))
+        try:
+            df['is_swing_high'] = False
+            df['is_swing_low'] = False
             
-        df['is_swing_high'] = is_high
-        df['is_swing_low'] = is_low
+            # Let's use a simple pivot detection
+            # Pivot High
+            is_high = pd.Series(True, index=df.index)
+            is_low = pd.Series(True, index=df.index)
+            
+            for i in range(1, length + 1):
+                is_high &= (df['high'] > df['high'].shift(i)) & (df['high'] > df['high'].shift(-i))
+                is_low &= (df['low'] < df['low'].shift(i)) & (df['low'] < df['low'].shift(-i))
+                
+            df['is_swing_high'] = is_high
+            df['is_swing_low'] = is_low
+        except Exception as e:
+            logger.warning(f"Error in identify_swings: {e}")
+            df['is_swing_high'] = False
+            df['is_swing_low'] = False
         
         return df
+
 
     def analyze_structure(self, df):
         """

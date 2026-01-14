@@ -786,10 +786,16 @@ class LaplaceDemonCore:
                 execute = False
                 vetoes.append(f"Neural Oracle: Low Probability ({win_prob:.1%}) | Score: {abs(score):.1f}")
                 reasons.append(f"Neural Filter: REJECTED ({win_prob:.1%})")
-            elif win_prob < threshold and abs(score) >= bypass_score:
-                reasons.append(f"Neural Filter: BYPASSED (High Conviction Score {abs(score):.1f})")
-            else:
-                reasons.append(f"Neural Filter: APPROVED ({win_prob:.1%})")
+                
+        # --- MINIMUM SCORE FILTER (The TRADE #1 Fix) ---
+        # Prevent very weak signals from executing.
+        # TRADE #1 executed with Score 16.5 and lost. This shouldn't happen.
+        MIN_SCORE_THRESHOLD = 25.0
+        if abs(score) < MIN_SCORE_THRESHOLD and execute:
+            execute = False
+            vetoes.append(f"Weak Signal Veto: Score {abs(score):.1f} < {MIN_SCORE_THRESHOLD}")
+            reasons.append(f"Weak Signal Filter: Score too low ({abs(score):.1f})")
+
 
         # --- OMEGA MULTIPLIER LOGIC ---
         lot_multiplier = 1.0

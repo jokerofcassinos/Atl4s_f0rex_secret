@@ -97,7 +97,8 @@ class TelegramNotifier:
                 pass
 
     async def notify_trade_entry(self, direction: str, symbol: str, entry: float,
-                           sl: float, tp: float, confidence: float, setup: str):
+                           sl: float, tp: float, confidence: float, setup: str,
+                           lot_size: float = 0.01, trade_number: int = 0):
         """Notify trade entry"""
         emoji = "🟢" if direction == "BUY" else "🔴"
         
@@ -106,19 +107,21 @@ class TelegramNotifier:
         safe_setup = str(setup).replace("_", "\\_")
         
         message = f"""
-{emoji} *NEW TRADE - {direction}*
+{emoji} *NEW TRADE #{trade_number} - {direction}*
 
 📊 *{safe_symbol}*
 Entry: `{entry:.5f}`
 SL: `{sl:.5f}`
 TP: `{tp:.5f}`
+📦 Lots: `{lot_size:.2f}`
 🎯 Setup: `{safe_setup}`
 🔥 Conf: `{confidence:.1f}%`
 """
         await self.send_message(message)
 
     async def notify_trade_exit(self, symbol: str, entry: float, exit: float,
-                          pnl_dollars: float, pnl_pips: float, reason: str, source: str = "UNKNOWN"):
+                          pnl_dollars: float, pnl_pips: float, reason: str, 
+                          source: str = "UNKNOWN", lot_size: float = 0.01, trade_number: int = 0):
         """Notify trade exit"""
         emoji = "💰" if pnl_dollars > 0 else "❌"
         
@@ -127,10 +130,11 @@ TP: `{tp:.5f}`
         safe_source = source.replace("_", "\\_")
         
         message = f"""
-{emoji} *TRADE CLOSED - {safe_symbol}*
+{emoji} *TRADE #{trade_number} CLOSED - {safe_symbol}*
 
 Entry: `{entry:.5f}`
 Exit: `{exit:.5f}`
+📦 Lots: `{lot_size:.2f}`
 Result: `${pnl_dollars:+.2f}` ({pnl_pips:+.1f} pips)
 🎯 Setup: `{safe_source}`
 🚪 Reason: `{reason}`

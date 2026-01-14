@@ -939,6 +939,29 @@ class ConsensusEngine:
             logger.info("Volatility Guard: Market too quiet. Veto.")
             return "WAIT", 0, details
         
+        # --- PHYSICS OVERRIDE (Scenario Adaptation - The Missing Analysis) ---
+        # User Feedback: "All modules fail in a specific scenario."
+        # The Scenario: Kinematics UP + Monte Carlo UP, but bot SELLS.
+        # The Fix: If Physics + Probability agree, but decision is opposite, BLOCK.
+        
+        # THRESHOLD LOWERED: Was 40/0.75, now 25/0.70 to catch more toxic scenarios.
+        physics_bullish = (k_dir == 1 and abs(k_score) > 25)  # Lowered from 40
+        physics_bearish = (k_dir == -1 and abs(k_score) > 25) # Lowered from 40
+        
+        mc_strongly_bullish = (mc_bullish > 0.70) # Lowered from 0.75
+        mc_strongly_bearish = (mc_bullish < 0.30) # Lowered from 0.25
+        
+        # OVERRIDE CONDITION: Physics + MC Agree, but bot is going opposite
+        if physics_bullish and mc_strongly_bullish and final_decision == "SELL":
+            logger.warning(f"PHYSICS OVERRIDE: Blocking SELL (Kinematics UP k_score={k_score:.1f} + MC Bullish {mc_bullish*100:.1f}%)")
+            final_decision = "WAIT"
+            holographic_reason = "PHYSICS_OVERRIDE"
+            
+        elif physics_bearish and mc_strongly_bearish and final_decision == "BUY":
+            logger.warning(f"PHYSICS OVERRIDE: Blocking BUY (Kinematics DOWN k_score={k_score:.1f} + MC Bearish {(1-mc_bullish)*100:.1f}%)")
+            final_decision = "WAIT"
+            holographic_reason = "PHYSICS_OVERRIDE"
+        
         # VPIN Veto Check
         if vpin > 0.8:
              # Toxic flow. If our total vector direction is opposite to informed flow delta, VETO.

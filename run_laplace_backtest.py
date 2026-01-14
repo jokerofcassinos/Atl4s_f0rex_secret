@@ -241,7 +241,9 @@ class LaplaceBacktestRunner:
                             pnl_dollars=trade.pnl_dollars,
                             pnl_pips=trade.pnl_pips,
                             reason=exit_reason,
-                            source=trade.signal_source
+                            source=trade.signal_source,
+                            lot_size=trade.lot_size if hasattr(trade, 'lot_size') else 0.01,
+                            trade_number=trade.id
                         )
                     
                     logger.info(f"EXIT #{trade.id}: {exit_reason} | PnL: ${trade.pnl_dollars:.2f} | Setup: {trade.signal_source}")
@@ -418,7 +420,9 @@ class LaplaceBacktestRunner:
                                     sl=trade.sl_price,
                                     tp=trade.tp_price,
                                     confidence=prediction.confidence,
-                                    setup=f"{prediction.primary_signal} [{order_idx+1}/{num_orders}]"
+                                    setup=f"{prediction.primary_signal} [{order_idx+1}/{num_orders}]",
+                                    lot_size=trade.lot_size if hasattr(trade, 'lot_size') else 0.01,
+                                    trade_number=trade.id
                                 )
                         else:
                              # If one fails (margin/slots), likely all fail. Break.
