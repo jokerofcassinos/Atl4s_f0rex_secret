@@ -201,22 +201,44 @@ class BacktestEngine:
     def calculate_position_size(self, sl_pips: float) -> float:
         """
         Calculate lot size based on risk percentage and stop loss.
-        
+
         Formula: Lots = (Account * Risk%) / (SL_pips * Pip_Value)
         """
         if sl_pips <= 0:
             return 0.01  # Minimum lot
             
-        # FIXED LOT MODE (With Margin Safety Check)
+        # FIXED LOT MODE (With Solvency & Margin Safety Check)
         if self.config.fixed_lots is not None:
              # Check if we have enough balance for this fixed lot
-             # Approx margin for 1 lot on 1:3000 leverage is very low, but let's be safe.
              # Margin = (Lot * 100,000) / Leverage
              required_margin = (self.config.fixed_lots * 100000) / self.config.leverage
+             
              if self.balance < required_margin * 1.5: # 150% margin buffer
                   # Scale down if balance is too low for fixed lot
-                  scaled_lot = (self.balance * 0.9) / (100000 / self.config.leverage)
-                  return max(0.01, round(scaled_lot, 2))
+                  # SOLVENCY CHECK: Also verify we don't risk >90% of balance on a single stop loss
+                  
+                  risk_dollars_per_pip_lot = self.config.pip_value # $10 for 1.0 lot
+                  risk_per_trade = sl_pips * risk_dollars_per_pip_lot * self.config.fixed_lots
+                  
+                  max_loss_allowed = self.balance * 0.90
+                  solvency_lots = self.config.fixed_lots
+                  
+                  if risk_per_trade > max_loss_allowed:
+                       # Resize to fit solvency
+                       # Lots = MaxLoss / (SL * PipValue)
+                       solvency_lots = max_loss_allowed / (sl_pips * risk_dollars_per_pip_lot)
+                  
+                  margin_lots = (self.balance * 0.9) / (100000 / self.config.leverage)
+                  
+                  final_lot = min(margin_lots, solvency_lots)
+                  return max(0.01, round(final_lot, 2))
+             
+             # Even if margin is fine, CHECK SOLVENCY for the full fixed lot
+             risk_dollars = sl_pips * self.config.pip_value * self.config.fixed_lots
+             if risk_dollars > (self.balance * 0.90):
+                  solvency_lots = (self.balance * 0.90) / (sl_pips * self.config.pip_value)
+                  return max(0.01, round(solvency_lots, 2))
+                  
              return self.config.fixed_lots
 
         risk_amount = self.balance * (self.config.risk_per_trade_pct / 100)

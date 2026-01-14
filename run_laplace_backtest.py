@@ -548,13 +548,23 @@ async def main():
     print("═" * 60)
     print("\n  Target: 70% Win Rate | $100,000 Capital | GBPUSD\n")
     
+    # Parse arguments
+    import argparse
+    parser = argparse.ArgumentParser(description='Laplace Demon Backtest Runner')
+    parser.add_argument('--capital', type=float, default=30.0, help='Initial capital in USD') # Default to 30 as requested
+    parser.add_argument('--risk', type=float, default=2.0, help='Risk per trade %')
+    parser.add_argument('--symbol', type=str, default="GBPUSD", help='Symbol to trade')
+    parser.add_argument('--spread', type=float, default=1.5, help='Spread in pips')
+    
+    args = parser.parse_args()
+
     # Initialize runner
-    symbol = "GBPUSD"
+    symbol = args.symbol
     runner = LaplaceBacktestRunner(
-        initial_capital=5000.0,
-        risk_per_trade=2.0,
+        initial_capital=args.capital,
+        risk_per_trade=args.risk,
         symbol=symbol,
-        spread_pips=1.5
+        spread_pips=args.spread
     )
     
     # Try to load data using DataLoader

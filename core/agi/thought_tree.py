@@ -223,12 +223,15 @@ class GlobalThoughtOrchestrator:
         """Indexes all nodes and periodically prunes RAM."""
         self.compression_counter += 1
         
-        # Pruning: Compress all trees every 100 calls to prevent memory leaks
-        if self.compression_counter % 100 == 0:
-            logger.info("AGI RAM Management: Running Tree Compression...")
-            self.compressor.compress_all()
-            # Clear index mapping for removed nodes
-            self._cleanup_index()
+        # Pruning: Compress all trees every 5000 calls to prevent memory leaks
+        # Optimization: Only run expensive compression if really needed
+        if self.compression_counter % 5000 == 0:
+            total_nodes = sum(len(t.nodes) for t in self.trees.values())
+            if total_nodes > 5000:
+                logger.info(f"AGI RAM Management: Running Tree Compression (Nodes: {total_nodes})...")
+                self.compressor.compress_all()
+                # Clear index mapping for removed nodes
+                self._cleanup_index()
         for mod_name, tree in self.trees.items():
             for node_id, node in tree.nodes.items():
                 if node_id not in self.indexed_node_ids:
