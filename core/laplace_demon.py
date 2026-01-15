@@ -851,6 +851,11 @@ class LaplaceDemonCore:
         cycle_res = details.get('Cycle', ('NEUTRAL', 0))
         cycle_phase = cycle_res[0] if isinstance(cycle_res, tuple) else str(cycle_res)
         
+        # --- GLOBAL DIVERGENCE VETO (Trade #80 Fix) ---
+        # Neutral trades often fail against divergence. Block ALL trades against it.
+        div_res = details.get('Divergence', {})
+        div_type = div_res.get('type', '')
+
         if score > 0: # We want to BUY
             if "MANIPULATION_SELL" in str(cycle_phase):
                 reasons.append(f"GLOBAL VETO: Smart Money is Selling (Bearish Manipulation).")
@@ -859,6 +864,10 @@ class LaplaceDemonCore:
             elif "EXPANSION_SELL" in str(cycle_phase):
                 reasons.append(f"GLOBAL VETO: Market is Trending Down (Expansion Sell).")
                 vetoes.append("Trend Veto: Expansion Sell")
+                score = 0
+            elif "bearish" in str(div_type).lower():
+                reasons.append(f"GLOBAL VETO: Bearish Divergence ({div_type}) opposes BUY.")
+                vetoes.append("Divergence Veto: Bearish Conflict")
                 score = 0
                 
         elif score < 0: # We want to SELL
@@ -870,7 +879,10 @@ class LaplaceDemonCore:
                 reasons.append(f"GLOBAL VETO: Market is Trending Up (Expansion Buy).")
                 vetoes.append("Trend Veto: Expansion Buy")
                 score = 0
-
+            elif "bullish" in str(div_type).lower():
+                reasons.append(f"GLOBAL VETO: Bullish Divergence ({div_type}) opposes SELL.")
+                vetoes.append("Divergence Veto: Bullish Conflict")
+                score = 0
         # --- GLOBAL SNIPER CONFLICT VETO (Trade #109 Fix) ---
         # If Sniper says one direction (>50) but we're going opposite, BLOCK.
         # THRESHOLD LOWERED from 70 to 50 (Trade #106 had Sniper 57.2)

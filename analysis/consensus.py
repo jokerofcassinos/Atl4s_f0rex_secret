@@ -912,33 +912,49 @@ class ConsensusEngine:
                   if kinematics_opposes and abs(k_score) > 25: 
                        logger.warning(f"KINEMATICS VETO: Blocking REVERSION (Accelerating against trade). k_dir={k_dir}, k_score={k_score:.1f}")
                   else:
-                       # --- SNIPER CONFLICT VETO (Trade #97-122 Fix) ---
-                       # If SMC/Sniper strongly says BUY (>75) but we're about to SELL, BLOCK.
-                       # This prevents selling when there's a strong bullish OB/FVG confluence.
-                       sniper_result = results.get('Sniper', {})
-                       sniper_signal = sniper_result.get('signal') if isinstance(sniper_result, dict) else None
-                       sniper_score = sniper_result.get('confidence', 0) if isinstance(sniper_result, dict) else 0
+                       # ✅ PHASE 15 FIX: Divergence Veto (Restored)
+                       # Must not revert against Divergence.
+                       div_vetoed = False
+                       div_res = results.get('Divergence', {})
+                       div_type = div_res.get('type', '')
                        
-                       planned_decision = "SELL" if rev_dir == 1 else "BUY"
-                       
-                       if planned_decision == "SELL" and sniper_signal == "BUY" and sniper_score > 75:
-                           logger.warning(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper says BUY {sniper_score:.1f})")
-                           # Don't set final_decision, just skip this trade
-                       elif planned_decision == "BUY" and sniper_signal == "SELL" and sniper_score > 75:
-                           logger.warning(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
-                           # Don't set final_decision, just skip this trade
-                       else:
-                           # ✅ SIGNAL INVERSION (User Request): Revert the Reversion
-                           final_decision = "SELL" if rev_dir == 1 else "BUY"
-                           final_score = abs(v_reversion) + abs(v_structure)
-                           holographic_reason = "REVERSION_SNIPER"
+                       # If SELL (rev_dir=1), check Bullish Divergence
+                       if rev_dir == 1 and 'bullish' in str(div_type).lower():
+                           logger.info(f"[REVERSION] SILENCED by Divergence Conflict ({div_type}).")
+                           div_vetoed = True
+                       # If BUY (rev_dir=-1), check Bearish Divergence
+                       elif rev_dir == -1 and 'bearish' in str(div_type).lower():
+                           logger.info(f"[REVERSION] SILENCED by Divergence Conflict ({div_type}).")
+                           div_vetoed = True
                            
-                           # --- OMEGA SNIPER UPGRADE (10x - 97% WR) ---
-                           # "Reversion Sniper = Omega Sniper Concept (10x)"
-                           details['lot_multiplier'] = 10.0
-                           details['tp_multiplier'] = 0.5
-                           details['mode'] = "OMEGA_REV_SNIPER"
-                           logger.info(f"OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 10x.")
+                       if not div_vetoed:
+                           # --- SNIPER CONFLICT VETO (Trade #97-122 Fix) ---
+                           # If SMC/Sniper strongly says BUY (>75) but we're about to SELL, BLOCK.
+                           # This prevents selling when there's a strong bullish OB/FVG confluence.
+                           sniper_result = results.get('Sniper', {})
+                           sniper_signal = sniper_result.get('signal') if isinstance(sniper_result, dict) else None
+                           sniper_score = sniper_result.get('confidence', 0) if isinstance(sniper_result, dict) else 0
+                           
+                           planned_decision = "SELL" if rev_dir == 1 else "BUY"
+                           
+                           if planned_decision == "SELL" and sniper_signal == "BUY" and sniper_score > 75:
+                               logger.warning(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper says BUY {sniper_score:.1f})")
+                               # Don't set final_decision, just skip this trade
+                           elif planned_decision == "BUY" and sniper_signal == "SELL" and sniper_score > 75:
+                               logger.warning(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
+                               # Don't set final_decision, just skip this trade
+                           else:
+                               # ✅ SIGNAL INVERSION (User Request): Revert the Reversion
+                               final_decision = "SELL" if rev_dir == 1 else "BUY"
+                               final_score = abs(v_reversion) + abs(v_structure)
+                               holographic_reason = "REVERSION_SNIPER"
+                               
+                               # --- OMEGA SNIPER UPGRADE (10x - 97% WR) ---
+                               # "Reversion Sniper = Omega Sniper Concept (10x)"
+                               details['lot_multiplier'] = 10.0
+                               details['tp_multiplier'] = 0.5
+                               details['mode'] = "OMEGA_REV_SNIPER"
+                               logger.info(f"OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 10x.")
                  
         # Logic C: STRUCTURE BOUNCE (Laminar Flow)
         # Structure is Strong + Trend is Laminar Flow (Low Entropy)
