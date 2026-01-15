@@ -780,6 +780,32 @@ class LaplaceDemonCore:
                       if score > 0: score = -60
                       else: score -= boost
 
+        # --- DIVERGENCE CONFIRMATION (Trade #92 Fix) ---
+        # If Setup is Counter-Trend (LION/REVERSION), we WANT Divergence.
+        # But if Setup is MOMENTUM, Divergence AGAINST us is fatal.
+        divergence_data = details.get('Divergence', {})
+        if not isinstance(divergence_data, dict): divergence_data = {}
+        
+        div_type = divergence_data.get('type', '')
+        
+        if setup == "MOMENTUM_BREAKOUT":
+             if score > 0 and "bearish" in str(div_type).lower():
+                  # Buying into Bearish Div -> Bad idea
+                  score *= 0.5
+                  reasons.append(f"Caution: Momentum vs Bearish Div ({div_type})")
+             elif score < 0 and "bullish" in str(div_type).lower():
+                  score *= 0.5
+                  reasons.append(f"Caution: Momentum vs Bullish Div ({div_type})")
+        
+        # --- PATTERN BOOST ---
+        pattern_data = details.get('Patterns', {}) # Was 'Pattern' - likely typo if dict keys inconsistent
+        if not isinstance(pattern_data, dict): pattern_data = {}
+        
+        pat_name = pattern_data.get('pattern')
+        if pat_name:
+             reasons.append(f"Pattern Detected: {pat_name}")
+             score += 10 # Small boost
+
         # 7. Final Confidence Adjustment
         smc_zone = smc_res.get('zone', 'NEUTRAL')
         if smc_zone:
@@ -934,11 +960,17 @@ class LaplaceDemonCore:
                     reasons.append(f"GLOBAL FLIP: Smart Money Selling + Bearish Div! REVERSING TO SELL.")
                     if "Smart Money Veto" in vetoes: vetoes.remove("Smart Money Veto") 
                 else:
+                    if setup == "LION_BREAKOUT": # STRICT: LION dies instantly in Manipulation
+                         vetoes.append(f"LION KILLER: Trading into Bearish Manipulation")
+                    
                     reasons.append(f"GLOBAL VETO: Smart Money is Selling (Bearish Manipulation).")
                     vetoes.append("Smart Money Veto: Bearish Manipulation")
                     score = 0
             elif "EXPANSION_SELL" in str(cycle_phase):
                 if setup != "STRUCTURE_TREND_RIDER": # Protect Rider
+                    if setup == "LION_BREAKOUT": # STRICT: LION dies trading AGAINST Expansion
+                         vetoes.append(f"LION KILLER: Buying against Expansion Sell")
+                    
                     reasons.append(f"GLOBAL VETO: Market is Trending Down (Expansion Sell).")
                     vetoes.append("Trend Veto: Expansion Sell")
                     score = 0
@@ -961,11 +993,17 @@ class LaplaceDemonCore:
                     reasons.append(f"GLOBAL FLIP: Smart Money Buying + Bullish Div! REVERSING TO BUY.")
                     if "Smart Money Veto" in vetoes: vetoes.remove("Smart Money Veto")
                 else:
+                    if setup == "LION_BREAKOUT": # STRICT
+                         vetoes.append(f"LION KILLER: Trading into Bullish Manipulation")
+
                     reasons.append(f"GLOBAL VETO: Smart Money is Buying (Bullish Manipulation).")
                     vetoes.append("Smart Money Veto: Bullish Manipulation")
                     score = 0
             elif "EXPANSION_BUY" in str(cycle_phase):
                 if setup != "STRUCTURE_TREND_RIDER":
+                    if setup == "LION_BREAKOUT": # STRICT
+                         vetoes.append(f"LION KILLER: Selling against Expansion Buy")
+
                     reasons.append(f"GLOBAL VETO: Market is Trending Up (Expansion Buy).")
                     vetoes.append("Trend Veto: Expansion Buy")
                     score = 0
@@ -1116,8 +1154,15 @@ class LaplaceDemonCore:
         # --- GAME THEORY VETO (Nash) ---
         # Don't buy if far above Nash, Don't sell if far below
         nash_price = self.game.calculate_nash_equilibrium(df_m5)['equilibrium_price']
+        # Dynamic SL based on Volatility
         atr_src = details.get('Trend', {})
-        atr = atr_src.get('atr', 0.0010) if isinstance(atr_src, dict) else 0.0010
+        if not isinstance(atr_src, dict): atr_src = {}
+        
+        atr = atr_src.get('atr', 0.0010)
+        
+        # Default SL: 15 pips
+        # Volatility Adjusted: 1.5 * ATR (approx 15-25 pips)
+        sl_pips = max(0.0010, atr * 1.5)
         
         if execute:
             # Bypass Logic: Aggressive setups or High Confidence override the "Safe" Nash filter
@@ -1176,7 +1221,7 @@ class LaplaceDemonCore:
 
         # --- OMEGA MULTIPLIER LOGIC ---
         # PRIORITY: Use lot_multiplier from consensus.py details if available (10x OMEGA)
-        lot_multiplier = details.get('lot_multiplier', 1.0)
+        lot_multiplier = details.get('lot_multiplier', 1.0) if isinstance(details, dict) else 1.0
         
         # Fallback logic only if consensus didn't set a multiplier
         if lot_multiplier <= 1.0 and execute:

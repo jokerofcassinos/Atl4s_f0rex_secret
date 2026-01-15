@@ -511,31 +511,63 @@ class SMCAnalyzer:
                             
                             # STRUCTURE VETO (Deep Forensic Fix)
                             # User feedback: "Bot sells into uptrend".
-                            # logic: If Order Block opposes the Macro Structure (Higher Highs), VETO it.
+                            # --- WICK VALIDATION (Anti-Bounce) ---
+                            # If we are breaking a block, we must NOT see rejection wicks respecting it.
+                            candle_open = float(df['open'].iloc[-1])
+                            candle_close = float(df['close'].iloc[-1])
+                            candle_high = float(df['high'].iloc[-1])
+                            candle_low = float(df['low'].iloc[-1])
+                            candle_body = abs(candle_close - candle_open)
+                            
+                            upper_wick = candle_high - max(candle_open, candle_close)
+                            lower_wick = min(candle_open, candle_close) - candle_low
+                            
+                            rider_valid = True
+                            rider_reason = ""
+
                             if ob.type == "BEARISH" and self.structure_trend == StructureType.BULLISH:
-                                base_conf = 0
-                                logger.info(f"Structure Veto: Blocking SELL. Structure={self.structure_trend}")
-                                # STRUCTURE RIDER SIGNAL (Aggressive Byte)
-                                signal['breaker_signal'] = {
-                                     'setup': 'STRUCTURE_TREND_RIDER',
-                                     'direction': 'BUY',
-                                     'confidence': 99.0,
-                                     'reason': 'Breaking Bearish OB in Bullish Trend',
-                                     'sl_price': ob.bottom - 0.0010,
-                                     'tp_price': ob.top + 0.0020
-                                }
+                                 # We want to BUY break of Resistance. 
+                                 # Danger: Upper Wick (Rejection from supply).
+                                 if upper_wick > (candle_body * 0.6): # Wick larger than 60% of body
+                                      rider_valid = False
+                                      rider_reason = "Rejected by Supply (Upper Wick)"
+                                 else:
+                                      rider_reason = "Breaking Bearish OB in Bullish Trend"
+                                      
+                                 if rider_valid:
+                                     base_conf = 0
+                                     logger.info(f"Structure Veto: Blocking SELL. Structure={self.structure_trend}")
+                                     # STRUCTURE RIDER SIGNAL (Aggressive Byte)
+                                     signal['breaker_signal'] = {
+                                          'setup': 'STRUCTURE_TREND_RIDER',
+                                          'direction': 'BUY',
+                                          'confidence': 99.0,
+                                          'reason': rider_reason,
+                                          'sl_price': ob.bottom - 0.0010,
+                                          'tp_price': ob.top + 0.0020
+                                     }
+
                             elif ob.type == "BULLISH" and self.structure_trend == StructureType.BEARISH:
-                                base_conf = 0
-                                logger.info(f"Structure Veto: Blocking BUY. Structure={self.structure_trend}")
-                                # STRUCTURE RIDER SIGNAL (Aggressive Byte)
-                                signal['breaker_signal'] = {
-                                     'setup': 'STRUCTURE_TREND_RIDER',
-                                     'direction': 'SELL',
-                                     'confidence': 99.0,
-                                     'reason': 'Breaking Bullish OB in Bearish Trend',
-                                     'sl_price': ob.top + 0.0010,
-                                     'tp_price': ob.bottom - 0.0020
-                                }
+                                 # We want to SELL break of Support.
+                                 # Danger: Lower Wick (Rejection from demand).
+                                 if lower_wick > (candle_body * 0.6):
+                                      rider_valid = False
+                                      rider_reason = "Rejected by Demand (Lower Wick)"
+                                 else:
+                                      rider_reason = "Breaking Bullish OB in Bearish Trend"
+                                 
+                                 if rider_valid:
+                                     base_conf = 0
+                                     logger.info(f"Structure Veto: Blocking BUY. Structure={self.structure_trend}")
+                                     # STRUCTURE RIDER SIGNAL (Aggressive Byte)
+                                     signal['breaker_signal'] = {
+                                          'setup': 'STRUCTURE_TREND_RIDER',
+                                          'direction': 'SELL',
+                                          'confidence': 99.0,
+                                          'reason': rider_reason,
+                                          'sl_price': ob.top + 0.0010,
+                                          'tp_price': ob.bottom - 0.0020
+                                     }
                             
                             # CHOP PENALTY: If ADX < 20 (Toxic Flow), reducing confidence.
                             
