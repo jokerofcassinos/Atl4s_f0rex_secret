@@ -939,33 +939,37 @@ class ConsensusEngine:
                      pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
 
                      # 1. Sniper Conflict
+                     vetoed = False
                      if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
                         (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
                          logger.info(f"[LION] SILENCED by Sniper Conflict ({s_score_check}).")
-                         continue # Skip this Lion activation
+                         vetoed = True
 
                      # 2. Divergence Conflict
-                     if (struc_dir == 1 and 'bearish' in str(div_type).lower()) or \
-                        (struc_dir == -1 and 'bullish' in str(div_type).lower()):
-                         logger.info(f"[LION] SILENCED by Divergence Conflict ({div_type}).")
-                         continue
+                     if not vetoed:
+                         if (struc_dir == 1 and 'bearish' in str(div_type).lower()) or \
+                            (struc_dir == -1 and 'bullish' in str(div_type).lower()):
+                             logger.info(f"[LION] SILENCED by Divergence Conflict ({div_type}).")
+                             vetoed = True
 
                      # 3. Pattern Conflict (Reversal Pattern against Breakout)
-                     if struc_dir == 1 and pat_name in ["Shooting Star", "Bearish Engulfing", "Evening Star"]:
-                          logger.info(f"[LION] SILENCED by Pattern Conflict ({pat_name}).")
-                          continue
-                     elif struc_dir == -1 and pat_name in ["Hammer", "Bullish Engulfing", "Morning Star"]:
-                          logger.info(f"[LION] SILENCED by Pattern Conflict ({pat_name}).")
-                          continue
+                     if not vetoed:
+                         if struc_dir == 1 and pat_name in ["Shooting Star", "Bearish Engulfing", "Evening Star"]:
+                              logger.info(f"[LION] SILENCED by Pattern Conflict ({pat_name}).")
+                              vetoed = True
+                         elif struc_dir == -1 and pat_name in ["Hammer", "Bullish Engulfing", "Morning Star"]:
+                              logger.info(f"[LION] SILENCED by Pattern Conflict ({pat_name}).")
+                              vetoed = True
 
-                     logger.warning(f"[LION] PROTOCOL LION ACTIVATED: Structure ({v_structure:.1f}) override WAIT.")
-                     final_decision = "BUY" if struc_dir == 1 else "SELL"
-                     final_score = abs(v_structure) + 20 # Higher score boost
-                     holographic_reason = "LION_BREAKOUT"
-                     
-                     # Lion trades get 10x leverage now
-                     details['mode'] = "LION_PROTOCOL"
-                     details['lot_multiplier'] = 10.0
+                     if not vetoed:
+                         logger.warning(f"[LION] PROTOCOL LION ACTIVATED: Structure ({v_structure:.1f}) override WAIT.")
+                         final_decision = "BUY" if struc_dir == 1 else "SELL"
+                         final_score = abs(v_structure) + 20 # Higher score boost
+                         holographic_reason = "LION_BREAKOUT"
+                         
+                         # Lion trades get 10x leverage now
+                         details['mode'] = "LION_PROTOCOL"
+                         details['lot_multiplier'] = 10.0
 
         # Logic E: QUANTUM HARMONY (Variety Setup)
         # If Quantum Probability is high (>0.9) and Structure agrees, take the ride.
@@ -987,33 +991,37 @@ class ConsensusEngine:
                      pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
 
                      # 1. Sniper Conflict
+                     vetoed = False
                      if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
                         (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
                          logger.info(f"[QUANTUM] SILENCED by Sniper Conflict ({s_score_check}).")
-                         continue 
+                         vetoed = True
 
                      # 2. Divergence Conflict
-                     if (struc_dir == 1 and 'bearish' in str(div_type).lower()) or \
-                        (struc_dir == -1 and 'bullish' in str(div_type).lower()):
-                         logger.info(f"[QUANTUM] SILENCED by Divergence Conflict ({div_type}).")
-                         continue
+                     if not vetoed:
+                         if (struc_dir == 1 and 'bearish' in str(div_type).lower()) or \
+                            (struc_dir == -1 and 'bullish' in str(div_type).lower()):
+                             logger.info(f"[QUANTUM] SILENCED by Divergence Conflict ({div_type}).")
+                             vetoed = True
 
                      # 3. Pattern Conflict
-                     if struc_dir == 1 and pat_name in ["Shooting Star", "Bearish Engulfing", "Evening Star"]:
-                          logger.info(f"[QUANTUM] SILENCED by Pattern Conflict ({pat_name}).")
-                          continue
-                     elif struc_dir == -1 and pat_name in ["Hammer", "Bullish Engulfing", "Morning Star"]:
-                          logger.info(f"[QUANTUM] SILENCED by Pattern Conflict ({pat_name}).")
-                          continue
+                     if not vetoed:
+                         if struc_dir == 1 and pat_name in ["Shooting Star", "Bearish Engulfing", "Evening Star"]:
+                              logger.info(f"[QUANTUM] SILENCED by Pattern Conflict ({pat_name}).")
+                              vetoed = True
+                         elif struc_dir == -1 and pat_name in ["Hammer", "Bullish Engulfing", "Morning Star"]:
+                              logger.info(f"[QUANTUM] SILENCED by Pattern Conflict ({pat_name}).")
+                              vetoed = True
 
-                     logger.warning(f"🌌 QUANTUM HARMONY ACTIVATED: Tunneling Prob ({quantum_prob:.2f}) + Structure.")
-                     final_decision = "BUY" if struc_dir == 1 else "SELL"
-                     final_score = abs(v_structure) + 30 # Good score boost
-                     holographic_reason = "QUANTUM_HARMONY"
-                     
-                     # Harmony trades get 5x leverage
-                     details['mode'] = "QUANTUM_HARMONY"
-                     details['lot_multiplier'] = 5.0
+                     if not vetoed:
+                         logger.warning(f"🌌 QUANTUM HARMONY ACTIVATED: Tunneling Prob ({quantum_prob:.2f}) + Structure.")
+                         final_decision = "BUY" if struc_dir == 1 else "SELL"
+                         final_score = abs(v_structure) + 30 # Good score boost
+                         holographic_reason = "QUANTUM_HARMONY"
+                         
+                         # Harmony trades get 5x leverage
+                         details['mode'] = "QUANTUM_HARMONY"
+                         details['lot_multiplier'] = 5.0
                  
         # Override with Golden Setups (The Royal Flush) logic preserved below...
         total_vector = v_momentum + v_reversion + v_structure # Legacy compatibility

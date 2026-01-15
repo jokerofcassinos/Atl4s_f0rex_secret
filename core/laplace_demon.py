@@ -532,7 +532,8 @@ class LaplaceDemonCore:
         m8_res = details.get('M8', {})
         toxic_flow = details.get('ToxicFlow', False)
         liq_signal = details.get('Liquidator')
-        nano_res = details.get('nano_blocks', {}) # Added this line to get nano_res
+        nano_res = details.get('nano_blocks', {})
+        eh_meta = details.get('EventHorizon', {})
 
         # 0. The Liquidator (New 90% Setup)
         if liq_signal:
@@ -576,59 +577,36 @@ class LaplaceDemonCore:
 
         # Trigger NANO SELL
         if nano_sell:
-             # VETO CHECK
              vetoed = False
-             if s_dir == 1 and s_score_v > 50: vetoed = True # Sniper Buy
-             if 'bullish' in str(d_type).lower(): vetoed = True # Bullish Div
-             if p_name in ["Hammer", "Bullish Engulfing"]: vetoed = True # Bullish Pattern
+             if s_dir == 1 and s_score_v > 50: vetoed = True
+             if 'bullish' in str(d_type).lower(): vetoed = True
+             if p_name in ["Hammer", "Bullish Engulfing"]: vetoed = True
              
              if not vetoed:
                  reasons.append("NANO ALGO: Sell Block/Resistance Detected")
-                 if score > 0: score = -50 # Flip to Sell
-                 else: score -= 30 # Boost sell
+                 if score > 0: score = -50
+                 else: score -= 30
                  if not setup: setup = "NANO_SCALE_IN"
              else:
-                 reasons.append("NANO SELL VETOED by Conflict (Sniper/Div/Pattern)")
+                 reasons.append("NANO SELL VETOED by Conflict")
 
         # Trigger NANO BUY
         if nano_buy:
-             # VETO CHECK
              vetoed = False
-             if s_dir == -1 and s_score_v > 50: vetoed = True # Sniper Sell
-             if 'bearish' in str(d_type).lower(): vetoed = True # Bearish Div
-             if p_name in ["Shooting Star", "Bearish Engulfing"]: vetoed = True # Bearish Pattern
+             if s_dir == -1 and s_score_v > 50: vetoed = True
+             if 'bearish' in str(d_type).lower(): vetoed = True
+             if p_name in ["Shooting Star", "Bearish Engulfing"]: vetoed = True
              
              if not vetoed:
                  reasons.append("NANO ALGO: Buy Block/Support Detected")
-                 if score < 0: score = 50 # Flip to Buy
-                 else: score += 30 # Boost buy
+                 if score < 0: score = 50
+                 else: score += 30
                  if not setup: setup = "NANO_SCALE_IN"
              else:
-                 reasons.append("NANO BUY VETOED by Conflict (Sniper/Div/Pattern)")
-        
-        # 6.5 Vortex 3-6-9 & Event Horizon
-        vortex = details.get('Vortex', {})
-        eh_meta = details.get('EventHorizon', {})
-        
-        # A. Vortex Time Trigger
-        if vortex.get('signal') != "WAIT":
-             reasons.append(f"VORTEX 3-6-9: {vortex['reason']}")
-             if vortex['signal'] == "BUY":
-                  if score < 0: score = 50 # Flip
-                  else: score += 40
-                  if not setup: setup = "VORTEX_TIMING"
-             elif vortex['signal'] == "SELL":
-                  if score > 0: score = -50
-                  else: score -= 40
-                  if not setup: setup = "VORTEX_TIMING"
+                 reasons.append("NANO BUY VETOED by Conflict")
 
         # B. Event Horizon Swarm (Seek & Destroy)
         if eh_meta.get('mode') == "SWARM_369":
-             # --- SWARM SAFEGUARDS ---
-             # Reuse variables from NANO section (s_dir, s_score_v, d_type, etc)
-             # If variables not initialized (python scope is function-level, so they exist if NANO block ran)
-             # But to be safe re-fetch if needed or assume existence if code flows sequentially
-             
              swarm_dir = 1 if "Buy" in eh_meta.get('reason', '') else -1 if "Sell" in eh_meta.get('reason', '') else 0
              
              vetoed = False
@@ -643,18 +621,15 @@ class LaplaceDemonCore:
                  reasons.append(f"EVENT HORIZON: {eh_meta.get('reason', 'Swarm Attack')}")
                  setup = "SWARM_369"
                  if "Buy Detected" in eh_meta.get('reason', ''):
-                      # If Toxic Flow, we reduce the boost drastically
                       boost = 50
-                  if toxic_flow: boost = 10 
-                  
-                  if score < 0: score = 60 # Strong Flip (still valid if not toxic)
-                  else: score += boost
-             elif "Sell Detected" in eh_meta.get('reason', ''):
-                  boost = 50
-                  if toxic_flow: boost = 10
-                  
-                  if score > 0: score = -60
-                  else: score -= boost
+                      if toxic_flow: boost = 10
+                      if score < 0: score = 60
+                      else: score += boost
+                 elif "Sell Detected" in eh_meta.get('reason', ''):
+                      boost = 50
+                      if toxic_flow: boost = 10
+                      if score > 0: score = -60
+                      else: score -= boost
 
         # 7. Final Confidence Adjustment
              if "BUY" in zone and score > -10:
