@@ -691,29 +691,67 @@ class LaplaceDemonCore:
                  if not setup: setup = "BLOCKED_BY_WALL"
 
         # --- GLOBAL SNIPER CONFLICT VETO (Trade #109 Fix) ---
-        # If Sniper strongly says one direction (>70) but we're going opposite, BLOCK.
-        # This applies to ALL setups (Neutral, MOMENTUM_BREAKOUT, REVERSION_SNIPER, etc)
-        # FIX: details['Sniper'] = {'score': s_score, 'dir': s_dir} (dir, NOT direction!)
+        # If Sniper says one direction (>50) but we're going opposite, BLOCK.
+        # THRESHOLD LOWERED from 70 to 50 (Trade #106 had Sniper 57.2)
         sniper_data = details.get('Sniper', {})
-        sniper_dir = sniper_data.get('dir', 0) if isinstance(sniper_data, dict) else 0  # +1 = BUY, -1 = SELL
+        sniper_dir = sniper_data.get('dir', 0) if isinstance(sniper_data, dict) else 0
         sniper_score = sniper_data.get('score', 0) if isinstance(sniper_data, dict) else 0
         
         decision_dir = "BUY" if score > 0 else "SELL" if score < 0 else "WAIT"
         
-        # Sniper dir: +1 = BUY, -1 = SELL
-        if decision_dir == "BUY" and sniper_dir == -1 and sniper_score > 70:
+        # Sniper dir: +1 = BUY, -1 = SELL (THRESHOLD: 50)
+        if decision_dir == "BUY" and sniper_dir == -1 and sniper_score > 50:
             reasons.append(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
             vetoes.append(f"Sniper Conflict: Sniper SELL {sniper_score:.0f}% opposes BUY")
             execute = False
             hard_veto = True
             logger.warning(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper SELL {sniper_score:.1f})")
             
-        elif decision_dir == "SELL" and sniper_dir == 1 and sniper_score > 70:
+        elif decision_dir == "SELL" and sniper_dir == 1 and sniper_score > 50:
             reasons.append(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper says BUY {sniper_score:.1f})")
             vetoes.append(f"Sniper Conflict: Sniper BUY {sniper_score:.0f}% opposes SELL")
             execute = False
             hard_veto = True
             logger.warning(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper BUY {sniper_score:.1f})")
+
+        # --- DIVERGENCE CONFLICT VETO (Trade #106 Fix) ---
+        # If Bullish Divergence but decision is SELL, BLOCK (and vice versa)
+        divergence_data = details.get('Divergence', {})
+        if isinstance(divergence_data, dict):
+            div_type = divergence_data.get('type', '')
+            if decision_dir == "SELL" and 'bullish' in str(div_type).lower():
+                reasons.append("DIVERGENCE CONFLICT: Blocking SELL (Bullish Divergence)")
+                vetoes.append("Divergence Conflict: Bullish signal opposes SELL")
+                execute = False
+                hard_veto = True
+                logger.warning("DIVERGENCE CONFLICT VETO: Blocking SELL (Bullish Divergence detected)")
+            elif decision_dir == "BUY" and 'bearish' in str(div_type).lower():
+                reasons.append("DIVERGENCE CONFLICT: Blocking BUY (Bearish Divergence)")
+                vetoes.append("Divergence Conflict: Bearish signal opposes BUY")
+                execute = False
+                hard_veto = True
+                logger.warning("DIVERGENCE CONFLICT VETO: Blocking BUY (Bearish Divergence detected)")
+
+        # --- PATTERN CONFLICT VETO (Trade #106 Fix) ---
+        # If Bullish Pattern (Hammer, Engulfing) but decision is SELL, BLOCK
+        pattern_data = details.get('Pattern', '')
+        bullish_patterns = ['hammer', 'bullish engulfing', 'morning star', 'doji']
+        bearish_patterns = ['shooting star', 'bearish engulfing', 'evening star']
+        
+        pattern_lower = str(pattern_data).lower() if pattern_data else ''
+        
+        if decision_dir == "SELL" and any(bp in pattern_lower for bp in bullish_patterns):
+            reasons.append(f"PATTERN CONFLICT: Blocking SELL (Bullish pattern: {pattern_data})")
+            vetoes.append("Pattern Conflict: Bullish pattern opposes SELL")
+            execute = False
+            hard_veto = True
+            logger.warning(f"PATTERN CONFLICT VETO: Blocking SELL (Bullish pattern: {pattern_data})")
+        elif decision_dir == "BUY" and any(bp in pattern_lower for bp in bearish_patterns):
+            reasons.append(f"PATTERN CONFLICT: Blocking BUY (Bearish pattern: {pattern_data})")
+            vetoes.append("Pattern Conflict: Bearish pattern opposes BUY")
+            execute = False
+            hard_veto = True
+            logger.warning(f"PATTERN CONFLICT VETO: Blocking BUY (Bearish pattern: {pattern_data})")
 
         # --- MONDAY CAUTION FILTER (Weekend Gap Fix) ---
         # Chart shows: Monday = 45% Win Rate, -$200 PnL (while other days = 90%+ WR)

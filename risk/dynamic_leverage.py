@@ -26,24 +26,25 @@ class DynamicLeverage:
         # Safety for tiny accounts
         if equity < 10: return 0.01
 
-        # EXNESS LEVERAGE TIERS
+        # EXNESS LEVERAGE TIERS - AGGRESSIVE SNOWBALL MODE
+        # With 85%+ Win Rate, we can compound much more aggressively
         if equity < 1000:
-            # TIER 1: UNLIMITED (1:1,000,000,000)
-            # High aggression for small account growth
-            # Ex: $100 -> ~0.15 lots | $500 -> ~0.50 lots
+            # TIER 1: UNLIMITED (1:1,000,000,000) - HYPER AGGRESSIVE
+            # Power law 0.85 (was 0.75) for steeper compounding
+            # Divisor 100 (was 200) for 2x larger positions
+            # Ex: $100 -> ~0.50 lots | $500 -> ~1.50 lots
             lev_tier = "UNLIMITED"
-            # Power law 0.75 is steeper than 0.65
-            base_lots = (pow(equity, 0.75)) / 200.0 
-            MAX_CEILING = 50.0 # Effectively no cap logic
+            base_lots = (pow(equity, 0.85)) / 100.0  # More aggressive
+            MAX_CEILING = 100.0  # Higher ceiling for snowball
         else:
-            # TIER 2: HIGH LEVERAGE (1:2000)
-            # Stabilized growth for larger capital
-            # Ex: $2000 -> ~0.70 lots | $10000 -> ~2.5 lots
+            # TIER 2: HIGH LEVERAGE (1:2000) - AGGRESSIVE
+            # Power law 0.80 (was 0.70) for faster growth
+            # Divisor 150 (was 300) for 2x larger positions
+            # Ex: $2000 -> ~2.0 lots | $10000 -> ~8.0 lots
             lev_tier = "1:2000"
-            base_lots = (pow(equity, 0.70)) / 300.0
-            # Margin Ceiling: (Equity * 2000) / 100000 = Max Lots allowed by broker
-            # We take 50% of that to leave room for Drawdown
-            MAX_CEILING = ((equity * 2000) / 100000) * 0.5
+            base_lots = (pow(equity, 0.80)) / 150.0  # More aggressive
+            # Higher margin ceiling for snowball
+            MAX_CEILING = ((equity * 2000) / 100000) * 0.8  # Was 0.5
 
         # 2. Confidence Multiplier (Brain)
         # Score 0 -> 1.0x
