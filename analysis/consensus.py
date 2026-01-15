@@ -838,10 +838,10 @@ class ConsensusEngine:
 
         # Logic A: MOMENTUM BREAKOUT
         # Momentum is Strong AND Structure Supports (or is Neutral) AND Reversion is Weak
-        # ✅ PHASE 11 FIX: Chaos Veto (The "Regime Lock") - RELAXED
-        # If Chaos is EXTREME (Lyapunov > 0.75) or Entropy > 0.95, MOMENTUM IS FAKE.
+        # ✅ PHASE 11 FIX: Chaos Veto (The "Regime Lock") - CALIBRATED
+        # Entropy is not 0-1. Log showed 1.91. Raising scale to 2.5.
         veto_momentum = False
-        if lyapunov > 0.75 or entropy > 0.95:
+        if lyapunov > 0.8 or entropy > 2.5:
              logger.info(f"[MOMENTUM] SILENCED by Extreme Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
              veto_momentum = True
 
@@ -869,7 +869,7 @@ class ConsensusEngine:
              
              safe_to_revert = True
              safe_to_revert = True
-             if lyapunov > 0.75 or entropy > 0.95: # In Extreme Chaos, require wicks
+             if lyapunov > 0.8 or entropy > 2.5: # In Extreme Chaos, require wicks
                  if rev_dir == 1 and rejection != "BEARISH_REJECTION":
                       safe_to_revert = False
                       logger.info("[REVERSION] SILENCED: Falling Knife (No Bearish Wick in Extreme Chaos)")
@@ -962,10 +962,10 @@ class ConsensusEngine:
                      div_type = div_res.get('type', '') if isinstance(div_res, dict) else ''
                      pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
 
-                     # ✅ PHASE 11 FIX: Chaos Veto (The "Leonidas Gate") - RELAXED
-                     # Breakouts create volatility. We only block EXTREME chaos.
+                     # ✅ PHASE 11 FIX: Chaos Veto (The "Leonidas Gate") - CALIBRATED
+                     # Breakouts create volatility. We only block EXTREME chaos (Entropy > 2.5).
                      vetoed = False
-                     if lyapunov > 0.7 or entropy > 0.9:
+                     if lyapunov > 0.8 or entropy > 2.5:
                           logger.info(f"[LION] SILENCED by Extreme Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
                           vetoed = True
                      
@@ -1006,9 +1006,9 @@ class ConsensusEngine:
                      div_type = div_res.get('type', '') if isinstance(div_res, dict) else ''
                      pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
 
-                     # ✅ PHASE 11 FIX: Chaos Veto (The "Quantum decoherence") - RELAXED
+                     # ✅ PHASE 11 FIX: Chaos Veto (The "Quantum decoherence") - CALIBRATED
                      vetoed = False
-                     if lyapunov > 0.7 or entropy > 0.9:
+                     if lyapunov > 0.8 or entropy > 2.5:
                           logger.info(f"[QUANTUM] SILENCED by Extreme Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
                           vetoed = True
                      
