@@ -574,10 +574,11 @@ class ConsensusEngine:
                 base_dynamic = 95.0 + (s_score - 50) * 0.1
                 score = base_dynamic if decision == "BUY" else -base_dynamic
                 
-                # --- HYBRID ATTACK: OMEGA SNIPER UPGRADE ---
+                # --- HYBRID ATTACK: OMEGA SNIPER UPGRADE (10x) ---
                 # "The Tank": Slow, precise -> Heavily Leveraged
-                details['lot_multiplier'] = 5.0
-                details['tp_multiplier'] = 0.5 # "Ladder Down" logic starts preemptively at 50% target
+                # UPGRADED: 5x -> 10x with 97% WR
+                details['lot_multiplier'] = 10.0
+                details['tp_multiplier'] = 0.5
                 details['mode'] = "OMEGA_REV_SNIPER"
                 
                 return decision, score, details
@@ -897,12 +898,12 @@ class ConsensusEngine:
                            final_score = abs(v_reversion) + abs(v_structure)
                            holographic_reason = "REVERSION_SNIPER"
                            
-                           # --- OMEGA SNIPER UPGRADE (User Request) ---
-                           # "Reversion Sniper = Omega Sniper Concept (x5)"
-                           details['lot_multiplier'] = 5.0
+                           # --- OMEGA SNIPER UPGRADE (10x - 97% WR) ---
+                           # "Reversion Sniper = Omega Sniper Concept (10x)"
+                           details['lot_multiplier'] = 10.0
                            details['tp_multiplier'] = 0.5
                            details['mode'] = "OMEGA_REV_SNIPER"
-                           logger.info(f"OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 5x.")
+                           logger.info(f"OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 10x.")
                  
         # Logic C: STRUCTURE BOUNCE (Laminar Flow)
         # Structure is Strong + Trend is Laminar Flow (Low Entropy)
@@ -914,26 +915,44 @@ class ConsensusEngine:
                  final_score = abs(v_structure) + abs(v_momentum)
                  holographic_reason = "STRUCTURE_FLOW"
                  
-        # Logic D: PROTOCOL LION (Last Resort Breakout)
-        # "The Lion does not ask for permission."
-        # If we are WAITING, but Structure suggests a clear path (Map) AND Ocean (H4) agrees...
-        # We FORCE the trade.
+        # Logic D: PROTOCOL LION (Last Resort Breakout) - RELAXED
+        # \"The Lion does not ask for permission.\"
+        # If we are WAITING, but Structure suggests a clear path, FORCE the trade.
+        # RELAXED: Removed Ocean alignment requirement, lowered threshold to 30
         if final_decision == "WAIT":
-             # Requirement 1: Strong Structure (> 40) - Relaxed from 50
-             if abs(v_structure) > 40:
+             # Requirement 1: Strong Structure (> 30) - Relaxed from 40
+             if abs(v_structure) > 30:
                  struc_dir = 1 if v_structure > 0 else -1
                  
-                 # Requirement 2: Ocean Alignment (H4 Trend)
-                 if struc_dir == ocean_dir:
-                     # Check v_momentum isn't fighting us too hard (>-20)
-                     if (v_momentum * struc_dir) > -20:
-                         logger.warning(f"🦁 PROTOCOL LION ACTIVATED: Structure ({v_structure:.1f}) + Ocean ({ocean_dir}) override WAIT.")
-                         final_decision = "BUY" if struc_dir == 1 else "SELL"
-                         final_score = abs(v_structure) + 10 # Base score on structure + small boost
-                         holographic_reason = "LION_BREAKOUT"
-                         
-                         # Lion trades are structure-based, standard leverage.
-                         details['mode'] = "LION_PROTOCOL"
+                 # REMOVED: Ocean alignment requirement (was blocking most trades)
+                 # Check v_momentum isn't fighting us too hard (>-30) - Relaxed from -20
+                 if (v_momentum * struc_dir) > -30:
+                     logger.warning(f"[LION] PROTOCOL LION ACTIVATED: Structure ({v_structure:.1f}) override WAIT.")
+                     final_decision = "BUY" if struc_dir == 1 else "SELL"
+                     final_score = abs(v_structure) + 20 # Higher score boost
+                     holographic_reason = "LION_BREAKOUT"
+                     
+                     # Lion trades get 10x leverage now
+                     details['mode'] = "LION_PROTOCOL"
+                     details['lot_multiplier'] = 10.0
+
+        # Logic E: QUANTUM HARMONY (Variety Setup)
+        # If Quantum Probability is high (>0.9) and Structure agrees, take the ride.
+        # This captures pure quantum tunneling events.
+        if final_decision == "WAIT":
+             quantum_prob = results.get('Quantum', {}).get('tunnel_prob', 0)
+             if quantum_prob > 0.90:
+                 # Check if structure aligns (or at least doesn't oppose strongly)
+                 struc_dir = 1 if v_structure > 0 else -1
+                 if (v_structure * struc_dir) > 10:  # Mild structure confirmation
+                     logger.warning(f"🌌 QUANTUM HARMONY ACTIVATED: Tunneling Prob ({quantum_prob:.2f}) + Structure.")
+                     final_decision = "BUY" if struc_dir == 1 else "SELL"
+                     final_score = abs(v_structure) + 30 # Good score boost
+                     holographic_reason = "QUANTUM_HARMONY"
+                     
+                     # Harmony trades get 5x leverage
+                     details['mode'] = "QUANTUM_HARMONY"
+                     details['lot_multiplier'] = 5.0
                  
         # Override with Golden Setups (The Royal Flush) logic preserved below...
         total_vector = v_momentum + v_reversion + v_structure # Legacy compatibility

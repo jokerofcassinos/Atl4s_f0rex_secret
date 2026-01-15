@@ -441,24 +441,55 @@ class LaplaceDemonCore:
         knife = legion_intel.get('knife')
         horizon = legion_intel.get('horizon')
         
-        # TimeKnife (High Volatility Scalp)
+        # TimeKnife (High Volatility Scalp) - Original Logic
         if knife and knife.confidence > 80:
              reasons.append(f"TimeKnife Spike detected ({knife.signal_type})")
-             # If math agrees, huge boost
              if (knife.signal_type == "BUY" and score > 0) or (knife.signal_type == "SELL" and score < 0):
                  score *= 1.5 
-             # If math is neutral but Knife is explicit, take the scalp
              elif abs(score) < 10: 
                  score += 50 if knife.signal_type == "BUY" else -50
                  setup = "LEGION_KNIFE_SCALP"
 
-        # EventHorizon (Gravity/Reversion)
+        # --- LEGION_KNIFE_SCALP FALLBACK (No Legion Required) ---
+        # If Kinematics is ACCELERATING strongly and score is moderate, trigger scalp
+        kin_data = details.get('Kinematics', {})
+        if isinstance(kin_data, dict):
+            k_angle = kin_data.get('angle', 0)
+            k_accel = kin_data.get('is_accelerating', False)
+            # Accelerating UP (0-90) with positive score, or DOWN (180-270) with negative score
+            if k_accel and not setup:
+                if 0 <= k_angle <= 90 and score > 30:
+                    reasons.append(f"KNIFE SCALP FALLBACK: Accelerating UP ({k_angle}°)")
+                    setup = "LEGION_KNIFE_SCALP"
+                    score *= 1.3  # Boost
+                elif 180 <= k_angle <= 270 and score < -30:
+                    reasons.append(f"KNIFE SCALP FALLBACK: Accelerating DOWN ({k_angle}°)")
+                    setup = "LEGION_KNIFE_SCALP"
+                    score *= 1.3
+
+        # EventHorizon (Gravity/Reversion) - Original Logic
         if horizon and horizon.signal_type in ["BUY", "SELL"]:
              if "SINGULARITY" in horizon.meta_data.get('reason', ''):
-                 # Extreme Reversion
                  reasons.append(f"EventHorizon Singularity: {horizon.signal_type}")
                  score += 100 if horizon.signal_type == "BUY" else -100
                  setup = "SINGULARITY_REVERSION"
+
+        # --- SWARM_369 FALLBACK (No Legion Required) ---
+        # If Supply/Demand zone is strong (>80) and Divergence exists, trigger SWARM
+        sd_data = details.get('SupplyDemand', {})
+        div_data = details.get('Divergence', {})
+        if isinstance(sd_data, dict) and isinstance(div_data, dict) and not setup:
+            sd_score = sd_data.get('score', 0)
+            div_type = div_data.get('type', '')
+            if sd_score > 80:
+                if 'bullish' in str(div_type).lower() and score > 0:
+                    reasons.append(f"SWARM_369 FALLBACK: Strong Demand + Bullish Divergence")
+                    setup = "SWARM_369"
+                    score *= 1.5
+                elif 'bearish' in str(div_type).lower() and score < 0:
+                    reasons.append(f"SWARM_369 FALLBACK: Strong Supply + Bearish Divergence")
+                    setup = "SWARM_369"
+                    score *= 1.5
 
         # 2. Global Swarm Consensus (The "Legion" Vote)
         # We now respect the 88-agent SwarmOrchestrator
@@ -877,21 +908,21 @@ class LaplaceDemonCore:
 
 
         # --- OMEGA MULTIPLIER LOGIC ---
-        lot_multiplier = 1.0
+        # PRIORITY: Use lot_multiplier from consensus.py details if available (10x OMEGA)
+        lot_multiplier = details.get('lot_multiplier', 1.0)
         
-        if execute:
-            if setup in ["KINETIC_BOOM", "LEGION_KNIFE_SCALP", "LION_PROTOCOL", "REVERSION_SNIPER"]:
-                lot_multiplier = 5.0
+        # Fallback logic only if consensus didn't set a multiplier
+        if lot_multiplier <= 1.0 and execute:
+            if setup in ["KINETIC_BOOM", "LEGION_KNIFE_SCALP", "LION_PROTOCOL"]:
+                lot_multiplier = 10.0  # Upgraded from 5.0
             elif setup == "NANO_SCALE_IN":
-                lot_multiplier = 3.0 # User Request: 3+3+3 Recurring
+                lot_multiplier = 3.0
             elif setup == "SWARM_369":
-                lot_multiplier = 9.0 # Full Geometric Swarm (Starts small but capacity is 9x)
-                # Note: The Execution Engine handles the splitting. 
-                # Here we just authorize the mass.
+                lot_multiplier = 9.0
             elif setup == "MOMENTUM_BREAKOUT" and confidence >= 95.0:
-                lot_multiplier = 2.0
+                lot_multiplier = 5.0  # Upgraded from 2.0
             elif setup == "MOMENTUM_BREAKOUT":
-                lot_multiplier = 1.0
+                lot_multiplier = 2.0  # Upgraded from 1.0
 
         prediction = LaplacePrediction(
             execute=execute,

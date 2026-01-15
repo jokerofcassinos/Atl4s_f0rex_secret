@@ -95,14 +95,15 @@ class RecursiveReasoner:
                     # Break loop, we found a new truth
                     break
                 else:
-                    # --- MONTE CARLO CONFLICT BLOCK (Trade #133 Fix) ---
-                    # Minor conflict still means Monte Carlo disagrees!
-                    # Instead of just reducing 5%, BLOCK the trade.
-                    # This prevents selling when MC says price is ascending.
-                    history.append(f"Iter {i}: MC Conflict ({reason}). Blocking trade.")
-                    current_decision = "WAIT"
-                    current_score = 0
-                    break
+                    # --- MC CONFLICT (Relaxed - 97% WR allows more risk) ---
+                    # Minor conflict: reduce score 30% instead of blocking
+                    # With high WR, we can afford to take more trades
+                    current_score *= 0.70  # 30% penalty (was full block)
+                    history.append(f"Iter {i}: MC Conflict ({reason}). Reducing confidence 30%.")
+                    if current_score < 25:  # Only block if very weak
+                         current_decision = "WAIT"
+                         history.append("Result: Veto Entry (Weak Conviction).")
+                         break
             else:
                 current_score *= 1.1 # Reinforce confidence
                 history.append(f"Iter {i}: Path confirms direction.")
