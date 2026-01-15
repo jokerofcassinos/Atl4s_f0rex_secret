@@ -992,7 +992,8 @@ class ConsensusEngine:
         # This captures pure quantum tunneling events.
         if final_decision == "WAIT":
              quantum_prob = results.get('Quantum', {}).get('tunnel_prob', 0)
-             if quantum_prob > 0.90:
+             # ✅ PHASE 12 FIX: Relaxed Threshold (90% -> 85%) to revive Quantum
+             if quantum_prob > 0.85:
                  # Check if structure aligns (or at least doesn't oppose strongly)
                  struc_dir = 1 if v_structure > 0 else -1
                  if (v_structure * struc_dir) > 10:  # Mild structure confirmation

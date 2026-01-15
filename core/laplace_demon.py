@@ -522,9 +522,10 @@ class LaplaceDemonCore:
                     
             # Case C: Legacy Indecisive, Swarm Strong (Swarm Lead)
             elif abs(score) < 20 and swarm_score > 75:
-                # ✅ PHASE 11 FIX: Chaos Veto on Swarm Initiative
+                # ✅ PHASE 12 FIX: Chaos Veto on Swarm (Neutral)
+                # Swarm is good, but dies in Chaos. Block if Chaos > 0.8.
                 chaos_veto_swarm = False
-                if lyapunov > 0.5 or entropy > 0.8:
+                if lyapunov > 0.8 or entropy > 2.5:
                      chaos_veto_swarm = True
                      reasons.append(f"Swarm Initiative VETOED by Chaos")
 
@@ -606,23 +607,37 @@ class LaplaceDemonCore:
              if 'bearish' in str(d_type).lower(): vetoed = True
              if p_name in ["Shooting Star", "Bearish Engulfing"]: vetoed = True
              
-             if not vetoed:
+             # ✅ PHASE 12 FIX: Nano Safeguards (Chaos + Wick)
+             veto_nano = False
+             if lyapunov > 0.8 or entropy > 2.5:
+                  veto_nano = True
+                  reasons.append("NANO VETOED by Chaos")
+             
+             # Wick Check for Nano Buy (Catching Knife Protection)
+             if not veto_nano:
+                  nano_action = "Buy" # Assuming nano_buy implies a "Buy" action for this check
+                  micro = details.get('Micro', {})
+                  # Only veto if rejection is NOT bullish AND chaos is moderate (to avoid false positives in clear trends)
+                  if micro.get('rejection') != "BULLISH_REJECTION" and lyapunov > 0.5:
+                       veto_nano = True
+                       reasons.append("NANO VETOED by No Wick (Knife)")
+
+             if not vetoed and not veto_nano:
                  reasons.append("NANO ALGO: Buy Block/Support Detected")
                  if score < 0: score = 50
                  else: score += 30
                  if not setup or setup in ["Neutral", "WAIT", "None"]: setup = "NANO_SCALE_IN"
              else:
-                 reasons.append("NANO BUY VETOED by Conflict")
+                 reasons.append("NANO BUY VETOED by Conflict/Chaos")
 
         # B. Event Horizon Swarm (Seek & Destroy)
         # ✅ PHASE 11 FIX: Chaos Veto on Event Horizon
         if eh_meta.get('mode') == "SWARM_369":
              swarm_dir = 1 if "Buy" in eh_meta.get('reason', '') else -1 if "Sell" in eh_meta.get('reason', '') else 0
              
+             # Chaos Veto - RELAXED (Agile Swarm)
              vetoed = False
-             
-             # Chaos Veto
-             if lyapunov > 0.5 or entropy > 0.8:
+             if lyapunov > 0.8 or entropy > 2.5:
                   reasons.append(f"EVENT HORIZON SILENCED by Chaos (Lyapunov {lyapunov:.2f})")
                   vetoed = True
 
