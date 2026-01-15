@@ -549,18 +549,62 @@ class LaplaceDemonCore:
                   if not setup: setup = "LIQUIDATOR_SWEEP"
         
         # A. Sell at Red Block (Resistance)
-        if nano_res.get('algo_sell_detected'):
-             reasons.append("NANO ALGO: Sell Block Detected (Resistance)")
-             if score > 0: score = -50 # Flip to Sell
-             else: score -= 30 # Boost sell
-             if not setup: setup = "NANO_SCALE_IN"
+        nano_sell = nano_res.get('algo_sell_detected')
+        nano_buy = nano_res.get('algo_buy_detected')
+        
+        # --- NANO FALLBACK (SNR Bounce) ---
+        snr_data = details.get('SNR', {})
+        if not nano_sell and not nano_buy and snr_data:
+            dist_res = snr_data.get('res_dist', 999)
+            dist_sup = snr_data.get('sup_dist', 999)
+            if dist_res < 0.0010 and score < 0: # Near Resistance + Bearish
+                nano_sell = True
+                reasons.append("NANO FALLBACK: SNR Resistance Bounce")
+            elif dist_sup < 0.0010 and score > 0: # Near Support + Bullish
+                nano_buy = True
+                reasons.append("NANO FALLBACK: SNR Support Bounce")
+
+        # --- UNIVERSAL VETO CHECKS (Sniper, Div, Pattern) ---
+        sniper_data = details.get('Sniper', {})
+        div_data = details.get('Divergence', {})
+        pat_data = details.get('Patterns', {})
+        
+        s_dir = sniper_data.get('dir', 0) if isinstance(sniper_data, dict) else 0
+        s_score_v = sniper_data.get('score', 0) if isinstance(sniper_data, dict) else 0
+        d_type = div_data.get('type', '') if isinstance(div_data, dict) else ''
+        p_name = pat_data.get('pattern', '') if isinstance(pat_data, dict) else ''
+
+        # Trigger NANO SELL
+        if nano_sell:
+             # VETO CHECK
+             vetoed = False
+             if s_dir == 1 and s_score_v > 50: vetoed = True # Sniper Buy
+             if 'bullish' in str(d_type).lower(): vetoed = True # Bullish Div
+             if p_name in ["Hammer", "Bullish Engulfing"]: vetoed = True # Bullish Pattern
              
-        # B. Buy at Green Block (Support)
-        if nano_res.get('algo_buy_detected'):
-             reasons.append("NANO ALGO: Buy Block Detected (Support)")
-             if score < 0: score = 50 # Flip to Buy
-             else: score += 30 # Boost buy
-             if not setup: setup = "NANO_SCALE_IN"
+             if not vetoed:
+                 reasons.append("NANO ALGO: Sell Block/Resistance Detected")
+                 if score > 0: score = -50 # Flip to Sell
+                 else: score -= 30 # Boost sell
+                 if not setup: setup = "NANO_SCALE_IN"
+             else:
+                 reasons.append("NANO SELL VETOED by Conflict (Sniper/Div/Pattern)")
+
+        # Trigger NANO BUY
+        if nano_buy:
+             # VETO CHECK
+             vetoed = False
+             if s_dir == -1 and s_score_v > 50: vetoed = True # Sniper Sell
+             if 'bearish' in str(d_type).lower(): vetoed = True # Bearish Div
+             if p_name in ["Shooting Star", "Bearish Engulfing"]: vetoed = True # Bearish Pattern
+             
+             if not vetoed:
+                 reasons.append("NANO ALGO: Buy Block/Support Detected")
+                 if score < 0: score = 50 # Flip to Buy
+                 else: score += 30 # Boost buy
+                 if not setup: setup = "NANO_SCALE_IN"
+             else:
+                 reasons.append("NANO BUY VETOED by Conflict (Sniper/Div/Pattern)")
         
         # 6.5 Vortex 3-6-9 & Event Horizon
         vortex = details.get('Vortex', {})
@@ -580,24 +624,27 @@ class LaplaceDemonCore:
 
         # B. Event Horizon Swarm (Seek & Destroy)
         if eh_meta.get('mode') == "SWARM_369":
-             reasons.append(f"EVENT HORIZON: {eh_meta.get('reason', 'Swarm Attack')}")
-             # This is a dominant signal (Predatory)
-             if eh_meta.get('signal_type') == "BUY": # Logic implied from meta if propagated, wait I need signal direction
-                  pass # Handled below
+             # --- SWARM SAFEGUARDS ---
+             # Reuse variables from NANO section (s_dir, s_score_v, d_type, etc)
+             # If variables not initialized (python scope is function-level, so they exist if NANO block ran)
+             # But to be safe re-fetch if needed or assume existence if code flows sequentially
              
-             # Force Swarm Mode if high confidence
-             setup = "SWARM_369"
-             # Score override? The Swarm Signal itself isn't fully propagated in EH Meta yet, 
-             # let's assume if EH Meta exists, it's a valid trigger.
-             # Actually, I should have passed the signal direction in meta or details.
+             swarm_dir = 1 if "Buy" in eh_meta.get('reason', '') else -1 if "Sell" in eh_meta.get('reason', '') else 0
              
-        # Correction: The Event Horizon signal was returned as 'eh_signal' in analyze, 
-        # but I only put 'meta_data' into details['EventHorizon'].
-        # I need the direction.
-        # Implied direction: Iceberg Buy -> BUY.
-             if "Buy Detected" in eh_meta.get('reason', ''):
-                  # If Toxic Flow, we reduce the boost drastically
-                  boost = 50
+             vetoed = False
+             if swarm_dir == 1:
+                 if s_dir == -1 and s_score_v > 50: vetoed = True
+                 if 'bearish' in str(d_type).lower(): vetoed = True
+             elif swarm_dir == -1:
+                 if s_dir == 1 and s_score_v > 50: vetoed = True
+                 if 'bullish' in str(d_type).lower(): vetoed = True
+                 
+             if not vetoed:
+                 reasons.append(f"EVENT HORIZON: {eh_meta.get('reason', 'Swarm Attack')}")
+                 setup = "SWARM_369"
+                 if "Buy Detected" in eh_meta.get('reason', ''):
+                      # If Toxic Flow, we reduce the boost drastically
+                      boost = 50
                   if toxic_flow: boost = 10 
                   
                   if score < 0: score = 60 # Strong Flip (still valid if not toxic)

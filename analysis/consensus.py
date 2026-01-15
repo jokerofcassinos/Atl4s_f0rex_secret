@@ -927,6 +927,37 @@ class ConsensusEngine:
                  # REMOVED: Ocean alignment requirement (was blocking most trades)
                  # Check v_momentum isn't fighting us too hard (>-30) - Relaxed from -20
                  if (v_momentum * struc_dir) > -30:
+                     # --- LION SAFEGUARDS (The "Right Veto") ---
+                     # Ensure we don't Lion-force into a Sniper wall or Divergence
+                     sniper_res = results.get('Sniper', {})
+                     div_res = results.get('Divergence', {})
+                     pat_res = results.get('Patterns', {})
+
+                     s_dir_check = sniper_res.get('direction', 0) if isinstance(sniper_res, dict) else 0
+                     s_score_check = sniper_res.get('score', 0) if isinstance(sniper_res, dict) else 0
+                     div_type = div_res.get('type', '') if isinstance(div_res, dict) else ''
+                     pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
+
+                     # 1. Sniper Conflict
+                     if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
+                        (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
+                         logger.info(f"[LION] SILENCED by Sniper Conflict ({s_score_check}).")
+                         continue # Skip this Lion activation
+
+                     # 2. Divergence Conflict
+                     if (struc_dir == 1 and 'bearish' in str(div_type).lower()) or \
+                        (struc_dir == -1 and 'bullish' in str(div_type).lower()):
+                         logger.info(f"[LION] SILENCED by Divergence Conflict ({div_type}).")
+                         continue
+
+                     # 3. Pattern Conflict (Reversal Pattern against Breakout)
+                     if struc_dir == 1 and pat_name in ["Shooting Star", "Bearish Engulfing", "Evening Star"]:
+                          logger.info(f"[LION] SILENCED by Pattern Conflict ({pat_name}).")
+                          continue
+                     elif struc_dir == -1 and pat_name in ["Hammer", "Bullish Engulfing", "Morning Star"]:
+                          logger.info(f"[LION] SILENCED by Pattern Conflict ({pat_name}).")
+                          continue
+
                      logger.warning(f"[LION] PROTOCOL LION ACTIVATED: Structure ({v_structure:.1f}) override WAIT.")
                      final_decision = "BUY" if struc_dir == 1 else "SELL"
                      final_score = abs(v_structure) + 20 # Higher score boost
@@ -945,6 +976,36 @@ class ConsensusEngine:
                  # Check if structure aligns (or at least doesn't oppose strongly)
                  struc_dir = 1 if v_structure > 0 else -1
                  if (v_structure * struc_dir) > 10:  # Mild structure confirmation
+                     # --- QUANTUM SAFEGUARDS (The "Right Veto") ---
+                     sniper_res = results.get('Sniper', {})
+                     div_res = results.get('Divergence', {})
+                     pat_res = results.get('Patterns', {})
+
+                     s_dir_check = sniper_res.get('direction', 0) if isinstance(sniper_res, dict) else 0
+                     s_score_check = sniper_res.get('score', 0) if isinstance(sniper_res, dict) else 0
+                     div_type = div_res.get('type', '') if isinstance(div_res, dict) else ''
+                     pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
+
+                     # 1. Sniper Conflict
+                     if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
+                        (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
+                         logger.info(f"[QUANTUM] SILENCED by Sniper Conflict ({s_score_check}).")
+                         continue 
+
+                     # 2. Divergence Conflict
+                     if (struc_dir == 1 and 'bearish' in str(div_type).lower()) or \
+                        (struc_dir == -1 and 'bullish' in str(div_type).lower()):
+                         logger.info(f"[QUANTUM] SILENCED by Divergence Conflict ({div_type}).")
+                         continue
+
+                     # 3. Pattern Conflict
+                     if struc_dir == 1 and pat_name in ["Shooting Star", "Bearish Engulfing", "Evening Star"]:
+                          logger.info(f"[QUANTUM] SILENCED by Pattern Conflict ({pat_name}).")
+                          continue
+                     elif struc_dir == -1 and pat_name in ["Hammer", "Bullish Engulfing", "Morning Star"]:
+                          logger.info(f"[QUANTUM] SILENCED by Pattern Conflict ({pat_name}).")
+                          continue
+
                      logger.warning(f"🌌 QUANTUM HARMONY ACTIVATED: Tunneling Prob ({quantum_prob:.2f}) + Structure.")
                      final_decision = "BUY" if struc_dir == 1 else "SELL"
                      final_score = abs(v_structure) + 30 # Good score boost
