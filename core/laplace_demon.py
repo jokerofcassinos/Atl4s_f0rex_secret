@@ -435,8 +435,11 @@ class LaplaceDemonCore:
         
         # Extract Chaos variables for Vetos
         chaos_data = details.get('Chaos', {})
+        if not isinstance(chaos_data, dict): chaos_data = {}
         lyapunov = chaos_data.get('lyapunov', 0.0)
+        
         math_data = details.get('Math', {})
+        if not isinstance(math_data, dict): math_data = {}
         entropy = math_data.get('entropy', 0.0)
         
         if setup:
@@ -444,8 +447,8 @@ class LaplaceDemonCore:
             
         # --- SWARM INTELLIGENCE INTEGRATION ---
         # 1. Specific Agent Confirmations (Micro-Boosts)
-        knife = legion_intel.get('knife')
-        horizon = legion_intel.get('horizon')
+        knife = legion_intel.get('knife') if isinstance(legion_intel, dict) else None
+        horizon = legion_intel.get('horizon') if isinstance(legion_intel, dict) else None
         
         # (REMOVED: LEGION_KNIFE_SCALP - Deprecated)
 
@@ -526,48 +529,45 @@ class LaplaceDemonCore:
 
         # --- TIER 2 ENHANCEMENTS (SMC / M8) ---
         smc_res = details.get('SMC', {})
+        if not isinstance(smc_res, dict): smc_res = {}
+        
         m8_res = details.get('M8', {})
+        if not isinstance(m8_res, dict): m8_res = {}
+        
         toxic_flow = details.get('ToxicFlow', False)
         liq_signal = details.get('Liquidator')
+        
         nano_res = details.get('nano_blocks', {})
+        if not isinstance(nano_res, dict): nano_res = {}
+        
         eh_meta = details.get('EventHorizon', {})
+        if not isinstance(eh_meta, dict): eh_meta = {}
 
         # --- STRUCTURE FLIP (Breaker Strategy) ---
         # "Aggressive system to capture the bullish/bearish" - User
-        # If Price hits an Order Block that opposes the Macro Structure, we trade the BREAKOUT (Breaker).
-        try:
-             smc_trend = smc_res.get('trend', 'NEUTRAL')
-             active_obs = smc_res.get('active_order_blocks', [])
-             current_price_check = tick['bid']
+        # Logic: We now read the 'breaker_signal' directly from the SMC module.
+        # This guarantees we trade EXACTLY when the Veto fires.
+        breaker_sig = smc_res.get('breaker_signal')
+        
+        if breaker_sig and isinstance(breaker_sig, dict):
+             # The Veto fired in structure.py and generated this signal
+             b_dir = breaker_sig.get('direction')
+             b_conf = breaker_sig.get('confidence', 0)
              
-             if active_obs and isinstance(active_obs, list):
-                  for ob in active_obs:
-                       # Handle Object or Dict (Safety)
-                       ob_type = getattr(ob, 'type', ob.get('type')) if hasattr(ob, 'get') else getattr(ob, 'type', 'NEUTRAL')
-                       ob_top = getattr(ob, 'top', ob.get('top')) if hasattr(ob, 'get') else getattr(ob, 'top', 0)
-                       ob_bot = getattr(ob, 'bottom', ob.get('bottom')) if hasattr(ob, 'get') else getattr(ob, 'bottom', 0)
-                       
-                       # Check proximity (Price inside OB)
-                       if ob_bot <= current_price_check <= ob_top:
-                            # CONFLICT DETECTED: Macro Trend vs Order Block
-                            if ob_type == "BEARISH" and smc_trend == "BULLISH":
-                                 # We are in a Bullish Trend hitting a Bearish Block. 
-                                 # Standard logic sells, but Breaker logic BUYS.
-                                 reasons.append(f"STRUCTURE RIDER: Breaking Bearish OB in Bullish Trend! (Aggressive Buy)")
-                                 score = 100 # Override
-                                 setup = "STRUCTURE_TREND_RIDER"
-                            elif ob_type == "BULLISH" and smc_trend == "BEARISH":
-                                 # We are in a Bearish Trend hitting a Bullish Block.
-                                 reasons.append(f"STRUCTURE RIDER: Breaking Bullish OB in Bearish Trend! (Aggressive Sell)")
-                                 score = -100 # Override
-                                 setup = "STRUCTURE_TREND_RIDER"
-        except Exception as e:
-             # Fail silently to avoid crash
-             pass
+             if b_dir == "BUY":
+                  reasons.append(f"STRUCTURE RIDER: Breaking Bearish OB in Bullish Trend! (Aggressive Buy)")
+                  score = 100 # Override
+                  setup = "STRUCTURE_TREND_RIDER"
+             elif b_dir == "SELL":
+                  reasons.append(f"STRUCTURE RIDER: Breaking Bullish OB in Bearish Trend! (Aggressive Sell)")
+                  score = -100 # Override
+                  setup = "STRUCTURE_TREND_RIDER"
 
         # 0. The Liquidator (New 90% Setup) - WITH KINEMATICS CHECK
         # Get Kinematics direction for counter-trend veto
         k_data = details.get('Kinematics', {})
+        if not isinstance(k_data, dict): k_data = {} # Safety wrap
+        
         k_dir = k_data.get('direction', 0)  # +1=UP, -1=DOWN
         k_angle = abs(k_data.get('angle', 0))
         
@@ -604,10 +604,21 @@ class LaplaceDemonCore:
         if isinstance(snr_data, tuple): snr_data = {} # Safety fallback
         
         div_data_check = details.get('Divergence', {})
-        div_type_check = div_data_check.get('type', '') if isinstance(div_data_check, dict) else ''
+        if not isinstance(div_data_check, dict): div_data_check = {}
+        div_type_check = div_data_check.get('type', '')
         
         pat_data_check = details.get('Patterns', {})
-        pat_name_check = pat_data_check.get('pattern', '') if isinstance(pat_data_check, dict) else ''
+        if not isinstance(pat_data_check, dict): pat_data_check = {}
+        pat_name_check = pat_data_check.get('pattern', '')
+
+        # Fix for SupplyDemand Tuple Crash (LION)
+        sd_data = details.get('SupplyDemand', {})
+        if not isinstance(sd_data, dict): sd_data = {}
+        
+        # Fix for Quant Tuple Crash (LION)
+        quant_res = details.get('Quant', {})
+        if not isinstance(quant_res, dict): quant_res = {}
+        quant_z = quant_res.get('z_score', 0)
 
         if setup == "LIQUIDATOR_SWEEP":
             # Safety: Check for Wall collision
@@ -654,13 +665,18 @@ class LaplaceDemonCore:
 
         # --- UNIVERSAL VETO CHECKS (Sniper, Div, Pattern) ---
         sniper_data = details.get('Sniper', {})
-        div_data = details.get('Divergence', {})
-        pat_data = details.get('Patterns', {})
+        if not isinstance(sniper_data, dict): sniper_data = {}
         
-        s_dir = sniper_data.get('dir', 0) if isinstance(sniper_data, dict) else 0
-        s_score_v = sniper_data.get('score', 0) if isinstance(sniper_data, dict) else 0
-        d_type = div_data.get('type', '') if isinstance(div_data, dict) else ''
-        p_name = pat_data.get('pattern', '') if isinstance(pat_data, dict) else ''
+        div_data = details.get('Divergence', {})
+        if not isinstance(div_data, dict): div_data = {}
+
+        pat_data = details.get('Patterns', {})
+        if not isinstance(pat_data, dict): pat_data = {}
+
+        s_dir = sniper_data.get('dir', 0)
+        s_score_v = sniper_data.get('score', 0)
+        d_type = div_data.get('type', '')
+        p_name = pat_data.get('pattern', '')
 
         # Trigger NANO SELL - WITH KINEMATICS CHECK
         if nano_sell:
@@ -704,13 +720,15 @@ class LaplaceDemonCore:
              if not veto_nano:
                   if setup == "MOMENTUM_BREAKOUT":
                        micro = details.get('Micro', {})
-                       rejection = micro.get('rejection') if isinstance(micro, dict) else None
+                       if not isinstance(micro, dict): micro = {}
+                       rejection = micro.get('rejection')
                        
                        if rejection != "BULLISH_REJECTION" and lyapunov > 0.5:
                             reasons.append(f"Chaos Veto: Momentum needs Micro Confirmation (Got {rejection})")
                             score = 0
                   else: # Original Nano Wick Check
                        micro = details.get('Micro', {})
+                       if not isinstance(micro, dict): micro = {}
                        if micro.get('rejection') != "BULLISH_REJECTION" and lyapunov > 0.5:
                             veto_nano = True
                             reasons.append("NANO VETOED by No Wick (Knife)")
@@ -862,31 +880,30 @@ class LaplaceDemonCore:
 
         # 5. SNR Walls (Tier 3)
         snr_data = details.get('SNR', {})
-        if isinstance(snr_data, dict):
-             res_dist = snr_data.get('res_dist', 999.0)
-             sup_dist = snr_data.get('sup_dist', 999.0)
-        else:
-             res_dist = 999.0
-             sup_dist = 999.0
+        if not isinstance(snr_data, dict): snr_data = {}
+        
+        res_dist = snr_data.get('res_dist', 999.0)
+        sup_dist = snr_data.get('sup_dist', 999.0)
              
-             # VETO BUY into Resistance (< 5 Pips)
-             if score > 0 and res_dist < 0.0005: 
-                 score *= 0.1 # Kill confidence
-                 vetoes.append(f"SNR Wall Veto: Resistance Ahead ({res_dist:.5f})")
-                 if not setup: setup = "BLOCKED_BY_WALL"
-                 
-                 score *= 0.1
-                 vetoes.append(f"SNR Wall Veto: Support Ahead ({sup_dist:.5f})")
-                 if not setup: setup = "BLOCKED_BY_WALL"
+        # VETO BUY into Resistance (< 5 Pips)
+        if score > 0 and res_dist < 0.0005: 
+            score *= 0.1 # Kill confidence
+            vetoes.append(f"SNR Wall Veto: Resistance Ahead ({res_dist:.5f})")
+            if not setup: setup = "BLOCKED_BY_WALL"
+            
+            score *= 0.1
+            vetoes.append(f"SNR Wall Veto: Support Ahead ({sup_dist:.5f})")
+            if not setup: setup = "BLOCKED_BY_WALL"
 
         # --- GLOBAL VETOES & COUNTER-STRATEGIES ---
 
         # 1. Chaos Veto for Neutral/Consensus (Trade #77 Fix)
         # Neutral trades (Consensus Vote) must NOT trade in Extreme Chaos.
-        chaos_res = details.get('Chaos', {})
+        chaos_details = details.get('Chaos', {})
         chaos_val = 0
-        if isinstance(chaos_res, dict): chaos_val = chaos_res.get('lyapunov', 0)
-        elif isinstance(chaos_res, tuple) and len(chaos_res) > 0: chaos_val = chaos_res[0] # Assume Lyapunov is first
+        if isinstance(chaos_details, dict):
+            chaos_val = chaos_details.get('lyapunov', 0)
+        elif isinstance(chaos_details, tuple) and len(chaos_details) > 0: chaos_val = chaos_details[0] # Assume Lyapunov is first
         
         if (setup == "Neutral" or "Consensus" in str(setup) or "WAIT" in str(setup)) and chaos_val > 0.9:
              reasons.append(f"GLOBAL VETO: Extreme Chaos ({chaos_val:.2f}) kills Neutral setup.")
@@ -905,7 +922,10 @@ class LaplaceDemonCore:
         else: div_type = str(div_res)
 
         if score > 0: # We want to BUY
-            if "MANIPULATION_SELL" in str(cycle_phase):
+            # --- BYPASS: STRUCTURE RIDER & SMR --- 
+            if setup == "STRUCTURE_TREND_RIDER":
+                 reasons.append(f"GLOBAL BYPASS: Structure Rider overrides Cycle Veto.")
+            elif "MANIPULATION_SELL" in str(cycle_phase):
                 # --- STRATEGY: SMART MONEY REVERSAL (Sell into the Trap) ---
                 # Require Bearish Divergence (Confluence) to flip
                 if ("LION" in str(setup) or "BREAKOUT" in str(setup)) and "bearish" in str(div_type).lower():
@@ -918,16 +938,21 @@ class LaplaceDemonCore:
                     vetoes.append("Smart Money Veto: Bearish Manipulation")
                     score = 0
             elif "EXPANSION_SELL" in str(cycle_phase):
-                reasons.append(f"GLOBAL VETO: Market is Trending Down (Expansion Sell).")
-                vetoes.append("Trend Veto: Expansion Sell")
-                score = 0
+                if setup != "STRUCTURE_TREND_RIDER": # Protect Rider
+                    reasons.append(f"GLOBAL VETO: Market is Trending Down (Expansion Sell).")
+                    vetoes.append("Trend Veto: Expansion Sell")
+                    score = 0
             elif "bearish" in str(div_type).lower():
-                reasons.append(f"GLOBAL VETO: Bearish Divergence ({div_type}) opposes BUY.")
-                vetoes.append("Divergence Veto: Bearish Conflict")
-                score = 0
+                if setup != "STRUCTURE_TREND_RIDER": # Protect Rider
+                    reasons.append(f"GLOBAL VETO: Bearish Divergence ({div_type}) opposes BUY.")
+                    vetoes.append("Divergence Veto: Bearish Conflict")
+                    score = 0
                 
         elif score < 0: # We want to SELL
-            if "MANIPULATION_BUY" in str(cycle_phase):
+            # --- BYPASS: STRUCTURE RIDER & SMR ---
+            if setup == "STRUCTURE_TREND_RIDER":
+                 reasons.append(f"GLOBAL BYPASS: Structure Rider overrides Cycle Veto.")
+            elif "MANIPULATION_BUY" in str(cycle_phase):
                 # --- STRATEGY: SMART MONEY REVERSAL (Buy into the Trap) ---
                 # Require Bullish Divergence (Confluence) to flip
                 if ("LION" in str(setup) or "BREAKOUT" in str(setup)) and "bullish" in str(div_type).lower():
@@ -940,19 +965,23 @@ class LaplaceDemonCore:
                     vetoes.append("Smart Money Veto: Bullish Manipulation")
                     score = 0
             elif "EXPANSION_BUY" in str(cycle_phase):
-                reasons.append(f"GLOBAL VETO: Market is Trending Up (Expansion Buy).")
-                vetoes.append("Trend Veto: Expansion Buy")
-                score = 0
+                if setup != "STRUCTURE_TREND_RIDER":
+                    reasons.append(f"GLOBAL VETO: Market is Trending Up (Expansion Buy).")
+                    vetoes.append("Trend Veto: Expansion Buy")
+                    score = 0
             elif "bullish" in str(div_type).lower():
-                reasons.append(f"GLOBAL VETO: Bullish Divergence ({div_type}) opposes SELL.")
-                vetoes.append("Divergence Veto: Bullish Conflict")
-                score = 0
+                 if setup != "STRUCTURE_TREND_RIDER":
+                    reasons.append(f"GLOBAL VETO: Bullish Divergence ({div_type}) opposes SELL.")
+                    vetoes.append("Divergence Veto: Bullish Conflict")
+                    score = 0
         # --- GLOBAL SNIPER CONFLICT VETO (Trade #109 Fix) ---
         # If Sniper says one direction (>50) but we're going opposite, BLOCK.
         # THRESHOLD LOWERED from 70 to 50 (Trade #106 had Sniper 57.2)
         sniper_data = details.get('Sniper', {})
-        sniper_dir = sniper_data.get('dir', 0) if isinstance(sniper_data, dict) else 0
-        sniper_score = sniper_data.get('score', 0) if isinstance(sniper_data, dict) else 0
+        if not isinstance(sniper_data, dict): sniper_data = {}
+
+        sniper_dir = sniper_data.get('dir', 0)
+        sniper_score = sniper_data.get('score', 0)
         
         decision_dir = "BUY" if score > 0 else "SELL" if score < 0 else "WAIT"
         
@@ -1044,16 +1073,27 @@ class LaplaceDemonCore:
 
         # 5. Neural Oracle (Tier 4 - Experimental)
         neural_pred = details.get('Neural')
+        neural_conf = 0.0 # Initialize
         if neural_pred is not None:
              try:
                  # Flatten if nested list
+                 import numpy as np # Import numpy for ndarray check
                  val = neural_pred[0] if isinstance(neural_pred, (list, np.ndarray)) else neural_pred
                  if isinstance(val, (list, np.ndarray)): val = val[0] # Double unpack
                  
-                 reasons.append(f"Neural Oracle: Raw Output {float(val):.3f}")
-             except Exception as e:
-                 # logger.debug(f"Neural Parse Error: {e}")
-                 pass
+                 # Final sanity check - if still not float, force 0
+                 if isinstance(val, (float, int)):
+                      neural_conf = float(val) / 100.0 if float(val) > 1.0 else float(val)
+                 else:
+                      neural_conf = 0.0
+             except:
+                 neural_conf = 0.0
+        
+        # Define threshold for this specific boost, distinct from the later win_prob threshold
+        neural_boost_threshold = 0.70 # Example threshold for boosting score
+        if neural_conf > neural_boost_threshold:
+             reasons.append(f"EXTREME CONFIDENCE: Neural Network agrees ({neural_conf*100:.1f}%)")
+             score += 50 # Boost
 
         # --- DECISION THRESHOLD ---
         decision_dir = "WAIT"

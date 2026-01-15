@@ -147,7 +147,9 @@ class SMCAnalyzer:
                 'active_order_blocks': [ob for ob in self.order_blocks if not ob.invalidated][-3:],
                 'active_fvgs': [f for f in self.fvgs if f.filled_pct < 100][-3:],
                 'liquidity_pools': self.liquidity_pools[-3:],
-                'entry_signal': entry
+                'liquidity_pools': self.liquidity_pools[-3:],
+                'entry_signal': entry,
+                'breaker_signal': entry.get('breaker_signal', None) # New aggressive signal
             }
         except Exception as e:
             logger.error(f"SMC ERROR: {e}")
@@ -484,7 +486,8 @@ class SMCAnalyzer:
             'confidence': 0,
             'sl_price': None,
             'tp_price': None,
-            'reason': 'No confluence'
+            'reason': 'No confluence',
+            'breaker_signal': None # Holds the aggressive counter-trade
         }
         
         # Check for OB + FVG confluence
@@ -512,9 +515,27 @@ class SMCAnalyzer:
                             if ob.type == "BEARISH" and self.structure_trend == StructureType.BULLISH:
                                 base_conf = 0
                                 logger.info(f"Structure Veto: Blocking SELL. Structure={self.structure_trend}")
+                                # STRUCTURE RIDER SIGNAL (Aggressive Byte)
+                                signal['breaker_signal'] = {
+                                     'setup': 'STRUCTURE_TREND_RIDER',
+                                     'direction': 'BUY',
+                                     'confidence': 99.0,
+                                     'reason': 'Breaking Bearish OB in Bullish Trend',
+                                     'sl_price': ob.bottom - 0.0010,
+                                     'tp_price': ob.top + 0.0020
+                                }
                             elif ob.type == "BULLISH" and self.structure_trend == StructureType.BEARISH:
                                 base_conf = 0
                                 logger.info(f"Structure Veto: Blocking BUY. Structure={self.structure_trend}")
+                                # STRUCTURE RIDER SIGNAL (Aggressive Byte)
+                                signal['breaker_signal'] = {
+                                     'setup': 'STRUCTURE_TREND_RIDER',
+                                     'direction': 'SELL',
+                                     'confidence': 99.0,
+                                     'reason': 'Breaking Bullish OB in Bearish Trend',
+                                     'sl_price': ob.top + 0.0010,
+                                     'tp_price': ob.bottom - 0.0020
+                                }
                             
                             # CHOP PENALTY: If ADX < 20 (Toxic Flow), reducing confidence.
                             
