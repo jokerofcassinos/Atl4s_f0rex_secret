@@ -84,7 +84,7 @@ class RecursiveReasoner:
                 # Check magnitude of disagreement
                 path_delta = (avg_future - last_price) / last_price
                 
-                if abs(path_delta) > 0.00035: # Significant drift (Reverted to 3.5 bps for 70% WR Round 3)
+                if abs(path_delta) > 0.00035: # Significant drift (3.5 bps for 70% WR Round 3)
                     history.append(f"Iter {i}: Conflict detected. {reason}")
                     history.append("Result: ENLIGHTENED PIVOT. Switching Decision.")
                     
@@ -95,13 +95,14 @@ class RecursiveReasoner:
                     # Break loop, we found a new truth
                     break
                 else:
-                    # Weak conflict, just reduce score (Caution)
-                    current_score *= 0.95 # Relaxed penalty (was 0.8)
-                    history.append(f"Iter {i}: Minor Conflict ({reason}). Reducing confidence.")
-                    if current_score < 40:
-                         current_decision = "WAIT"
-                         history.append("Result: Veto Entry (Weak Conviction).")
-                         break
+                    # --- MONTE CARLO CONFLICT BLOCK (Trade #133 Fix) ---
+                    # Minor conflict still means Monte Carlo disagrees!
+                    # Instead of just reducing 5%, BLOCK the trade.
+                    # This prevents selling when MC says price is ascending.
+                    history.append(f"Iter {i}: MC Conflict ({reason}). Blocking trade.")
+                    current_decision = "WAIT"
+                    current_score = 0
+                    break
             else:
                 current_score *= 1.1 # Reinforce confidence
                 history.append(f"Iter {i}: Path confirms direction.")

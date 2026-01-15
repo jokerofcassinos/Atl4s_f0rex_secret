@@ -383,6 +383,12 @@ class LaplaceBacktestRunner:
                         num_orders = int(lot_multiplier)
                         lot_multiplier = 1.0 # Reset to base unit per order
 
+                    # --- SL/TP VALIDATION (Order #1 Fix) ---
+                    # Block trades with invalid SL/TP (0.0p = no protection)
+                    if prediction.sl_pips <= 0 or prediction.tp_pips <= 0:
+                        logger.warning(f"INVALID SL/TP VETO: SL={prediction.sl_pips:.1f}p TP={prediction.tp_pips:.1f}p (No protection)")
+                        continue  # Skip this trade
+
                     # Execute N times
                     for order_idx in range(num_orders):
                         trade = self.engine.open_trade(

@@ -715,6 +715,22 @@ class LaplaceDemonCore:
             hard_veto = True
             logger.warning(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper BUY {sniper_score:.1f})")
 
+        # --- MONDAY CAUTION FILTER (Weekend Gap Fix) ---
+        # Chart shows: Monday = 45% Win Rate, -$200 PnL (while other days = 90%+ WR)
+        # The WeekendGapPredictor has errors, so Monday trades are unreliable.
+        # SOLUTION: Block ALL trades on Monday to avoid weekend gap issues.
+        if df_m5 is not None and len(df_m5) > 0:
+            try:
+                current_time = df_m5.index[-1] if hasattr(df_m5.index[-1], 'weekday') else None
+                if current_time is not None and current_time.weekday() == 0:  # 0 = Monday
+                    reasons.append("MONDAY CAUTION: Blocking trade (Weekend Gap Risk)")
+                    vetoes.append("Monday Caution: Weekend gap instability")
+                    execute = False
+                    hard_veto = True
+                    logger.warning("MONDAY CAUTION: Blocking trade due to weekend gap risk")
+            except:
+                pass  # If we can't check weekday, proceed normally
+
         # 4.5 KINETIC SHIELD (DISABLED - Was killing profits)
         # COMMENTED OUT TO RESTORE PROFITABILITY.
         # kin_data = details.get('Kinematics', {})
