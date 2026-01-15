@@ -531,6 +531,14 @@ class SMCAnalyzer:
                                  if upper_wick > (candle_body * 0.6): # Wick larger than 60% of body
                                       rider_valid = False
                                       rider_reason = "Rejected by Supply (Upper Wick)"
+                                 # MIDPOINT VALIDATION: Must be above OB Midpoint to confirm strength
+                                 elif candle_close < ob.midpoint:
+                                      rider_valid = False
+                                      rider_reason = "Below OB Midpoint (Resistance Intact)"
+                                 # LIVE PRICE CHECK: If we are CURRENTLY below midpoint, it's not a break!
+                                 elif current_price < ob.midpoint:
+                                      rider_valid = False
+                                      rider_reason = "Live Price Reclaimed Midpoint (Resistance Held)"
                                  else:
                                       rider_reason = "Breaking Bearish OB in Bullish Trend"
                                       
@@ -553,6 +561,14 @@ class SMCAnalyzer:
                                  if lower_wick > (candle_body * 0.6):
                                       rider_valid = False
                                       rider_reason = "Rejected by Demand (Lower Wick)"
+                                 # MIDPOINT VALIDATION: Must be below OB Midpoint to confirm strength
+                                 elif candle_close > ob.midpoint:
+                                      rider_valid = False
+                                      rider_reason = "Above OB Midpoint (Support Intact)"
+                                 # LIVE PRICE CHECK: If we are CURRENTLY above midpoint, it's not a break, it's a reclaim!
+                                 elif current_price > ob.midpoint:
+                                      rider_valid = False
+                                      rider_reason = "Live Price Reclaimed Midpoint (Support Held)"
                                  else:
                                       rider_reason = "Breaking Bullish OB in Bearish Trend"
                                  

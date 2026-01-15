@@ -990,9 +990,17 @@ class ConsensusEngine:
                      pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
 
                      # ✅ PHASE 11 FIX: Chaos Veto (The "Leonidas Gate") - CALIBRATED
+                     # User Report: "LION executes in Choppy/Ranging markets (Lyapunov ~0.49-0.60)."
+                     # FIX: Drastically lowered threshold. LION requires stability.
                      vetoed = False
-                     if lyapunov > 0.8 or entropy > 2.5:
-                          logger.info(f"[LION] SILENCED by Extreme Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
+                     
+                     # Dynamic Threshold based on Regime
+                     lion_chaos_limit = 0.50
+                     if regime != "TRENDING":
+                         lion_chaos_limit = 0.35 # Very strict in Range/MeanReversion
+                     
+                     if lyapunov > lion_chaos_limit or entropy > 2.0:
+                          logger.info(f"[LION] SILENCED by Chaos (Lyapunov {lyapunov:.2f} > {lion_chaos_limit}, Entropy {entropy:.2f})")
                           vetoed = True
                      
                      # ✅ PHASE 15 FIX: Restore Divergence Veto (Critical for MC Conflict)
@@ -1002,10 +1010,11 @@ class ConsensusEngine:
                              logger.info(f"[LION] SILENCED by Divergence Conflict ({div_type}).")
                              vetoed = True
                      
-                     # ✅ PHASE 15 FIX: Restore Sniper Conflict @75 (Medium threshold)
+                     # ✅ PHASE 15 FIX: Restore Sniper Conflict @70 (Strict threshold)
+                     # Was 75, lowered to 70 to catch the "Sniper SELL 85%" cases.
                      if not vetoed:
-                         if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 75) or \
-                            (struc_dir == -1 and s_dir_check == 1 and s_score_check > 75):
+                         if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 70) or \
+                            (struc_dir == -1 and s_dir_check == 1 and s_score_check > 70):
                              logger.info(f"[LION] SILENCED by Sniper Conflict ({s_score_check}).")
                              vetoed = True
                      

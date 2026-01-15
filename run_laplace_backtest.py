@@ -377,7 +377,7 @@ class LaplaceBacktestRunner:
                     # Instead of one giant trade, we split into N trades of 1x.
                     # This aligns with the "Swarm" concept and allows granular management.
                     num_orders = 1
-                    lot_multiplier = prediction.lot_multiplier
+                    lot_multiplier = getattr(prediction, 'lot_multiplier', 1.0)
                     
                     if lot_multiplier >= 2.0:
                         num_orders = int(lot_multiplier)
@@ -594,6 +594,8 @@ async def main():
     parser.add_argument('--risk', type=float, default=2.0, help='Risk per trade %')
     parser.add_argument('--symbol', type=str, default="GBPUSD", help='Symbol to trade')
     parser.add_argument('--spread', type=float, default=1.5, help='Spread in pips')
+    parser.add_argument('--days', type=int, default=10, help='Number of days to backtest')
+    parser.add_argument('--end_date', type=str, default=None, help='End date for backtest (YYYY-MM-DD HH:MM:SS)')
     
     args = parser.parse_args()
 
@@ -721,12 +723,26 @@ async def main():
         except Exception as e:
             logger.warning(f"Timezone normalization warning: {e}")
 
+        # Parse End Date
         end_date = runner.df_m5.index[-1]
+        if args.end_date:
+             try:
+                 custom_end = datetime.strptime(args.end_date, '%Y-%m-%d %H:%M:%S')
+                 # Check if custom end is within data range
+                 if custom_end <= runner.df_m5.index[-1]:
+                      end_date = custom_end
+                 else:
+                      logger.warning(f"Requested end date {args.end_date} is beyond available data. Using last available.")
+             except ValueError:
+                 logger.error("Invalid date format. Use YYYY-MM-DD HH:MM:SS")
+
         if hasattr(end_date, 'tzinfo') and end_date.tzinfo is not None:
              end_date = end_date.replace(tzinfo=None)
              
-        start_date = end_date - timedelta(days=10)
-        mask = runner.df_m5.index >= start_date
+        start_date = end_date - timedelta(days=args.days)
+        
+        # Slicing safely
+        mask = (runner.df_m5.index >= start_date) & (runner.df_m5.index <= end_date)
         runner.df_m5 = runner.df_m5.loc[mask]
         
         # Apply the same filter to other dataframes to maintain consistency

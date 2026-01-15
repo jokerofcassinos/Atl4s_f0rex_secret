@@ -555,13 +555,28 @@ class LaplaceDemonCore:
              b_conf = breaker_sig.get('confidence', 0)
              
              if b_dir == "BUY":
-                  reasons.append(f"STRUCTURE RIDER: Breaking Bearish OB in Bullish Trend! (Aggressive Buy)")
-                  score = 100 # Override
-                  setup = "STRUCTURE_TREND_RIDER"
+                  # Check for BULL TRAP (Breaking Resistance but Momentum is BEARISH)
+                  # If Momentum is effectively SELLING (score < -30) while we break UP, it's likely a liquidity grab.
+                  if score < -30:
+                       reasons.append(f"BULL TRAP DETECTED: Fake Breakout vs Momentum ({score:.1f})")
+                       score = -100 # Flip to SELL
+                       setup = "BULL_TRAP_SNIPER"
+                  else:
+                       reasons.append(f"STRUCTURE RIDER: Breaking Bearish OB in Bullish Trend! (Aggressive Buy)")
+                       score = 100 # Override
+                       setup = "STRUCTURE_TREND_RIDER"
+
              elif b_dir == "SELL":
-                  reasons.append(f"STRUCTURE RIDER: Breaking Bullish OB in Bearish Trend! (Aggressive Sell)")
-                  score = -100 # Override
-                  setup = "STRUCTURE_TREND_RIDER"
+                  # Check for BEAR TRAP (Breaking Support but Momentum is BULLISH)
+                  # If Momentum is effectively BUYING (score > 30) while we break DOWN, it's likely a Spring.
+                  if score > 30:
+                       reasons.append(f"BEAR TRAP DETECTED: Fake Breakdown vs Momentum ({score:.1f})")
+                       score = 100 # Flip to BUY
+                       setup = "BEAR_TRAP_SNIPER"
+                  else:
+                       reasons.append(f"STRUCTURE RIDER: Breaking Bullish OB in Bearish Trend! (Aggressive Sell)")
+                       score = -100 # Override
+                       setup = "STRUCTURE_TREND_RIDER"
 
         # 0. The Liquidator (New 90% Setup) - WITH KINEMATICS CHECK
         # Get Kinematics direction for counter-trend veto
@@ -954,11 +969,18 @@ class LaplaceDemonCore:
             elif "MANIPULATION_SELL" in str(cycle_phase):
                 # --- STRATEGY: SMART MONEY REVERSAL (Sell into the Trap) ---
                 # Require Bearish Divergence (Confluence) to flip
+                # TOXIC FILTER: Require ADX > 20 (Don't reverse in dead market)
+                adx = atr_src.get('adx', 25.0) if isinstance(atr_src, dict) else 25.0
+                
                 if ("LION" in str(setup) or "BREAKOUT" in str(setup)) and "bearish" in str(div_type).lower():
-                    score = -100 # Maximum Conviction SELL
-                    setup = "SMART_MONEY_REVERSAL"
-                    reasons.append(f"GLOBAL FLIP: Smart Money Selling + Bearish Div! REVERSING TO SELL.")
-                    if "Smart Money Veto" in vetoes: vetoes.remove("Smart Money Veto") 
+                    if adx < 20: 
+                         score = 0
+                         vetoes.append("SMR VETO: ADX too low (<20) for Reversal")
+                    else:
+                         score = -100 # Maximum Conviction SELL
+                         setup = "SMART_MONEY_REVERSAL"
+                         reasons.append(f"GLOBAL FLIP: Smart Money Selling + Bearish Div! REVERSING TO SELL.")
+                         if "Smart Money Veto" in vetoes: vetoes.remove("Smart Money Veto") 
                 else:
                     if setup == "LION_BREAKOUT": # STRICT: LION dies instantly in Manipulation
                          vetoes.append(f"LION KILLER: Trading into Bearish Manipulation")
@@ -987,11 +1009,18 @@ class LaplaceDemonCore:
             elif "MANIPULATION_BUY" in str(cycle_phase):
                 # --- STRATEGY: SMART MONEY REVERSAL (Buy into the Trap) ---
                 # Require Bullish Divergence (Confluence) to flip
+                # TOXIC FILTER: Require ADX > 20
+                adx = atr_src.get('adx', 25.0) if isinstance(atr_src, dict) else 25.0
+                
                 if ("LION" in str(setup) or "BREAKOUT" in str(setup)) and "bullish" in str(div_type).lower():
-                    score = 100 # Maximum Conviction BUY
-                    setup = "SMART_MONEY_REVERSAL"
-                    reasons.append(f"GLOBAL FLIP: Smart Money Buying + Bullish Div! REVERSING TO BUY.")
-                    if "Smart Money Veto" in vetoes: vetoes.remove("Smart Money Veto")
+                    if adx < 20:
+                         score = 0
+                         vetoes.append("SMR VETO: ADX too low (<20) for Reversal")
+                    else:
+                         score = 100 # Maximum Conviction BUY
+                         setup = "SMART_MONEY_REVERSAL"
+                         reasons.append(f"GLOBAL FLIP: Smart Money Buying + Bullish Div! REVERSING TO BUY.")
+                         if "Smart Money Veto" in vetoes: vetoes.remove("Smart Money Veto")
                 else:
                     if setup == "LION_BREAKOUT": # STRICT
                          vetoes.append(f"LION KILLER: Trading into Bullish Manipulation")
@@ -1007,6 +1036,13 @@ class LaplaceDemonCore:
                     reasons.append(f"GLOBAL VETO: Market is Trending Up (Expansion Buy).")
                     vetoes.append("Trend Veto: Expansion Buy")
                     score = 0
+            
+            # --- FINAL LION SANITY CHECK (SMC Alignment) ---
+            if setup == "LION_BREAKOUT" and not score == 0:
+                 smc_trend = smc_res.get('trend', 'NEUTRAL')
+                 if (score > 0 and smc_trend == "BEARISH") or (score < 0 and smc_trend == "BULLISH"):
+                      score = 0
+                      vetoes.append(f"LION KILLER: SMC Trend Conflict ({smc_trend})")
             elif "bullish" in str(div_type).lower():
                  if setup != "STRUCTURE_TREND_RIDER":
                     reasons.append(f"GLOBAL VETO: Bullish Divergence ({div_type}) opposes SELL.")
@@ -1223,6 +1259,7 @@ class LaplaceDemonCore:
         # PRIORITY: Use lot_multiplier from consensus.py details if available (10x OMEGA)
         lot_multiplier = details.get('lot_multiplier', 1.0) if isinstance(details, dict) else 1.0
         
+        # Fallback logic only if consensus didn't set a multiplier
         # Fallback logic only if consensus didn't set a multiplier
         if lot_multiplier <= 1.0 and execute:
             if setup in ["LION_PROTOCOL", "LION_BREAKOUT", "SMART_MONEY_REVERSAL"]:
