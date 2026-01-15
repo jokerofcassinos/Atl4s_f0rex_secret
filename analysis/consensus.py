@@ -837,11 +837,22 @@ class ConsensusEngine:
         holographic_reason = "Neutral"
 
         # Logic A: MOMENTUM BREAKOUT
-        # Momentum is Strong AND Structure Supports (or is Neutral) AND Reversion is Weak
-        # ✅ PHASE 11 FIX: Chaos Veto (The "Regime Lock") - CALIBRATED
-        # Entropy is not 0-1. Log showed 1.91. Raising scale to 2.5.
+        # ✅ PHASE 15: Hour 13 Filter (NY Overlap Liquidity Grab Protection)
         veto_momentum = False
-        if lyapunov > 0.8 or entropy > 2.5:
+        
+        # Get hour from DATA (not wall-clock!)
+        try:
+            data_hour = df_m5.index[-1].hour
+        except:
+            data_hour = -1
+        
+        # Hour 13 is deadly for Momentum (0% WR from forensic analysis)
+        if data_hour == 13:
+            logger.info(f"[MOMENTUM] SILENCED: Hour 13 Liquidity Grab Zone")
+            veto_momentum = True
+        
+        # Chaos Veto (The "Regime Lock")
+        if not veto_momentum and (lyapunov > 0.8 or entropy > 2.5):
              logger.info(f"[MOMENTUM] SILENCED by Extreme Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
              veto_momentum = True
 
@@ -963,19 +974,63 @@ class ConsensusEngine:
                      pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
 
                      # ✅ PHASE 11 FIX: Chaos Veto (The "Leonidas Gate") - CALIBRATED
-                     # Breakouts create volatility. We only block EXTREME chaos (Entropy > 2.5).
                      vetoed = False
                      if lyapunov > 0.8 or entropy > 2.5:
                           logger.info(f"[LION] SILENCED by Extreme Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
                           vetoed = True
                      
-                     # REMOVED: Regime Veto (H4 vs H1)
-                     # Lion is a breakout strategy, it inherently resolves conflicts.
-                     # Blocking on H4/H1 conflict prevents it from doing its job.
+                     # ✅ PHASE 15 FIX: Restore Divergence Veto (Critical for MC Conflict)
+                     if not vetoed:
+                         if (struc_dir == 1 and 'bearish' in str(div_type).lower()) or \
+                            (struc_dir == -1 and 'bullish' in str(div_type).lower()):
+                             logger.info(f"[LION] SILENCED by Divergence Conflict ({div_type}).")
+                             vetoed = True
+                     
+                     # ✅ PHASE 15 FIX: Restore Sniper Conflict @75 (Medium threshold)
+                     if not vetoed:
+                         if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 75) or \
+                            (struc_dir == -1 and s_dir_check == 1 and s_score_check > 75):
+                             logger.info(f"[LION] SILENCED by Sniper Conflict ({s_score_check}).")
+                             vetoed = True
+                     
+                     # ✅ PHASE 15 FIX: Kinematics Veto (use k_dir already calculated at line 405)
+                     # Threshold lowered to 15° - Trade #84 had angle 24° which bypassed 30°
+                     if not vetoed:
+                         # SELL (struc_dir=-1) but Kinematics UP (k_dir=1) → block
+                         # BUY (struc_dir=1) but Kinematics DOWN (k_dir=-1) → block
+                         if (struc_dir == -1 and k_dir == 1 and abs(k_angle) > 15) or \
+                            (struc_dir == 1 and k_dir == -1 and abs(k_angle) > 15):
+                             logger.info(f"[LION] SILENCED by Kinematics Counter-Trend (k_dir={k_dir}, angle={k_angle}°).")
+                             vetoed = True
+                     
+                     # ✅ PHASE 15 FIX: Smart Money Manipulation Veto (Replaces rigid Hour 13 filter)
+                     # If Cycle detects Manipulation (Liquidity Grab), we don't trade AGAINST it.
+                     cycle_res = results.get('Cycle', ('NEUTRAL', 0))
+                     # cycle_res is a tuple: (phase, score) e.g. ("MANIPULATION_BUY", 90)
+                     cycle_phase = cycle_res[0] if isinstance(cycle_res, tuple) else str(cycle_res)
+                     
+                     if not vetoed:
+                         # Block SELL if:
+                         # 1. Smart Money is Buying (MANIPULATION_BUY)
+                         # 2. Market is in confirmed UP Trend (EXPANSION_BUY)
+                         if struc_dir == -1:
+                             if "MANIPULATION_BUY" in str(cycle_phase):
+                                 logger.info(f"[LION] SILENCED by Smart Money: Bullish Manipulation Detected.")
+                                 vetoed = True
+                             elif "EXPANSION_BUY" in str(cycle_phase):
+                                 logger.info(f"[LION] SILENCED by Cycle Phase: Expansion BUY (Trend against Trade).")
+                                 vetoed = True
 
-                     # REMOVED: Conflict Vetos (Sniper/Div/Pattern)
-                     # Lion is a Permissionless Breakout. It implies these signals are failing.
-                     # We depend SOLELY on the Chaos Veto (Env Check) for safety.
+                         # Block BUY if:
+                         # 1. Smart Money is Selling (MANIPULATION_SELL)
+                         # 2. Market is in confirmed DOWN Trend (EXPANSION_SELL)
+                         elif struc_dir == 1:
+                             if "MANIPULATION_SELL" in str(cycle_phase):
+                                 logger.info(f"[LION] SILENCED by Smart Money: Bearish Manipulation Detected.")
+                                 vetoed = True
+                             elif "EXPANSION_SELL" in str(cycle_phase):
+                                 logger.info(f"[LION] SILENCED by Cycle Phase: Expansion SELL (Trend against Trade).")
+                                 vetoed = True
 
                      if not vetoed:
                          logger.warning(f"[LION] PROTOCOL LION ACTIVATED: Structure ({v_structure:.1f}) override WAIT.")
@@ -987,65 +1042,42 @@ class ConsensusEngine:
                          details['mode'] = "LION_PROTOCOL"
                          details['lot_multiplier'] = 10.0
 
-        # Logic E: QUANTUM HARMONY (Variety Setup)
-        # If Quantum Probability is high (>0.9) and Structure agrees, take the ride.
-        # This captures pure quantum tunneling events.
-        if final_decision == "WAIT":
-             quantum_prob = results.get('Quantum', {}).get('tunnel_prob', 0)
-             # ✅ PHASE 12 FIX: Relaxed Threshold (90% -> 85%) to revive Quantum
-             if quantum_prob > 0.85:
-                 # Check if structure aligns (or at least doesn't oppose strongly)
-                 struc_dir = 1 if v_structure > 0 else -1
-                 if (v_structure * struc_dir) > 10:  # Mild structure confirmation
-                     # --- QUANTUM SAFEGUARDS (The "Right Veto") ---
-                     sniper_res = results.get('Sniper', {})
-                     div_res = results.get('Divergence', {})
-                     pat_res = results.get('Patterns', {})
+        # Logic E: QUANTUM HARMONY (OVERRIDE MODE - Phase 15)
+        # Very high tunnel_prob (>0.95) can OVERRIDE other setups
+        quantum_prob = results.get('Quantum', {}).get('tunnel_prob', 0)
+        quantum_can_override = quantum_prob > 0.95  # Only extreme tunneling overrides
+        quantum_as_fallback = quantum_prob > 0.75 and final_decision == "WAIT"
+        
+        if quantum_can_override or quantum_as_fallback:
+             struc_dir = 1 if v_structure > 0 else -1
+             if abs(v_structure) > 5:  # Any structure signal
+                 vetoed = False
+                 
+                 # Chaos Veto (Essential)
+                 if lyapunov > 0.8 or entropy > 2.5:
+                      logger.info(f"[QUANTUM] SILENCED by Extreme Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
+                      vetoed = True
+                 
+                 # Sniper Conflict @90 (Only extreme conflicts)
+                 sniper_res = results.get('Sniper', {})
+                 s_dir_check = sniper_res.get('direction', 0) if isinstance(sniper_res, dict) else 0
+                 s_score_check = sniper_res.get('score', 0) if isinstance(sniper_res, dict) else 0
+                 
+                 if not vetoed:
+                     if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 90) or \
+                        (struc_dir == -1 and s_dir_check == 1 and s_score_check > 90):
+                         logger.info(f"[QUANTUM] SILENCED by Extreme Sniper Conflict ({s_score_check}).")
+                         vetoed = True
 
-                     s_dir_check = sniper_res.get('direction', 0) if isinstance(sniper_res, dict) else 0
-                     s_score_check = sniper_res.get('score', 0) if isinstance(sniper_res, dict) else 0
-                     div_type = div_res.get('type', '') if isinstance(div_res, dict) else ''
-                     pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
-
-                     # ✅ PHASE 11 FIX: Chaos Veto (The "Quantum decoherence") - CALIBRATED
-                     vetoed = False
-                     if lyapunov > 0.8 or entropy > 2.5:
-                          logger.info(f"[QUANTUM] SILENCED by Extreme Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
-                          vetoed = True
+                 if not vetoed:
+                     mode_str = "OVERRIDE" if quantum_can_override else "FALLBACK"
+                     logger.warning(f"🌌 QUANTUM HARMONY [{mode_str}]: Tunneling Prob ({quantum_prob:.2f}) + Structure.")
+                     final_decision = "BUY" if struc_dir == 1 else "SELL"
+                     final_score = abs(v_structure) + 40  # Higher score boost
+                     holographic_reason = "QUANTUM_HARMONY"
                      
-                     # 1. Sniper Conflict
-                     if not vetoed:
-                         if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
-                            (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
-                             logger.info(f"[QUANTUM] SILENCED by Sniper Conflict ({s_score_check}).")
-                             vetoed = True
-
-                     # 2. Divergence Conflict
-                     if not vetoed:
-                         if (struc_dir == 1 and 'bearish' in str(div_type).lower()) or \
-                            (struc_dir == -1 and 'bullish' in str(div_type).lower()):
-                             logger.info(f"[QUANTUM] SILENCED by Divergence Conflict ({div_type}).")
-                             vetoed = True
-
-                     # 3. Pattern Conflict
-                     if not vetoed:
-                         if struc_dir == 1 and pat_name in ["Shooting Star", "Bearish Engulfing", "Evening Star"]:
-                              logger.info(f"[QUANTUM] SILENCED by Pattern Conflict ({pat_name}).")
-                              vetoed = True
-                         elif struc_dir == -1 and pat_name in ["Hammer", "Bullish Engulfing", "Morning Star"]:
-                              logger.info(f"[QUANTUM] SILENCED by Pattern Conflict ({pat_name}).")
-                              vetoed = True
-                          # REMOVED: Regime Veto (Quantum tunnels through barriers)
-
-                     if not vetoed:
-                         logger.warning(f"🌌 QUANTUM HARMONY ACTIVATED: Tunneling Prob ({quantum_prob:.2f}) + Structure.")
-                         final_decision = "BUY" if struc_dir == 1 else "SELL"
-                         final_score = abs(v_structure) + 30 # Good score boost
-                         holographic_reason = "QUANTUM_HARMONY"
-                         
-                         # Harmony trades get 5x leverage
-                         details['mode'] = "QUANTUM_HARMONY"
-                         details['lot_multiplier'] = 5.0
+                     details['mode'] = "QUANTUM_HARMONY"
+                     details['lot_multiplier'] = 5.0
                  
         # Override with Golden Setups (The Royal Flush) logic preserved below...
         total_vector = v_momentum + v_reversion + v_structure # Legacy compatibility
@@ -1161,18 +1193,19 @@ class ConsensusEngine:
             final_score = min(99.9, max(1.0, normalized_conf))
             
             # Apply strict confidence filters (User Requests)
-            if holographic_reason == "Neutral" and final_score < 88.0:
-                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 88%. Silencing.")
+            # ✅ PHASE 15: Relaxed thresholds to allow more executions
+            if holographic_reason == "Neutral" and final_score < 75.0:  # Relaxed from 88
+                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 75%. Silencing.")
                  decision = "WAIT"
-                 final_score = 0 # ✅ CRITICAL FIX: Zero score to stop Laplace V2
-            elif holographic_reason == "REVERSION_SNIPER" and final_score < 88.0:
-                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 88%. Silencing.")
+                 final_score = 0
+            elif holographic_reason == "REVERSION_SNIPER" and final_score < 70.0:  # Relaxed from 88
+                 logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 70%. Silencing.")
                  decision = "WAIT"
-                 final_score = 0 # ✅ CRITICAL FIX
+                 final_score = 0
             elif holographic_reason == "MOMENTUM_BREAKOUT" and final_score < 75.0:
                  logger.info(f"HOLOGRAPHIC VETO: Reason={holographic_reason} Conf={final_score:.1f}% < 75%. Silencing.")
                  decision = "WAIT"
-                 final_score = 0 # ✅ CRITICAL FIX
+                 final_score = 0
             else:
                  decision = final_decision
                  logger.info(f"HOLOGRAPHIC CONSENSUS: {decision} | Reason: {holographic_reason} | Conf: {final_score:.1f}%")

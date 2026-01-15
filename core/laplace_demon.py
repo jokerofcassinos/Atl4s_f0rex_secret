@@ -433,6 +433,12 @@ class LaplaceDemonCore:
         reasons = []
         vetoes = []
         
+        # Extract Chaos variables for Vetos
+        chaos_data = details.get('Chaos', {})
+        lyapunov = chaos_data.get('lyapunov', 0.0)
+        math_data = details.get('Math', {})
+        entropy = math_data.get('entropy', 0.0)
+        
         if setup:
             reasons.append(f"Legacy V1 Setup: {setup} (Base Score: {score:.1f})")
             
@@ -537,6 +543,26 @@ class LaplaceDemonCore:
                     if not setup or setup in ["Neutral", "WAIT", "None"]:
                          setup = "SWARM_INITIATIVE"
 
+                # ✅ PHASE 15 FIX: Smart Money Veto for Neutral/Swarm Trades
+                # Neutral trades are weak. We MUST NOT trade them against Smart Money or Trend.
+                if not chaos_veto_swarm: # Only check if not already vetoed
+                    cycle_res = details.get('Cycle', ('NEUTRAL', 0))
+                    cycle_phase = cycle_res[0] if isinstance(cycle_res, tuple) else str(cycle_res)
+                    
+                    # Check direction of Swarm Score
+                    swarm_dir = 1 if swarm_vector > 0 else -1 if swarm_vector < 0 else 0
+                    
+                    if swarm_dir == -1: # SELL
+                        if "MANIPULATION_BUY" in str(cycle_phase) or "EXPANSION_BUY" in str(cycle_phase):
+                            chaos_veto_swarm = True # Reuse veto flag to silence it
+                            reasons.append(f"Swarm VETOED by Smart Money (Bullish Phase: {cycle_phase})")
+                            score = 0 # Kill the score
+                    elif swarm_dir == 1: # BUY
+                        if "MANIPULATION_SELL" in str(cycle_phase) or "EXPANSION_SELL" in str(cycle_phase):
+                            chaos_veto_swarm = True
+                            reasons.append(f"Swarm VETOED by Smart Money (Bearish Phase: {cycle_phase})")
+                            score = 0
+
         # --- TIER 2 ENHANCEMENTS (SMC / M8) ---
         smc_res = details.get('SMC', {})
         m8_res = details.get('M8', {})
@@ -545,35 +571,73 @@ class LaplaceDemonCore:
         nano_res = details.get('nano_blocks', {})
         eh_meta = details.get('EventHorizon', {})
 
-        # 0. The Liquidator (New 90% Setup)
+        # 0. The Liquidator (New 90% Setup) - WITH KINEMATICS CHECK
+        # Get Kinematics direction for counter-trend veto
+        k_data = details.get('Kinematics', {})
+        k_dir = k_data.get('direction', 0)  # +1=UP, -1=DOWN
+        k_angle = abs(k_data.get('angle', 0))
+        
         if liq_signal:
+             # KINEMATICS VETO: Don't fight strong acceleration
+             liq_vetoed = False
              if "BUY" in liq_signal:
-                  reasons.append(f"THE LIQUIDATOR: {liq_signal}")
-                  # If score contradicts, we flip it or boost massive if aligns
-                  if score < 0: score = 50 # Force flip to Buy
-                  else: score += 50
-                  if not setup: setup = "LIQUIDATOR_SWEEP"
+                  # If Kinematics is strongly ACCELERATING DOWN, don't buy
+                  if k_dir == -1 and k_angle > 45:
+                       reasons.append(f"LIQUIDATOR VETOED: Kinematics DOWN ({k_angle}°)")
+                       liq_vetoed = True
+                  if not liq_vetoed:
+                       reasons.append(f"THE LIQUIDATOR: {liq_signal}")
+                       if score < 0: score = 50
+                       else: score += 50
+                       if not setup: setup = "LIQUIDATOR_SWEEP"
              elif "SELL" in liq_signal:
-                  reasons.append(f"THE LIQUIDATOR: {liq_signal}")
-                  if score > 0: score = -50
-                  else: score -= 50
-                  if not setup: setup = "LIQUIDATOR_SWEEP"
+                  # If Kinematics is strongly ACCELERATING UP, don't sell
+                  if k_dir == 1 and k_angle > 45:
+                       reasons.append(f"LIQUIDATOR VETOED: Kinematics UP ({k_angle}°)")
+                       liq_vetoed = True
+                  if not liq_vetoed:
+                       reasons.append(f"THE LIQUIDATOR: {liq_signal}")
+                       if score > 0: score = -50
+                       else: score -= 50
+                       if not setup: setup = "LIQUIDATOR_SWEEP"
         
         # A. Sell at Red Block (Resistance)
         nano_sell = nano_res.get('algo_sell_detected')
         nano_buy = nano_res.get('algo_buy_detected')
         
-        # --- NANO FALLBACK (SNR Bounce) ---
+        # --- NANO FALLBACK (SNR Bounce) - WITH FULL CONFLUENCE CHECK ---
         snr_data = details.get('SNR', {})
+        div_data_check = details.get('Divergence', {})
+        div_type_check = div_data_check.get('type', '') if isinstance(div_data_check, dict) else ''
+        pat_data_check = details.get('Patterns', {})
+        pat_name_check = pat_data_check.get('pattern', '') if isinstance(pat_data_check, dict) else ''
+        
         if not nano_sell and not nano_buy and snr_data:
             dist_res = snr_data.get('res_dist', 999)
             dist_sup = snr_data.get('sup_dist', 999)
-            if dist_res < 0.0010 and score < 0: # Near Resistance + Bearish
-                nano_sell = True
-                reasons.append("NANO FALLBACK: SNR Resistance Bounce")
-            elif dist_sup < 0.0010 and score > 0: # Near Support + Bullish
-                nano_buy = True
-                reasons.append("NANO FALLBACK: SNR Support Bounce")
+            
+            # Near Resistance + Bearish → SELL, BUT check all bullish signals
+            if dist_res < 0.0010 and score < 0:
+                if 'bullish' in str(div_type_check).lower():
+                    reasons.append("NANO FALLBACK VETOED: Bullish Divergence vs Resistance")
+                elif pat_name_check in ["Hammer", "Bullish Engulfing", "Morning Star"]:
+                    reasons.append(f"NANO FALLBACK VETOED: Bullish Pattern ({pat_name_check})")
+                elif k_dir == 1 and k_angle > 45:
+                    reasons.append(f"NANO FALLBACK VETOED: Kinematics UP ({k_angle}°)")
+                else:
+                    nano_sell = True
+                    reasons.append("NANO FALLBACK: SNR Resistance Bounce")
+            # Near Support + Bullish → BUY, BUT check all bearish signals
+            elif dist_sup < 0.0010 and score > 0:
+                if 'bearish' in str(div_type_check).lower():
+                    reasons.append("NANO FALLBACK VETOED: Bearish Divergence vs Support")
+                elif pat_name_check in ["Shooting Star", "Bearish Engulfing", "Evening Star"]:
+                    reasons.append(f"NANO FALLBACK VETOED: Bearish Pattern ({pat_name_check})")
+                elif k_dir == -1 and k_angle > 45:
+                    reasons.append(f"NANO FALLBACK VETOED: Kinematics DOWN ({k_angle}°)")
+                else:
+                    nano_buy = True
+                    reasons.append("NANO FALLBACK: SNR Support Bounce")
 
         # --- UNIVERSAL VETO CHECKS (Sniper, Div, Pattern) ---
         sniper_data = details.get('Sniper', {})
@@ -585,12 +649,17 @@ class LaplaceDemonCore:
         d_type = div_data.get('type', '') if isinstance(div_data, dict) else ''
         p_name = pat_data.get('pattern', '') if isinstance(pat_data, dict) else ''
 
-        # Trigger NANO SELL
+        # Trigger NANO SELL - WITH KINEMATICS CHECK
         if nano_sell:
              vetoed = False
              if s_dir == 1 and s_score_v > 50: vetoed = True
              if 'bullish' in str(d_type).lower(): vetoed = True
              if p_name in ["Hammer", "Bullish Engulfing"]: vetoed = True
+             
+             # KINEMATICS VETO: Don't sell into accelerating UP move
+             if k_dir == 1 and k_angle > 45:
+                 vetoed = True
+                 reasons.append(f"NANO SELL VETOED: Kinematics UP ({k_angle}°)")
              
              if not vetoed:
                  reasons.append("NANO ALGO: Sell Block/Resistance Detected")
@@ -598,7 +667,7 @@ class LaplaceDemonCore:
                  else: score -= 30
                  if not setup: setup = "NANO_SCALE_IN"
              else:
-                 reasons.append("NANO SELL VETOED by Conflict")
+                 if "VETOED" not in ' '.join(reasons): reasons.append("NANO SELL VETOED by Conflict")
 
         # Trigger NANO BUY
         if nano_buy:
@@ -613,11 +682,15 @@ class LaplaceDemonCore:
                   veto_nano = True
                   reasons.append("NANO VETOED by Chaos")
              
+             # KINEMATICS VETO: Don't buy into accelerating DOWN move
+             if not veto_nano and k_dir == -1 and k_angle > 45:
+                 veto_nano = True
+                 reasons.append(f"NANO BUY VETOED: Kinematics DOWN ({k_angle}°)")
+             
              # Wick Check for Nano Buy (Catching Knife Protection)
              if not veto_nano:
-                  nano_action = "Buy" # Assuming nano_buy implies a "Buy" action for this check
+                  nano_action = "Buy"
                   micro = details.get('Micro', {})
-                  # Only veto if rejection is NOT bullish AND chaos is moderate (to avoid false positives in clear trends)
                   if micro.get('rejection') != "BULLISH_REJECTION" and lyapunov > 0.5:
                        veto_nano = True
                        reasons.append("NANO VETOED by No Wick (Knife)")
@@ -641,12 +714,11 @@ class LaplaceDemonCore:
                   reasons.append(f"EVENT HORIZON SILENCED by Chaos (Lyapunov {lyapunov:.2f})")
                   vetoed = True
 
+             # Conflict checks - RELAXED (Phase 15)
              if not vetoed and swarm_dir == 1:
-                 if s_dir == -1 and s_score_v > 50: vetoed = True
-                 if 'bearish' in str(d_type).lower(): vetoed = True
+                 if s_dir == -1 and s_score_v > 90: vetoed = True  # Relaxed from 50
              elif not vetoed and swarm_dir == -1:
-                 if s_dir == 1 and s_score_v > 50: vetoed = True
-                 if 'bullish' in str(d_type).lower(): vetoed = True
+                 if s_dir == 1 and s_score_v > 90: vetoed = True  # Relaxed from 50
                  
              if not vetoed:
                  reasons.append(f"EVENT HORIZON: {eh_meta.get('reason', 'Swarm Attack')}")
@@ -773,6 +845,31 @@ class LaplaceDemonCore:
                  score *= 0.1
                  vetoes.append(f"SNR Wall Veto: Support Ahead ({sup_dist:.5f})")
                  if not setup: setup = "BLOCKED_BY_WALL"
+
+        # --- GLOBAL SMART MONEY VETO (Cycle / Expansion) ---
+        # Ultimate Protection: Never trade against Smart Money Manipulation or confirmed Expansion.
+        cycle_res = details.get('Cycle', ('NEUTRAL', 0))
+        cycle_phase = cycle_res[0] if isinstance(cycle_res, tuple) else str(cycle_res)
+        
+        if score > 0: # We want to BUY
+            if "MANIPULATION_SELL" in str(cycle_phase):
+                reasons.append(f"GLOBAL VETO: Smart Money is Selling (Bearish Manipulation).")
+                vetoes.append("Smart Money Veto: Bearish Manipulation")
+                score = 0
+            elif "EXPANSION_SELL" in str(cycle_phase):
+                reasons.append(f"GLOBAL VETO: Market is Trending Down (Expansion Sell).")
+                vetoes.append("Trend Veto: Expansion Sell")
+                score = 0
+                
+        elif score < 0: # We want to SELL
+            if "MANIPULATION_BUY" in str(cycle_phase):
+                reasons.append(f"GLOBAL VETO: Smart Money is Buying (Bullish Manipulation).")
+                vetoes.append("Smart Money Veto: Bullish Manipulation")
+                score = 0
+            elif "EXPANSION_BUY" in str(cycle_phase):
+                reasons.append(f"GLOBAL VETO: Market is Trending Up (Expansion Buy).")
+                vetoes.append("Trend Veto: Expansion Buy")
+                score = 0
 
         # --- GLOBAL SNIPER CONFLICT VETO (Trade #109 Fix) ---
         # If Sniper says one direction (>50) but we're going opposite, BLOCK.
