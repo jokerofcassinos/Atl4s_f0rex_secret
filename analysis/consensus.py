@@ -838,8 +838,14 @@ class ConsensusEngine:
 
         # Logic A: MOMENTUM BREAKOUT
         # Momentum is Strong AND Structure Supports (or is Neutral) AND Reversion is Weak
-        # ✅ PHASE 0 FIX #3: Relaxed threshold from 50 → 30
-        if abs(v_momentum) > 30:
+        # ✅ PHASE 11 FIX: Chaos Veto (The "Regime Lock")
+        # If Chaos is high (Lyapunov > 0.5) or Entropy > 0.8, MOMENTUM IS FAKE.
+        veto_momentum = False
+        if lyapunov > 0.5 or entropy > 0.8:
+             logger.info(f"[MOMENTUM] SILENCED by Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
+             veto_momentum = True
+
+        if abs(v_momentum) > 30 and not veto_momentum:
              mom_dir = 1 if v_momentum > 0 else -1
              # Check alignment
              if (v_structure * mom_dir) >= 0: # Structure doesn't oppose
@@ -850,10 +856,27 @@ class ConsensusEngine:
 
         # Logic B: REVERSION TRADE (Sniper Entry)
         # Reversion is Strong AND Structure Supports
-        # ✅ PHASE 0 FIX #3: Relaxed threshold from 40 → 25
+        # ✅ PHASE 11 FIX: Wick Filter (The "Knife Guard")
+        # If Chaos is High, we MUST have a rejection wick to revert.
         if abs(v_reversion) > 25:
              rev_dir = 1 if v_reversion > 0 else -1
-             if (v_structure * rev_dir) > 20: # Structure MUST support Reversion (Confluence)
+             
+             # Micro-Pattern Validation (The Wick Filter)
+             # rev_dir=1 means we want to SELL (Inverted Logic below). So we need BEARISH rejection.
+             # rev_dir=-1 means we want to BUY. So we need BULLISH rejection.
+             micro_data = details.get('Micro', {})
+             rejection = micro_data.get('rejection', 'NEUTRAL')
+             
+             safe_to_revert = True
+             if lyapunov > 0.5 or entropy > 0.8: # In Chaos, require wicks
+                 if rev_dir == 1 and rejection != "BEARISH_REJECTION":
+                      safe_to_revert = False
+                      logger.info("[REVERSION] SILENCED: Falling Knife (No Bearish Wick in Chaos)")
+                 elif rev_dir == -1 and rejection != "BULLISH_REJECTION":
+                      safe_to_revert = False
+                      logger.info("[REVERSION] SILENCED: Falling Knife (No Bullish Wick in Chaos)")
+
+             if (v_structure * rev_dir) > 20 and safe_to_revert: # Structure MUST support Reversion (Confluence)
                  
                   # --- KINEMATICS PHASE SPACE VETO (Deep Forensic Fix) ---
                   # User feedback: "Bot sells into accelerating uptrend".
@@ -938,12 +961,26 @@ class ConsensusEngine:
                      div_type = div_res.get('type', '') if isinstance(div_res, dict) else ''
                      pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
 
-                     # 1. Sniper Conflict
+                     # ✅ PHASE 11 FIX: Chaos Veto (The "Leonidas Gate")
                      vetoed = False
-                     if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
-                        (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
-                         logger.info(f"[LION] SILENCED by Sniper Conflict ({s_score_check}).")
-                         vetoed = True
+                     if lyapunov > 0.5 or entropy > 0.8:
+                          logger.info(f"[LION] SILENCED by Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
+                          vetoed = True
+                     
+                     # ✅ PHASE 11 FIX: Regime Veto (H4 vs H1)
+                     # river is H1 Flow, h4_dir is H4 Structure. If they oppose, Lion shouldn't attack.
+                     if not vetoed and h4_dir != 0 and river != 0 and h4_dir != river:
+                          # Only override if structure is ABSURDLY strong (>60)
+                          if abs(v_structure) < 60:
+                               logger.info(f"[LION] SILENCED by Regime Conflict (H4 {h4_dir} vs H1 {river})")
+                               vetoed = True
+
+                     # 1. Sniper Conflict
+                     if not vetoed:
+                         if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
+                            (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
+                             logger.info(f"[LION] SILENCED by Sniper Conflict ({s_score_check}).")
+                             vetoed = True
 
                      # 2. Divergence Conflict
                      if not vetoed:
@@ -990,12 +1027,18 @@ class ConsensusEngine:
                      div_type = div_res.get('type', '') if isinstance(div_res, dict) else ''
                      pat_name = pat_res.get('pattern', '') if isinstance(pat_res, dict) else ''
 
-                     # 1. Sniper Conflict
+                     # ✅ PHASE 11 FIX: Chaos Veto (The "Quantum decoherence")
                      vetoed = False
-                     if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
-                        (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
-                         logger.info(f"[QUANTUM] SILENCED by Sniper Conflict ({s_score_check}).")
-                         vetoed = True
+                     if lyapunov > 0.5 or entropy > 0.8:
+                          logger.info(f"[QUANTUM] SILENCED by Chaos (Lyapunov {lyapunov:.2f}, Entropy {entropy:.2f})")
+                          vetoed = True
+                     
+                     # 1. Sniper Conflict
+                     if not vetoed:
+                         if (struc_dir == 1 and s_dir_check == -1 and s_score_check > 50) or \
+                            (struc_dir == -1 and s_dir_check == 1 and s_score_check > 50):
+                             logger.info(f"[QUANTUM] SILENCED by Sniper Conflict ({s_score_check}).")
+                             vetoed = True
 
                      # 2. Divergence Conflict
                      if not vetoed:

@@ -522,10 +522,19 @@ class LaplaceDemonCore:
                     
             # Case C: Legacy Indecisive, Swarm Strong (Swarm Lead)
             elif abs(score) < 20 and swarm_score > 75:
-                # If Legacy is sleeping but Swarm sees something clear
-                score += (swarm_vector * 0.8) # Adopt Swarm view
-                reasons.append(f"Swarm Initiative: {swarm_decision} (Conf {swarm_score:.1f}%)")
-                if not setup: setup = "SWARM_INITIATIVE"
+                # ✅ PHASE 11 FIX: Chaos Veto on Swarm Initiative
+                chaos_veto_swarm = False
+                if lyapunov > 0.5 or entropy > 0.8:
+                     chaos_veto_swarm = True
+                     reasons.append(f"Swarm Initiative VETOED by Chaos")
+
+                if not chaos_veto_swarm:
+                    # If Legacy is sleeping but Swarm sees something clear
+                    score += (swarm_vector * 0.8) # Adopt Swarm view
+                    reasons.append(f"Swarm Initiative: {swarm_decision} (Conf {swarm_score:.1f}%)")
+                    # ✅ BUG FIX: 'setup' is rarely None/Empty string, usually "Neutral". Check explicit list.
+                    if not setup or setup in ["Neutral", "WAIT", "None"]:
+                         setup = "SWARM_INITIATIVE"
 
         # --- TIER 2 ENHANCEMENTS (SMC / M8) ---
         smc_res = details.get('SMC', {})
@@ -601,19 +610,26 @@ class LaplaceDemonCore:
                  reasons.append("NANO ALGO: Buy Block/Support Detected")
                  if score < 0: score = 50
                  else: score += 30
-                 if not setup: setup = "NANO_SCALE_IN"
+                 if not setup or setup in ["Neutral", "WAIT", "None"]: setup = "NANO_SCALE_IN"
              else:
                  reasons.append("NANO BUY VETOED by Conflict")
 
         # B. Event Horizon Swarm (Seek & Destroy)
+        # ✅ PHASE 11 FIX: Chaos Veto on Event Horizon
         if eh_meta.get('mode') == "SWARM_369":
              swarm_dir = 1 if "Buy" in eh_meta.get('reason', '') else -1 if "Sell" in eh_meta.get('reason', '') else 0
              
              vetoed = False
-             if swarm_dir == 1:
+             
+             # Chaos Veto
+             if lyapunov > 0.5 or entropy > 0.8:
+                  reasons.append(f"EVENT HORIZON SILENCED by Chaos (Lyapunov {lyapunov:.2f})")
+                  vetoed = True
+
+             if not vetoed and swarm_dir == 1:
                  if s_dir == -1 and s_score_v > 50: vetoed = True
                  if 'bearish' in str(d_type).lower(): vetoed = True
-             elif swarm_dir == -1:
+             elif not vetoed and swarm_dir == -1:
                  if s_dir == 1 and s_score_v > 50: vetoed = True
                  if 'bullish' in str(d_type).lower(): vetoed = True
                  
@@ -669,7 +685,7 @@ class LaplaceDemonCore:
                   score = 80.0 if score > 0 else -80.0
               
              # DISABLED: Regime Lock
-             # momentum_strategies = ["MOMENTUM_BREAKOUT", "CONSENSUS_VOTE", "KINETIC_BOOM", "LION_PROTOCOL"]
+             # momentum_strategies = ["MOMENTUM_BREAKOUT", "CONSENSUS_VOTE", "KINETIC_BOOM", "LION_PROTOCOL", "QUANTUM_HARMONY"]
              # if setup in momentum_strategies:
              #     reasons.append(f"REGIME LOCK: Vetoing {setup} in Toxic Flow (Momentum fails in Chop)")
              #     vetoes.append(f"Regime Lock: {setup} invalid in Chop")
