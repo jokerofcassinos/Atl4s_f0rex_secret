@@ -1,10 +1,10 @@
 ---
 name: novos setups
 description: pensar em novos setups para serem implementados
-version: 1.1
+version: 1.2
 ---
 
-Pensar em novos setups para serem implementados, sempre que possível, pensar em setups que sejam diferentes dos existentes e que sejam capazes de serem implementados no sistema. é importante analisar tambem que os setups novos abrem oportunidades de lucro explorando tambem os pontos fracos dos setups existentes, ou seja, os setups novos devem ser capazes de explorar oportunidades de lucro que os setups existentes não exploram. além disso, voce deve pensar já de forma antecipada os vetos nescessarios, ja prevenindo possiveis problemas e falhas que possam ocorrer em cenarios diversos.
+Pensar em novos setups para serem implementados, sempre que possível, pensar em setups que sejam diferentes dos existentes e que sejam capazes de serem implementados no sistema. é importante analisar tambem que os setups novos abrem oportunidades de lucro explorando tambem os pontos fracos dos setups existentes, ou seja, os setups novos devem ser capazes de explorar oportunidades de lucro que os setups existentes não exploram. além disso, voce deve pensar já de forma antecipada os vetos nescessarios, ja prevenindo possiveis problemas e falhas que possam ocorrer em cenarios diversos. e tambem ja pense nos split fires.
 
 # 🚀 PROPOSTAS DE NOVOS SETUPS (ARQUITETURA AGI)
 
@@ -61,6 +61,35 @@ Análise de Gaps Atuais:
 *   **Vetos Preventivos (Safety):**
     *   **Veto de Fakeout (Armadilha):** Se romper e o volume for baixo (< Média 20), é armadilha. Bloquear.
     *   **Veto de Caos:** Se Lyapunov estiver alto *antes* do rompimento, ignorar (falso sinal errático).
+
+---
+
+## 4. THE QUANTUM HARPOON (O Arpão Quântico)
+**Conceito:** Baseado em Mean Reversion Extrema. Quando o preço estica demais (elástico), ele tende a voltar com violência para a média. O Arpão identifica esse ponto de exaustão matemática.
+
+*   **Lógica Principal:**
+    *   **Z-Score > 3.0 (ou < -3.0):** Preço está a 3 desvios padrão da média (evento estatisticamente raro, < 0.3%).
+    *   **Kinematics Warning:** Aceleração começa a cair (Derivada Segunda inverte) ou Ângulo de Ataque > 80 graus (Insustentável).
+    *   **Gatilho:** Fechamento de vela M1 revertendo a direção (Candle de Rejeição) após tocar a Banda de Bollinger 3.0.
+
+*   **Vantagem (Edge):** Win Rate altíssimo para Scalps curtos (retorno à média).
+*   **Vetos Preventivos (Safety):**
+    *   **Veto de Tendência Absoluta (Trem-Bala):** Se o Consenso Global estiver **EXTREMO (> 80)**, não operar contra, mesmo com Z-Score alto. O mercado pode ficar irracional por mais tempo que nós temos de margem.
+    *   **Veto de Notícia:** Bloquear em Payroll/CPI, onde 3-Sigma é rompido facilmente.
+
+---
+
+## 5. THE FRACTAL ECHO (O Eco Fractal)
+**Conceito:** O mercado repete padrões em escalas diferentes. Se um padrão de reversão acontece em M1, M5 e M15 *simultaneamente* (alinhamento fractal), a probabilidade de sucesso é multiplicada.
+
+*   **Lógica Principal:**
+    *   Detectar Fractal de Alta/Baixa (Padrão de 5 velas: High no meio, 2 lower highs de cada lado) em M1.
+    *   Verificar se existe Fractal correspondente em M5 na mesma zona.
+    *   **Gatilho:** Rompimento da máxima/mínima do Fractal M1 alinhado.
+
+*   **Vantagem (Edge):** Confirmação multi-tempo elimina ruído de M1.
+*   **Vetos Preventivos:**
+    *   **Veto de Divergência:** Se M1 diz Compra mas M15 diz Venda, silencia o Eco.
 
 ---
 

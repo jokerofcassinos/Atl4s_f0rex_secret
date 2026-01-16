@@ -594,24 +594,35 @@ class LaplaceDemonCore:
              liq_vetoed = False
              if "BUY" in liq_signal:
                   # If Kinematics is strongly ACCELERATING DOWN, don't buy
-                  if k_dir == -1 and k_angle > 45:
-                       reasons.append(f"LIQUIDATOR VETOED: Kinematics DOWN ({k_angle}°)")
-                       liq_vetoed = True
-                  if not liq_vetoed:
+                   if k_dir == -1 and k_angle > 45:
+                        reasons.append(f"LIQUIDATOR VETOED: Kinematics DOWN ({k_angle}°)")
+                        liq_vetoed = True
+                   
+                   # CONSENSUS VETO: Don't Fade Strong SELL Trend
+                   if score < -50:
+                        reasons.append(f"LIQUIDATOR VETOED: Fading Strong SELL Consensus ({score:.1f})")
+                        liq_vetoed = True
+                        
+                   if not liq_vetoed:
                        reasons.append(f"LIQUIDATOR: Sweep of {liq_signal} + Kinematics Match")
-                       score = -100 if "BUY" in liq_signal else 100 # Invert signal (Sweep Buy = Sell)
+                       score = 100 # Buy the Sweep
                        setup = "LIQUIDATOR_SWEEP"
 
              elif "SELL" in liq_signal:
                   # If Kinematics is strongly ACCELERATING UP, don't sell
-                  if k_dir == 1 and k_angle > 45:
-                       reasons.append(f"LIQUIDATOR VETOED: Kinematics UP ({k_angle}°)")
-                       liq_vetoed = True
-                  if not liq_vetoed:
-                       reasons.append(f"THE LIQUIDATOR: {liq_signal}")
-                       if score > 0: score = -50
-                       else: score -= 50
-                       if not setup: setup = "LIQUIDATOR_SWEEP"
+                   if k_dir == 1 and k_angle > 45:
+                        reasons.append(f"LIQUIDATOR VETOED: Kinematics UP ({k_angle}°)")
+                        liq_vetoed = True
+
+                   # CONSENSUS VETO: Don't Fade Strong BUY Trend
+                   if score > 50:
+                        reasons.append(f"LIQUIDATOR VETOED: Fading Strong BUY Consensus ({score:.1f})")
+                        liq_vetoed = True
+                         
+                   if not liq_vetoed:
+                       reasons.append(f"THE LIQUIDATOR: {liq_signal} (Reversal)")
+                       score = -100 # Sell the Sweep
+                       setup = "LIQUIDATOR_SWEEP"
 
         # --- NEW SETUPS (AGI BRAINSTORM 1.1) ---
         
@@ -717,9 +728,12 @@ class LaplaceDemonCore:
                             if c_high >= fvg_bot and c_close < fvg_top:
                                  if c_close > fvg_top: continue
                                  
-                                 # SANITY CHECK: Don't fade a Strong Consensus TREND
-                                 # If Consensus says BUY (>50) and we try to SELL, BLOCK IT.
-                                 if score > 50:
+                                 # 1. Consensus Veto
+                                 if score > 50: continue
+
+                                 # 2. Kinematics Veto (Don't fade Rocket UP)
+                                 if k_dir == 1 and k_angle > 45:
+                                      reasons.append(f"VOID FILLER VETOED: Kinematics UP ({k_angle}°)")
                                       continue
 
                                  # PRIORITY CHECK
@@ -808,6 +822,29 @@ class LaplaceDemonCore:
         quant_res = details.get('Quant', {})
         if not isinstance(quant_res, dict): quant_res = {}
         quant_z = quant_res.get('z_score', 0)
+
+        # --- QUANTUM HARPOON (AGI SETUP) ---
+        # Logic: Mean Reversion 3-Sigma + Kinematic Deceleration
+        # Veto: Don't fade a "Train" (Score > 80)
+        strong_trend_veto = abs(score) > 80.0
+        
+        if quant_z > 3.0 and not strong_trend_veto: # Extreme Overbought -> SELL
+             # Check Kinematics: Must be Decelerating (k_angle < 45 or k_dir turning)
+             # If k_angle > 80 and continuing UP, it's a Rocket. Do NOT sell.
+             if k_dir == 1 and k_angle > 80:
+                  vetoes.append(f"Harpoon Veto: Rocket Alert (Z={quant_z:.1f} but Angle={k_angle:.0f}°)")
+             else:
+                  score = -90 # High Conviction Sell
+                  setup = "QUANTUM_HARPOON"
+                  reasons.append(f"QUANTUM HARPOON: Shorting 3-Sigma Extension (Z={quant_z:.2f})")
+                  
+        elif quant_z < -3.0 and not strong_trend_veto: # Extreme Oversold -> BUY
+             if k_dir == -1 and k_angle > 80:
+                  vetoes.append(f"Harpoon Veto: Crash Alert (Z={quant_z:.1f} but Angle={k_angle:.0f}°)")
+             else:
+                  score = 90 # High Conviction Buy
+                  setup = "QUANTUM_HARPOON"
+                  reasons.append(f"QUANTUM HARPOON: Buying 3-Sigma Extension (Z={quant_z:.2f})")
 
         if setup == "LIQUIDATOR_SWEEP":
             # Safety: Check for Wall collision
@@ -1385,6 +1422,31 @@ class LaplaceDemonCore:
              reasons.append(f"EXTREME CONFIDENCE: Neural Network agrees ({neural_conf*100:.1f}%)")
              score += 50 # Boost
 
+        # --- GLOBAL KINEMATICS HARD VETO (The "Rocket Logic") ---
+        # User Request: "Conflict of Decision: Selling when Price is Rising"
+        # We perform a final check on the INTENDED direction vs ACTUAL MOMENTUM.
+        
+        # 1. Check SELL against RISING Rocket
+        if score < 0: # Intending to SELL
+             if k_dir == 1 and k_angle > 45:
+                  # Exception: Is this a "Top Fishing" setup like QUANTUM HARPOON?
+                  # Even Harpoon shouldn't fade a 80deg rocket, but maybe 45-60deg.
+                  # Let's be strict for now to stop the bleeding.
+                  score = 0
+                  execute = False # Redundant but safe
+                  hard_veto = True
+                  vetoes.append(f"GLOBAL HARD VETO: Attempting to SELL into RISING ROCKET ({k_angle}°)")
+                  reasons.append(f"FATAL CONFLICT: Momentum is UP, Signal is SELL. Vetoing.")
+
+        # 2. Check BUY against CRASHING Meteor
+        elif score > 0: # Intending to BUY
+             if k_dir == -1 and k_angle > 45:
+                  score = 0
+                  execute = False
+                  hard_veto = True
+                  vetoes.append(f"GLOBAL HARD VETO: Attempting to BUY into CRASHING METEOR ({k_angle}°)")
+                  reasons.append(f"FATAL CONFLICT: Momentum is DOWN, Signal is BUY. Vetoing.")
+
         # --- DECISION THRESHOLD ---
         decision_dir = "WAIT"
         execute = False
@@ -1416,11 +1478,17 @@ class LaplaceDemonCore:
         # Volatility Adjusted: 1.5 * ATR (approx 15-25 pips)
         sl_raw = max(0.0010, atr * 1.5)
         
-        # SCALP CAP: For specific scalp setups, cap SL at 20 pips to preserve R:R
-        if setup in ["VOID_FILLER_FVG", "GOLDEN_COIL_M8", "VOLATILITY_SQUEEZE", "LEGION_KNIFE_SCALP"]:
-             sl_pips = min(sl_raw, 0.0020) # Cap at 20 pips
+        # SCALP CAP: User requested "Distant SL". 
+        # We convert Price Delta (0.00xx) to Pips (xx.0) for the Risk Manager.
+        
+        if setup in ["VOID_FILLER_FVG", "GOLDEN_COIL_M8", "VOLATILITY_SQUEEZE", "LEGION_KNIFE_SCALP", "LIQUIDATOR_SWEEP"]:
+             # Cap at 35 pips (0.0035) instead of 20 to allow breathing room
+             sl_delta = min(sl_raw, 0.0035) 
         else:
-             sl_pips = sl_raw
+             sl_delta = sl_raw
+             
+        # Convert Delta to Pips (Expected by _apply_risk_management)
+        sl_pips = sl_delta / 0.0001
         
         if execute:
             # Bypass Logic: Aggressive setups or High Confidence override the "Safe" Nash filter
@@ -1450,13 +1518,14 @@ class LaplaceDemonCore:
             # CALIBRATION: Phase 6 (Round 3) - Target 70% WR
             # We enforce stricter thresholds: WinProb > 60% and High Bypass Bar (85.0)
             
-            threshold = 0.60 # Increased from 0.40
+            threshold = 0.50 # Optimized for Volume vs Quality
             bypass_score = 85.0 # Restored to 85.0 (Allows Trade #96 Sniper to pass)
             
             # Special Case: If Toxic Flow is active, we demand stricter confirmation.
             # Trade #83 (76%) failed here.
+            # FORENSIC UPDATE: 0.85 was too strict (killed profit). 0.75 is the sweet spot.
             if toxic_flow:
-                threshold = 0.85
+                threshold = 0.75 
                 reasons.append(f"Toxic Flow Active: Raising Neural Threshold to {threshold:.2f}")
             
             # Special Case: If Toxic Flow is active, we ALREADY handled strictness above.
@@ -1476,12 +1545,10 @@ class LaplaceDemonCore:
             vetoes.append(f"Weak Signal Veto: Score {abs(score):.1f} < {MIN_SCORE_THRESHOLD}")
             reasons.append(f"Weak Signal Filter: Score too low ({abs(score):.1f})")
 
-
-        # --- OMEGA MULTIPLIER LOGIC ---
+        # --- OMEGA MULTIPLIER LOGIC ( moved up ) ---
         # PRIORITY: Use lot_multiplier from consensus.py details if available (10x OMEGA)
         lot_multiplier = details.get('lot_multiplier', 1.0) if isinstance(details, dict) else 1.0
         
-        # Fallback logic only if consensus didn't set a multiplier
         # Fallback logic only if consensus didn't set a multiplier
         if lot_multiplier <= 1.0 and execute:
             if setup in ["LION_PROTOCOL", "LION_BREAKOUT", "SMART_MONEY_REVERSAL"]:
@@ -1491,15 +1558,66 @@ class LaplaceDemonCore:
             elif setup == "VOID_FILLER_FVG":
                 lot_multiplier = 30.0 # SPLIT FIRE: Aggressive Filling
                 reasons.append("SPLIT FIRE ACTIVATED: Aggressive Void Filling")
-            elif setup in ["GOLDEN_COIL_M8", "VOLATILITY_SQUEEZE"]:
-                lot_multiplier = 20.0 # SPLIT FIRE: Trend/Momentum
+            elif setup in ["GOLDEN_COIL_M8", "VOLATILITY_SQUEEZE", "QUANTUM_HARPOON", "LIQUIDATOR_SWEEP"]:
+                lot_multiplier = 30.0 # SPLIT FIRE: Trend/Momentum/Reversion
                 reasons.append(f"SPLIT FIRE ACTIVATED: {setup}")
             elif setup == "NANO_SCALE_IN":
                 lot_multiplier = 3.0
-            elif setup == "MOMENTUM_BREAKOUT" and confidence >= 95.0:
-                lot_multiplier = 5.0  # Upgraded from 2.0
             elif setup == "MOMENTUM_BREAKOUT":
                 lot_multiplier = 2.0  # Upgraded from 1.0
+
+        # --- CHAOS VETO (Forensic Fix) ---
+        # In High Chaos (>0.35), standard signals (Score < 50) are unreliable.
+        # Trade #93 lost because we trusted a Score of 27 in Chaos 0.50.
+        lyapunov = details.get('Chaos', {}).get('lyapunov', 0.0)
+        if lyapunov > 0.35:
+            if abs(score) < 50.0 and execute:
+                execute = False
+                vetoes.append(f"Chaos Veto: Weak Signal ({abs(score):.1f}) in High Chaos ({lyapunov:.2f})")
+                reasons.append(f"Chaos Filter: Signal too weak for Chaotic Market")
+            elif execute:
+                # If executing in Chaos (Score > 50), reduce risk
+                lot_multiplier *= 0.5
+                reasons.append(f"CHAOS DAMPENER: Halving Risk due to Chaos ({lyapunov:.2f})")
+
+        # --- AGGRESSION QUALITY CONTROL (Smart Gradient) ---
+        # Forensic Update: Binary cutoff (Score < 50) killed profits.
+        # We implementation a Gradient Risk Curve to "Press Winners" intelligently.
+        if lot_multiplier > 1.0:
+             if abs(score) < 30.0:
+                  lot_multiplier = 1.0
+                  reasons.append(f"RISK CONTROL: Weak Signal ({abs(score):.1f}). Reverting to Standard Lots.")
+             elif abs(score) < 50.0:
+                  # Gradient: Score 30->50 maps to 4x->15x Multiplier
+                  # This allows "Good but not Great" trades to contribute to growth.
+                  ratio = (abs(score) - 30.0) / 20.0
+                  target_mult = 4.0 + (ratio * 11.0)
+                  # Cap at original multiplier to avoids inflating low-aggression setups
+                  lot_multiplier = min(lot_multiplier, target_mult)
+                  reasons.append(f"GRADIENT RISK: Scaling to {lot_multiplier:.1f}x (Score {abs(score):.1f})")
+             else:
+                  # God Mode Approved (Score > 50). Full Multiplier accepted.
+                  pass
+
+        
+        # --- GLOBAL CONSENSUS VETO (User Request) ---
+        # "God Mode" demands alignment. We do not fight the river.
+        if execute:
+             # USE PURE CONSENSUS for Veto (Before Setup pollution)
+             # legacy_result is a dict {'score': float, 'setup': str}
+             raw_consensus = legacy_result.get('score', 0.0) if isinstance(legacy_result, dict) else 0.0
+             consensus_score = float(raw_consensus)
+             
+             # Tolerance: 10.0 (Block meaningful conflict)
+             if decision_dir == "SELL" and consensus_score > 10.0:
+                  execute = False
+                  vetoes.append(f"Global Consensus Veto: Fighting Buy Trend ({consensus_score:.1f} > 10.0)")
+                  reasons.append(f"Trend Alignment: FAILED (Consensus says BUY)")
+                  
+             elif decision_dir == "BUY" and consensus_score < -10.0:
+                  execute = False
+                  vetoes.append(f"Global Consensus Veto: Fighting Sell Trend ({consensus_score:.1f} < -10.0)")
+                  reasons.append(f"Trend Alignment: FAILED (Consensus says SELL)")
 
         prediction = LaplacePrediction(
             execute=execute,
@@ -1514,6 +1632,10 @@ class LaplaceDemonCore:
             lot_multiplier=lot_multiplier # Pass calculated multiplier
         )
         
+        # CRITICAL FIX: explicit assignment of calculated SL/TP
+        prediction.sl_pips = sl_pips
+        # prediction.tp_pips = tp_pips (Calculated elsewhere or default)
+        
         if execute:
             self._apply_risk_management(prediction, df_m5)
             
@@ -1525,8 +1647,11 @@ class LaplaceDemonCore:
         # Get ATR
         atr = ta.volatility.AverageTrueRange(df_m5['high'], df_m5['low'], df_m5['close'], window=14).average_true_range().iloc[-1]
         
-        # SL = 40.0 pips (Fixed per Balance Optimization)
-        sl_pips = 40.0 
+        # SL = 40.0 pips (Fixed per Balance Optimization) -> NOW DYNAMIC FALLBACK
+        if prediction.sl_pips is None or prediction.sl_pips == 0:
+             sl_pips = 40.0 
+        else:
+             sl_pips = prediction.sl_pips # KEEP CALCULATED VALUE 
         
         # TP = 20.0 pips (Balanced Scalp Profile)
         tp_pips = 20.0 

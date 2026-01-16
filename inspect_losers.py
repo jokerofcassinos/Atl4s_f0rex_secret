@@ -1,19 +1,18 @@
-
 import json
-
-file_path = 'reports/laplace_gbpusd_results.json'
+import pandas as pd
 
 try:
-    with open(file_path, 'r') as f:
+    with open('d:/Atl4s-Forex/reports/laplace_gbpusd_results.json', 'r') as f:
         data = json.load(f)
-
+        
     trades = data.get('trades', [])
-    losers = [t for t in trades if t['pnl_dollars'] < 0]
-
-    print(f"Found {len(losers)} losing trades.")
-
-    for t in losers:
-        print(f"ID: {t['id']} | Dir: {t['direction']} | PnL: ${t['pnl_dollars']:.2f} | Reason: {t['exit_reason']} | Entry: {t['entry_time']} | Source: {t['signal_source']}")
-
+    df = pd.DataFrame(trades)
+    
+    losers = df[df['pnl_dollars'] < 0]
+    
+    print(f"Total Losers: {len(losers)}")
+    print("-" * 60)
+    for index, row in losers.iterrows():
+        print(f"Trade #{row['id']} | {row['entry_time']} | {row['direction']} | {row['signal_source']} | PnL: ${row['pnl_dollars']:.2f}")
 except Exception as e:
     print(f"Error: {e}")

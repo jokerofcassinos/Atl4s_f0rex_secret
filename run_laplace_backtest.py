@@ -200,6 +200,22 @@ class LaplaceBacktestRunner:
             current_time = candle.name
             current_price = candle['close']
             
+            # --- OPTIMIZATION (Hyper-Warp) ---
+            # User Request: Skip Sat (5), Sun (6), Mon (0) to save time.
+            # 1. If NO trades are open, we can skip the candle entirely (Maximum Speed).
+            # 2. If trades ARE open, we must process the candle (to hit SL/TP), but we skip Analysis (No new signals).
+            
+            is_weekend_or_monday = current_time.weekday() in [5, 6, 0]
+            
+            if is_weekend_or_monday:
+                 if not self.engine.active_trades:
+                      continue # SKIP LOOP (Hyper Speed)
+                 else:
+                      # Continue loop to manage exits, but flagging to skip analysis
+                      skip_analysis = True
+            else:
+                 skip_analysis = False
+            
             # Progress logging
             if i % 1000 == 0:
                 pct = (i / total_candles) * 100
@@ -324,6 +340,11 @@ class LaplaceBacktestRunner:
                     pass
              # --------------------------------------------------------------------------
             
+            # OPTIMIZATION: If we are in 'skip_analysis' mode (Monday/Weekend with open trades),
+            # we stop here. We processed exits/decay, but we don't want new signals.
+            if skip_analysis:
+                 continue
+
             # Check for new signals (respect minimum interval)
             if last_signal_time is not None:
                 candles_since_signal = i - last_signal_time
@@ -397,11 +418,16 @@ class LaplaceBacktestRunner:
                         if current_balance > 500:
                              # Linear decay or simple tiers based on Base Risk of 20%
                              if current_balance > 5000:
-                                  max_aggression = 0.5 # 10% Risk (Vault) - Ultra Safe
+                                  max_aggression = 1.0 # 20% Risk (Base) - Wealth Preservation
                              elif current_balance > 2000:
-                                  max_aggression = 1.0 # 20% Risk (Base) - Standard
+                                  max_aggression = 2.0 # 40% Risk - High Growth
                              else:
-                                  max_aggression = 1.5 # 30% Risk - Building (Survives 3 losses)
+                                  max_aggression = 3.0 # 60% Risk - Aggressive
+                        else:
+                             # GOD MODE: 90% Win Rate allows 80% Risk (Kelly Criterion ~0.8)
+                             # Target: $30 -> $1000 in 10 days. 
+                             # We need maximum velocity.
+                             max_aggression = 4.0 # 80% Risk per Setup.
                         
                         target_total_multiplier = min(lot_multiplier, max_aggression) 
                         

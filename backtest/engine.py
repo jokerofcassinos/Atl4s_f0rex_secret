@@ -148,6 +148,9 @@ class BacktestResult:
     
     # Trade statistics
     avg_win: float = 0.0
+    
+    def get_balance(self) -> float:
+        return self.equity_curve[-1][1] if self.equity_curve else self.config.initial_capital
     avg_loss: float = 0.0
     largest_win: float = 0.0
     largest_loss: float = 0.0
@@ -194,10 +197,17 @@ class BacktestEngine:
         self.equity_curve: List[Tuple[datetime, float]] = []
         self.trade_counter = 0
         
-        # Tracking
+        self.equity_curve = []
         self.peak_equity = self.config.initial_capital
         self.max_drawdown = 0.0
         
+        # Performance cache
+        self.trade_history = []
+        
+    def get_balance(self) -> float:
+        """Expose current balance/equity for external logic."""
+        return self.balance
+    
     def calculate_position_size(self, sl_pips: float) -> float:
         """
         Calculate lot size based on risk percentage and stop loss.
@@ -436,7 +446,16 @@ class BacktestEngine:
             effective_vsl = self.config.vsl_dollars
             if self.balance > 200:
                  dynamic_thresh = self.balance * 0.10 # 10% Equity buffer
-                 effective_vsl = max(effective_vsl, dynamic_thresh)
+                 
+                 # CIRCUIT BREAKER: Ensure VSL allows the intended Trade Risk.
+                 # If we risk $500 (SL), VSL should not trigger at $200.
+                 # Set VSL to 1.5x Expected Loss (Catastrophe Only).
+                 expected_risk = abs(trade.entry_price - trade.sl_price) * self.config.get_pip_value_for_lots(trade.lots) / self.config.pip_value * 10 # Approx ($/pips)
+                 # Actually, simpler: calculate risk based on SL price
+                 risk_pips_dist = abs(self.calculate_pips(trade.entry_price, trade.sl_price))
+                 trade_risk_dollars = risk_pips_dist * self.config.get_pip_value_for_lots(trade.lots)
+                 
+                 effective_vsl = max(effective_vsl, dynamic_thresh, trade_risk_dollars * 1.5)
             
             if current_pnl <= -abs(effective_vsl):
                  return f"VSL_HIT_(${abs(effective_vsl):.1f})"

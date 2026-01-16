@@ -1414,7 +1414,8 @@ class ConsensusEngine:
         # Heartbeat Log (Show activity even if WAIT)
         if decision == "WAIT":
             logger.info(f"Consensus Heartbeat: Trend={t_score:.0f} Sniper={s_score:.0f} Quant={q_score:.0f} Vector={total_vector:.2f}")
-            total_vector = 0 # ✅ CRITICAL: Ensure Laplace V2 sees 0 if Consensus says WAIT
+            # total_vector = 0 # REMOVED: We need the raw score for Veto logic in Laplace
+            pass
         else:
             # ✅ Laplace V2 Integration: Return the normalized signed score
             direction_sign = 1 if decision == "BUY" else -1
