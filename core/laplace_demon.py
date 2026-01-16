@@ -700,6 +700,11 @@ class LaplaceDemonCore:
                             if c_low <= fvg_top and c_close > fvg_bot: 
                                  if c_close < fvg_bot: continue
                                  
+                                 # SANITY CHECK: Don't fade a Strong Consensus TREND
+                                 # If Consensus says SELL (>50) and we try to BUY, BLOCK IT.
+                                 if score < -50:
+                                      continue
+
                                  # PRIORITY CHECK: Only apply if Score 130 > Current Score
                                  if 130 > abs(score):
                                      reasons.append(f"THE VOID FILLER: Bullish FVG Rejection @ {fvg_top:.5f}")
@@ -712,6 +717,11 @@ class LaplaceDemonCore:
                             if c_high >= fvg_bot and c_close < fvg_top:
                                  if c_close > fvg_top: continue
                                  
+                                 # SANITY CHECK: Don't fade a Strong Consensus TREND
+                                 # If Consensus says BUY (>50) and we try to SELL, BLOCK IT.
+                                 if score > 50:
+                                      continue
+
                                  # PRIORITY CHECK
                                  if 130 > abs(score):
                                      reasons.append(f"THE VOID FILLER: Bearish FVG Rejection @ {fvg_bot:.5f}")
@@ -1404,7 +1414,13 @@ class LaplaceDemonCore:
         
         # Default SL: 15 pips
         # Volatility Adjusted: 1.5 * ATR (approx 15-25 pips)
-        sl_pips = max(0.0010, atr * 1.5)
+        sl_raw = max(0.0010, atr * 1.5)
+        
+        # SCALP CAP: For specific scalp setups, cap SL at 20 pips to preserve R:R
+        if setup in ["VOID_FILLER_FVG", "GOLDEN_COIL_M8", "VOLATILITY_SQUEEZE", "LEGION_KNIFE_SCALP"]:
+             sl_pips = min(sl_raw, 0.0020) # Cap at 20 pips
+        else:
+             sl_pips = sl_raw
         
         if execute:
             # Bypass Logic: Aggressive setups or High Confidence override the "Safe" Nash filter

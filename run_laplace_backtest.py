@@ -397,11 +397,11 @@ class LaplaceBacktestRunner:
                         if current_balance > 500:
                              # Linear decay or simple tiers based on Base Risk of 20%
                              if current_balance > 5000:
-                                  max_aggression = 0.25 # 5% Total Risk (Vault Mode)
+                                  max_aggression = 0.5 # 10% Risk (Vault) - Ultra Safe
                              elif current_balance > 2000:
-                                  max_aggression = 0.5 # 10% Total Risk (Protection Mode)
+                                  max_aggression = 1.0 # 20% Risk (Base) - Standard
                              else:
-                                  max_aggression = 3.0 # 60% Total Risk (Active Growth)
+                                  max_aggression = 1.5 # 30% Risk - Building (Survives 3 losses)
                         
                         target_total_multiplier = min(lot_multiplier, max_aggression) 
                         
