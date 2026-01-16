@@ -368,7 +368,7 @@ class LaplaceDemonCore:
                  logger.warning(f"M8 Analysis Failed: {e}")
 
         # 3. SYNTHESIS
-        prediction = self._synthesize_master_decision(legacy_result, legion_intel, details, current_price, df_m5)
+        prediction = self._synthesize_master_decision(legacy_result, legion_intel, details, current_price, df_m5, df_m1=df_m1)
         
         # Log the internal state so the user sees the "Mind" at work
         swarm_dec = legion_intel.get('swarm_decision', 'WAIT')
@@ -424,7 +424,7 @@ class LaplaceDemonCore:
         
         return {'score': legacy_vector, 'setup': setup_type}, details
 
-    def _synthesize_master_decision(self, legacy_result, legion_intel, details, price, df_m5):
+    def _synthesize_master_decision(self, legacy_result, legion_intel, details, price, df_m5, df_m1=None):
         """
         Merges the Legacy Vector with Swarm Intelligence.
         THE HYBRID ENGINE: Bugatti V1 + AGI Swarm V2
@@ -589,6 +589,14 @@ class LaplaceDemonCore:
         k_dir = k_data.get('direction', 0)  # +1=UP, -1=DOWN
         k_angle = abs(k_data.get('angle', 0))
         
+        if liq_signal:
+             # KINEMATICS VETO: Don't fight strong acceleration
+             liq_vetoed = False
+             if "BUY" in liq_signal:
+                  # If Kinematics is strongly ACCELERATING DOWN, don't buy
+                  if k_dir == -1 and k_angle > 45:
+                       reasons.append(f"LIQUIDATOR VETOED: Kinematics DOWN ({k_angle}°)")
+                       liq_vetoed = True
                   if not liq_vetoed:
                        reasons.append(f"LIQUIDATOR: Sweep of {liq_signal} + Kinematics Match")
                        score = -100 if "BUY" in liq_signal else 100 # Invert signal (Sweep Buy = Sell)
@@ -672,16 +680,7 @@ class LaplaceDemonCore:
         # 2. VOID FILLER (FVG Reversion) - Placeholder for next cycle
         
         # ----------------------------------------
-             elif "SELL" in liq_signal:
-                  # If Kinematics is strongly ACCELERATING UP, don't sell
-                  if k_dir == 1 and k_angle > 45:
-                       reasons.append(f"LIQUIDATOR VETOED: Kinematics UP ({k_angle}°)")
-                       liq_vetoed = True
-                  if not liq_vetoed:
-                       reasons.append(f"THE LIQUIDATOR: {liq_signal}")
-                       if score > 0: score = -50
-                       else: score -= 50
-                       if not setup: setup = "LIQUIDATOR_SWEEP"
+
         
         # A. Sell at Red Block (Resistance)
         nano_sell = nano_res.get('algo_sell_detected')
@@ -1121,7 +1120,7 @@ class LaplaceDemonCore:
             # If SMC Structure says BULLISH, we should NOT sell unless it's a Smart Money Reversal.
             smc_struc = smc_res.get('structure', 'NEUTRAL')
             if setup != "SMART_MONEY_REVERSAL":
-                 if smc_struc == "BULLISH" and setup != "STRUCTURE_TREND_RIDER": # Allow Rider to short pullbacks? No, Rider rides trend.
+                 if smc_struc == "BULLISH" and setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8": # Allow Rider and Coil
                       reasons.append(f"STRUCTURE VETO: Blocking SELL (Structure is {smc_struc})")
                       vetoes.append(f"Structure Veto: Cannot Sell in Bullish Structure")
                       score = 0
@@ -1133,7 +1132,7 @@ class LaplaceDemonCore:
                       score = 0
                       vetoes.append(f"LION KILLER: SMC Trend Conflict ({smc_trend})")
             elif "bullish" in str(div_type).lower():
-                 if setup != "STRUCTURE_TREND_RIDER":
+                 if setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8":
                     reasons.append(f"GLOBAL VETO: Bullish Divergence ({div_type}) opposes SELL.")
                     vetoes.append("Divergence Veto: Bullish Conflict")
                     score = 0
@@ -1166,7 +1165,7 @@ class LaplaceDemonCore:
         # Sniper dir: +1 = BUY, -1 = SELL (THRESHOLD: 50)
         if decision_dir == "BUY" and sniper_dir == -1 and sniper_score > 50:
             # RELAXED VETO: If we have > 90% Confidence (e.g. Swarm + Legacy), we ignore Sniper.
-            if abs(score) >= 90:
+            if abs(score) >= 90 or setup == "GOLDEN_COIL_M8":
                  reasons.append(f"SNIPER OVERRIDE: High Confidence ({score:.1f}) bypasses Sniper Veto.")
             else:
                 reasons.append(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
