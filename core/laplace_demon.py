@@ -300,6 +300,52 @@ class LaplaceDemonCore:
                   return "TOXIC_FLOW_COMPRESSION_LOCK"
         return None
 
+    def _check_ema_slope_veto(self, df_m5: pd.DataFrame, direction: str, reasons: list) -> Optional[str]:
+        """
+        GLOBAL TREND FILTER: EMA Slope Veto.
+        Blocks counter-trend trades based on EMA20 direction.
+        
+        If EMA20 is RISING (slope > 0) and direction is SELL -> VETO.
+        If EMA20 is FALLING (slope < 0) and direction is BUY -> VETO.
+        
+        This catches "slow grinding trends" that Kinematics misses (angle < 25°).
+        """
+        if df_m5 is None or len(df_m5) < 25:
+             return None  # Not enough data
+        
+        try:
+             # Calculate EMA20
+             ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
+             
+             # Calculate slope over last 5 candles (25 minutes)
+             slope_window = 5
+             if len(ema20) < slope_window:
+                  return None
+                  
+             ema_now = ema20.iloc[-1]
+             ema_prev = ema20.iloc[-slope_window]
+             
+             # Slope direction: positive = up, negative = down
+             ema_slope = ema_now - ema_prev
+             
+             # Threshold: ~1 pip change over 5 candles is significant direction
+             min_slope = 0.00010  # 1 pip
+             
+             if ema_slope > min_slope:  # EMA RISING
+                  if direction == "SELL":
+                       reasons.append(f"EMA SLOPE VETO: EMA20 Rising ({ema_slope:.5f})")
+                       return "EMA_SLOPE_BULLISH_TREND"
+                       
+             elif ema_slope < -min_slope:  # EMA FALLING
+                  if direction == "BUY":
+                       reasons.append(f"EMA SLOPE VETO: EMA20 Falling ({ema_slope:.5f})")
+                       return "EMA_SLOPE_BEARISH_TREND"
+                       
+        except Exception as e:
+             logger.warning(f"EMA Slope Veto Error: {e}")
+             
+        return None
+
     async def analyze(self,
                 df_m1: pd.DataFrame,
                 df_m5: pd.DataFrame,
