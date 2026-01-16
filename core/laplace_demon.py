@@ -416,7 +416,9 @@ class LaplaceDemonCore:
         setup_type = None
         if isinstance(details, dict):
             # Try to find reason in Vectors or general details
-            setup_type = details.get('Vectors', {}).get('Reason')
+            vecs = details.get('Vectors', {})
+            setup_type = vecs.get('Reason') if isinstance(vecs, dict) else None
+            
             if not setup_type:
                  setup_type = details.get('setup_name') # Just in case I patch consensus later
         
@@ -581,6 +583,7 @@ class LaplaceDemonCore:
         # 0. The Liquidator (New 90% Setup) - WITH KINEMATICS CHECK
         # Get Kinematics direction for counter-trend veto
         k_data = details.get('Kinematics', {})
+        if not isinstance(k_data, dict): k_data = {}
         if not isinstance(k_data, dict): k_data = {} # Safety wrap
         
         k_dir = k_data.get('direction', 0)  # +1=UP, -1=DOWN
@@ -684,8 +687,10 @@ class LaplaceDemonCore:
         
         div_data = details.get('Divergence', {})
         if not isinstance(div_data, dict): div_data = {}
+        if not isinstance(div_data, dict): div_data = {}
 
         pat_data = details.get('Patterns', {})
+        if not isinstance(pat_data, dict): pat_data = {}
         if not isinstance(pat_data, dict): pat_data = {}
 
         s_dir = sniper_data.get('dir', 0)
@@ -961,6 +966,10 @@ class LaplaceDemonCore:
         if isinstance(div_res, dict): div_type = div_res.get('type', '')
         elif isinstance(div_res, tuple) and len(div_res) > 0: div_type = div_res[0]
         else: div_type = str(div_res)
+
+        # Define atr_src early for SMR checks
+        atr_src = details.get('Trend', {})
+        if not isinstance(atr_src, dict): atr_src = {}
 
         if score > 0: # We want to BUY
             # --- BYPASS: STRUCTURE RIDER & SMR --- 

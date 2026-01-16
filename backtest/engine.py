@@ -244,8 +244,10 @@ class BacktestEngine:
         risk_amount = self.balance * (self.config.risk_per_trade_pct / 100)
         lot_size = risk_amount / (sl_pips * self.config.pip_value)
         
-        # Clamp to reasonable bounds (Max 100 lots)
-        lot_size = max(0.01, min(lot_size, 100.0))
+        # Clamp to reasonable bounds (Max 100 lots) -> UNLIMITED for "1k Challenge"
+        # lot_size = max(0.01, min(lot_size, 100.0))
+        # We only min clamp to 0.01
+        lot_size = max(0.01, lot_size)
         return round(lot_size, 2)
     
     def calculate_pips(self, price1: float, price2: float) -> float:
@@ -342,25 +344,26 @@ class BacktestEngine:
         # Calculate position size with Anti-Ruin limits
         lots = self.calculate_position_size(sl_pips)
 
-        # 4. Final Safety Check: Max Risk Amount
-        potential_loss_dollars = lots * sl_pips * self.config.pip_value
-        max_loss_allowed = self.balance * 0.30 # Max 30% loss allowed per trade
-        
-        if potential_loss_dollars > max_loss_allowed:
-             # Scale down lots to fit max loss
-             # New Lots = Max Loss / (SL * PipVal)
-             new_lots = max_loss_allowed / (sl_pips * self.config.pip_value)
-             # logger.warning(f"Risk Capping: Scaled lots {lots} -> {new_lots:.2f} to limit loss to ${max_loss_allowed:.2f}")
-             lots = max(0.01, round(new_lots, 2))
-        
         # Apply Omega Sniper Multiplier (5x, etc)
         if lot_multiplier != 1.0:
             logger.info(f"Applying Lot Multiplier: {lot_multiplier}x (Base: {lots})")
             lots *= lot_multiplier
+
+        # 4. Final Safety Check: Max Risk Amount (MOVED AFTER MULTIPLIER)
+        # Re-calc potential loss with FINAL lots
+        potential_loss_dollars = lots * sl_pips * self.config.pip_value
+        max_loss_allowed = self.balance * 0.30 # Max 30% loss allowed even for Nuclear trades
         
-        # For small accounts (<$100), use fixed minimum lot
-        if self.balance < 100:
-            lots = 0.01  # Fixed minimum lot for small accounts
+        if potential_loss_dollars > max_loss_allowed:
+             # Scale down lots to fit max loss
+             new_lots = max_loss_allowed / (sl_pips * self.config.pip_value)
+             if new_lots < lots:
+                 logger.warning(f"Risk Capping: Scaled lots {lots:.2f} -> {new_lots:.2f} to limit loss to ${max_loss_allowed:.2f} (30%)")
+                 lots = max(0.01, round(new_lots, 2))
+        
+        # REMOVED: Small account cap (<$100 -> 0.01) to allow "1k Challenge" scaling
+        # if self.balance < 100:
+        #     lots = 0.01  # Fixed minimum lot for small accounts
         
         if lots < 0.01:
             return None  # Can't afford the trade

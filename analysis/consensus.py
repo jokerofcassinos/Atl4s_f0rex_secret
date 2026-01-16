@@ -344,37 +344,63 @@ class ConsensusEngine:
         # Unpack Results
         # Trend
         trend_res = results.get('Trend')
-        if trend_res is None: trend_res = {'score': 0, 'direction': 0, 'regime': 'RANGING', 'river': 0}
-        t_score = trend_res['score']
-        t_dir = trend_res['direction']
-        regime = trend_res['regime']
-        river = trend_res['river']
+        if trend_res is None: 
+            trend_res = {'score': 0, 'direction': 0, 'regime': 'RANGING', 'river': 0}
+        elif isinstance(trend_res, tuple):
+             # Legacy tuple support: (score, direction) or (score, dir, regime, river)
+             t_score = trend_res[0] if len(trend_res) > 0 else 0
+             t_dir = trend_res[1] if len(trend_res) > 1 else 0
+             trend_res = {'score': t_score, 'direction': t_dir, 'regime': 'RANGING', 'river': 0}
+
+        t_score = trend_res.get('score', 0)
+        t_dir = trend_res.get('direction', 0)
+        regime = trend_res.get('regime', 'RANGING')
+        river = trend_res.get('river', 0)
         ocean_dir = trend_res.get('ocean', 0) # H4 Trend (Previously undefined in local scope)
         details['Trend'] = {'score': t_score, 'dir': t_dir, 'regime': regime, 'river': river, 'ocean': ocean_dir}
         
         # Sniper
         sniper_res = results.get('Sniper')
         if sniper_res is None: sniper_res = (0, 0)
-        s_score, s_dir = sniper_res
+        s_score = sniper_res[0] if isinstance(sniper_res, tuple) else sniper_res.get('score', 0)
+        s_dir = sniper_res[1] if isinstance(sniper_res, tuple) else sniper_res.get('dir', 0)
         details['Sniper'] = {'score': s_score, 'dir': s_dir}
         
         # Quant
         quant_res = results.get('Quant')
         if quant_res is None: quant_res = (0, 0, "NEUTRAL")
-        q_score, q_dir, q_type = quant_res
+        if isinstance(quant_res, tuple):
+             q_score = quant_res[0]
+             q_dir = quant_res[1]
+             q_type = quant_res[2] if len(quant_res) > 2 else "NEUTRAL"
+        else:
+             q_score = quant_res.get('score', 0)
+             q_dir = quant_res.get('dir', 0)
+             q_type = quant_res.get('type', "NEUTRAL")
         
-        details['Quant'] = {'score': q_score, 'dir': q_dir}
+        details['Quant'] = {'score': q_score, 'dir': q_dir, 'type': q_type}
         
         # Patterns
         patterns_res = results.get('Patterns')
         if patterns_res is None: patterns_res = (0, 0, "None")
-        p_score, p_dir, p_name = patterns_res
+        if isinstance(patterns_res, tuple):
+            p_score, p_dir, p_name = patterns_res
+        else:
+            p_score = patterns_res.get('score', 0)
+            p_dir = patterns_res.get('dir', 0)
+            p_name = patterns_res.get('name', "None")
+
         details['Patterns'] = {'score': p_score, 'dir': p_dir, 'name': p_name}
         
         # Cycle
         cycle_res = results.get('Cycle')
         if cycle_res is None: cycle_res = ("NEUTRAL", 0)
-        c_phase, c_score = cycle_res
+        if isinstance(cycle_res, tuple):
+            c_phase, c_score = cycle_res
+        else:
+            c_phase = cycle_res.get('phase', 'NEUTRAL')
+            c_score = cycle_res.get('score', 0)
+
         c_dir = 0
         if c_phase == "MANIPULATION_BUY": c_dir = 1
         elif c_phase == "MANIPULATION_SELL": c_dir = -1
@@ -383,39 +409,62 @@ class ConsensusEngine:
         # SupplyDemand
         sd_res = results.get('SupplyDemand')
         if sd_res is None: sd_res = (0, 0, {})
-        sd_score, sd_dir, sd_info = sd_res
+        sd_score = sd_res[0] if isinstance(sd_res, tuple) else sd_res.get('score', 0)
+        sd_dir = sd_res[1] if isinstance(sd_res, tuple) else sd_res.get('dir', 0)
+        sd_info = sd_res[2] if isinstance(sd_res, tuple) and len(sd_res)>2 else sd_res.get('info', {})
         details['SupplyDemand'] = {'score': sd_score, 'dir': sd_dir, 'info': sd_info}
         
         # Divergence
         div_res = results.get('Divergence')
         if div_res is None: div_res = (0, 0, "None")
-        d_score, d_dir, d_type = div_res
+        d_score = div_res[0] if isinstance(div_res, tuple) else div_res.get('score', 0)
+        d_dir = div_res[1] if isinstance(div_res, tuple) else div_res.get('dir', 0)
+        d_type = div_res[2] if isinstance(div_res, tuple) and len(div_res)>2 else div_res.get('type', "None")
         details['Divergence'] = {'score': d_score, 'dir': d_dir, 'type': d_type}
         
         # Volatility
         vol_res = results.get('Volatility')
         if vol_res is None: vol_res = (0, 0)
-        v_score, v_dir = vol_res
+        v_score = vol_res[0] if isinstance(vol_res, tuple) else vol_res.get('score', 0)
+        v_dir = vol_res[1] if isinstance(vol_res, tuple) else vol_res.get('dir', 0)
         details['Volatility'] = {'score': v_score, 'dir': v_dir}
         
         # Kinematics
         kin_res = results.get('Kinematics')
         if kin_res is None: kin_res = (0, 0, 0, 0, 0)
-        k_vel, k_acc, k_score, k_angle, k_energy = kin_res
+        if isinstance(kin_res, tuple):
+             k_vel, k_acc, k_score, k_angle, k_energy = kin_res
+        else:
+             k_vel = kin_res.get('vel', 0)
+             k_acc = kin_res.get('acc', 0)
+             k_score = kin_res.get('score', 0)
+             k_angle = kin_res.get('angle', 0)
+             k_energy = kin_res.get('energy', 0)
+
         k_dir = 1 if k_score > 0 else -1 if k_score < 0 else 0
         details['Kinematics'] = {'vel': k_vel, 'acc': k_acc, 'score': abs(k_score), 'angle': k_angle, 'energy': k_energy}
         
         # Fractal Vision
         fractal_res = results.get('Fractal')
         if fractal_res is None: fractal_res = {'score': 0, 'h4_structure': 'NEUTRAL'}
-        f_score = fractal_res['score']
+        # FIXED: Check if it's a tuple
+        if isinstance(fractal_res, tuple):
+             # Legacy fractal tuple? Let's assume (score, structure)
+             f_score = fractal_res[0] if len(fractal_res) > 0 else 0
+             h4_struc = "NEUTRAL" # Default
+             fractal_res = {'score': f_score, 'h4_structure': h4_struc}
+        
+        f_score = fractal_res.get('score', 0)
         f_dir = 1 if f_score > 0 else -1 if f_score < 0 else 0
         details['Fractal'] = fractal_res
         
         # Math Core
         math_res = results.get('Math')
         if math_res is None: math_res = {'regime_prob': 0.5, 'hurst': 0.5, 'entropy': 0, 'kalman_diff': 0}
-        regime_prob = math_res['regime_prob']
+        if isinstance(math_res, tuple):
+             math_res = {'regime_prob': 0.5, 'hurst': 0.5, 'entropy': 0, 'kalman_diff': 0}
+
+        regime_prob = math_res.get('regime_prob', 0.5)
         hurst = math_res.get('hurst', 0.5)
         entropy = math_res.get('entropy', 0)
         kalman_diff = math_res.get('kalman_diff', 0)
@@ -433,8 +482,14 @@ class ConsensusEngine:
         # Quantum Core
         quantum_res = results.get('Quantum')
         if quantum_res is None: quantum_res = {'tunneling_prob': 0.0, 'is_excited': False}
-        q_tunnel = quantum_res['tunneling_prob']
-        is_excited = quantum_res.get('is_excited', False)
+        if isinstance(quantum_res, tuple):
+            q_tunnel = quantum_res[0]
+            is_excited = False
+            quantum_res = {'tunneling_prob': q_tunnel, 'is_excited': is_excited}
+        else:
+            q_tunnel = quantum_res.get('tunneling_prob', 0)
+            is_excited = quantum_res.get('is_excited', False)
+
         details['Quantum'] = quantum_res
         
         # Cortex Memory
@@ -445,7 +500,10 @@ class ConsensusEngine:
         # Prediction Engine (Monte Carlo)
         pred_res = results.get('Prediction')
         if pred_res is None: pred_res = {'prob_bullish': 0.5, 'skew': 0}
-        mc_bullish = pred_res['prob_bullish']
+        if isinstance(pred_res, tuple):
+             pred_res = {'prob_bullish': 0.5, 'skew': 0}
+             
+        mc_bullish = pred_res.get('prob_bullish', 0.5)
         mc_skew = pred_res.get('skew', 0)
         details['Prediction'] = pred_res
         
@@ -506,7 +564,15 @@ class ConsensusEngine:
         is_singularity = singularity_res['decision'] == "SINGULARITY_REACHED"
         
         # Phase 5: Weekend Gap Predictor
-        weekend_gap_res = results.get('WeekendGap', {'decision': 'WAIT', 'score': 0, 'reason': ''})
+        weekend_gap_res = results.get('WeekendGap')
+        if weekend_gap_res is None: 
+            weekend_gap_res = {'decision': 'WAIT', 'score': 0, 'reason': ''}
+        elif isinstance(weekend_gap_res, tuple):
+             # Legacy tuple support: (decision, score)
+             wg_dec = weekend_gap_res[0] if len(weekend_gap_res) > 0 else 'WAIT'
+             wg_score = weekend_gap_res[1] if len(weekend_gap_res) > 1 else 0
+             weekend_gap_res = {'decision': wg_dec, 'score': wg_score, 'reason': ''}
+             
         details['WeekendGap'] = weekend_gap_res
         weekend_gap_score = weekend_gap_res.get('score', 0)
         weekend_gap_decision = weekend_gap_res.get('decision', 'WAIT')
@@ -915,7 +981,7 @@ class ConsensusEngine:
                        # ✅ PHASE 15 FIX: Divergence Veto (Restored)
                        # Must not revert against Divergence.
                        div_vetoed = False
-                       div_res = results.get('Divergence', {})
+                       div_res = details.get('Divergence', {})
                        div_type = div_res.get('type', '')
                        
                        # If SELL (rev_dir=1), check Bullish Divergence
@@ -931,7 +997,8 @@ class ConsensusEngine:
                            # --- SNIPER CONFLICT VETO (Trade #97-122 Fix) ---
                            # If SMC/Sniper strongly says BUY (>75) but we're about to SELL, BLOCK.
                            # This prevents selling when there's a strong bullish OB/FVG confluence.
-                           sniper_result = results.get('Sniper', {})
+                           sniper_result = details.get('Sniper', {})
+                           s_score_c = sniper_result.get('score', 0) if isinstance(sniper_result, dict) else 0
                            sniper_signal = sniper_result.get('signal') if isinstance(sniper_result, dict) else None
                            sniper_score = sniper_result.get('confidence', 0) if isinstance(sniper_result, dict) else 0
                            
@@ -980,9 +1047,10 @@ class ConsensusEngine:
                  if (v_momentum * struc_dir) > -30:
                      # --- LION SAFEGUARDS (The "Right Veto") ---
                      # Ensure we don't Lion-force into a Sniper wall or Divergence
-                     sniper_res = results.get('Sniper', {})
-                     div_res = results.get('Divergence', {})
-                     pat_res = results.get('Patterns', {})
+                     # Use sanitized 'details' populated earlier, not raw 'results'
+                     sniper_res = details.get('Sniper', {})
+                     div_res = details.get('Divergence', {})
+                     pat_res = details.get('Patterns', {})
 
                      s_dir_check = sniper_res.get('direction', 0) if isinstance(sniper_res, dict) else 0
                      s_score_check = sniper_res.get('score', 0) if isinstance(sniper_res, dict) else 0
@@ -1062,6 +1130,8 @@ class ConsensusEngine:
                          final_decision = "BUY" if struc_dir == 1 else "SELL"
                          final_score = abs(v_structure) + 20 # Higher score boost
                          holographic_reason = "LION_BREAKOUT"
+                         # BOOST: 25x for "1k Challenge"
+                         lot_multiplier = 25.0
                          
                          # Lion trades get 10x leverage now
                          details['mode'] = "LION_PROTOCOL"
@@ -1069,7 +1139,7 @@ class ConsensusEngine:
 
         # Logic E: QUANTUM HARMONY (OVERRIDE MODE - Phase 15)
         # Very high tunnel_prob (>0.95) can OVERRIDE other setups
-        quantum_prob = results.get('Quantum', {}).get('tunnel_prob', 0)
+        quantum_prob = details.get('Quantum', {}).get('tunnel_prob', 0)
         quantum_can_override = quantum_prob > 0.95  # Only extreme tunneling overrides
         quantum_as_fallback = quantum_prob > 0.75 and final_decision == "WAIT"
         
@@ -1084,7 +1154,7 @@ class ConsensusEngine:
                       vetoed = True
                  
                  # Sniper Conflict @90 (Only extreme conflicts)
-                 sniper_res = results.get('Sniper', {})
+                 sniper_res = details.get('Sniper', {})
                  s_dir_check = sniper_res.get('direction', 0) if isinstance(sniper_res, dict) else 0
                  s_score_check = sniper_res.get('score', 0) if isinstance(sniper_res, dict) else 0
                  
@@ -1251,6 +1321,18 @@ class ConsensusEngine:
             total_vector = -total_vector
             holographic_reason = "CONSENSUS_VOTE"
             logger.info(f"LEGACY CONSENSUS (Inverted): {decision} | Reason: {holographic_reason} | Conf: {final_score:.1f}%")
+        
+        # --- PHASE 20: NUCLEAR PROFIT BOOST ($1k Challenge) ---
+        # If we have a finalized decision with HIGH confidence for Sniper/Breakout, engage 25x leverage.
+        if decision != "WAIT" and final_score >= 98.0:
+             # Check reasons
+             is_sniper = "SNIPER" in holographic_reason or "TRAP" in holographic_reason
+             is_breakout = "BREAKOUT" in holographic_reason
+             if is_sniper or is_breakout:
+                  logger.warning(f"NUCLEAR BOOST: Engaging 25x Multiplier for {holographic_reason} (Conf {final_score:.1f}%)")
+                  lot_multiplier = 25.0
+                  details['lot_multiplier'] = 25.0
+                  details['mode'] = "NUCLEAR_SCALING"
                 
         # --- PHASE 10: RECURSIVE DEBATE (Chain-of-Thought) ---
         if decision != "WAIT":

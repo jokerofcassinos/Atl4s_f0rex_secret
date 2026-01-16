@@ -71,7 +71,8 @@ class LaplaceBacktestRunner:
             spread_pips=spread_pips,
             slippage_pips=0.5,
             symbol=symbol,
-            fixed_lots=50.0 # [FIXED LOT MODE] Auto-Scales for <$30k accounts (Smart Engine)
+            # fixed_lots=50.0 # [DISABLED] Dynamic Risk for "1k Challenge"
+            fixed_lots=None 
         )
         
         # Initialize components
@@ -598,6 +599,16 @@ async def main():
     parser.add_argument('--end_date', type=str, default=None, help='End date for backtest (YYYY-MM-DD HH:MM:SS)')
     
     args = parser.parse_args()
+
+    # Clear logs immediately after starting
+    log_files = ["laplace_backtest.log", "genesis.log"] 
+    for lf in log_files:
+        if os.path.exists(lf):
+            try:
+                with open(lf, 'w') as f: f.truncate(0)
+                print(f"🧹 Cleared log: {lf}")
+            except: pass
+
 
     # Initialize runner
     symbol = args.symbol
