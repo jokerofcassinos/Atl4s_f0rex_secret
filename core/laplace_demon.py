@@ -262,6 +262,44 @@ class LaplaceDemonCore:
             self.swarm.inject_bridge(bridge)
         logger.info("[BRIDGE] CONNECTED: Laplace Demon now has physical execution authority.")
 
+    def _check_temporal_hazards(self, current_time: datetime, setup: str) -> Optional[str]:
+        """
+        Hard Veto Logic based on Time of Day/Week.
+        1. Friday Doomsday: Global Shutoff after 20:00.
+        2. Asian Hazard Zone: No Momentum/Squeeze 23:55-01:05.
+        """
+        weekday = current_time.weekday() # 0=Mon, 4=Fri
+        hour = current_time.hour
+        minute = current_time.minute
+        
+        # 1. Friday Doomsday Protocol
+        if weekday == 4 and hour >= 20:
+             return f"FRIDAY_DOOMSDAY_PROTOCOL (Hour {hour}:00 > 20:00)"
+
+        # 2. Asian Hazard Zone (23:55 - 01:05)
+        # Convert to minutes for easier range check
+        time_minutes = hour * 60 + minute
+        # 23:55 = 1435, 01:05 = 65. Range crosses midnight.
+        is_hazard_time = (time_minutes >= 1435) or (time_minutes <= 65)
+        
+        if is_hazard_time:
+             # Block Momentum & Squeeze Strategies
+             if setup in ["VOLATILITY_SQUEEZE", "MOMENTUM_BREAKOUT", "STRUCTURE_TREND_RIDER"]:
+                  return f"ASIAN_HAZARD_ZONE ({hour}:{minute:02d})"
+                  
+        return None
+
+    def _check_toxic_flow_lock(self, is_compressed: bool, setup: str, reasons: list) -> Optional[str]:
+        """
+        Hard Veto Logic based on Order Flow State.
+        Block Breakout strategies during Compression.
+        """
+        if is_compressed:
+             reasons.append("Toxic Flow: Compression Detected")
+             if setup in ["VOLATILITY_SQUEEZE", "MOMENTUM_BREAKOUT"]:
+                  return "TOXIC_FLOW_COMPRESSION_LOCK"
+        return None
+
     async def analyze(self,
                 df_m1: pd.DataFrame,
                 df_m5: pd.DataFrame,
@@ -435,6 +473,21 @@ class LaplaceDemonCore:
         reasons = []
         vetoes = []
         
+        # --- PHASE 5 BLINDAGEM ESTRATEGICA (HARD VETOES) ---
+        # 1. Temporal Hazards (Friday Doomsday & Asian Trap)
+        temporal_veto = self._check_temporal_hazards(df_m5.index[-1] if not df_m5.empty else datetime.now(), setup)
+        if temporal_veto:
+             vetoes.append(temporal_veto)
+             return LaplacePrediction(execute=False, direction="HOLD", confidence=0.0, strength=SignalStrength.VETO, reasons=reasons, vetoes=vetoes, primary_signal=f"VETO: {temporal_veto}")
+
+        # 2. Toxic Flow Lock (Compression Veto for Squeeze)
+        toxic_veto = self._check_toxic_flow_lock(details.get('ToxicFlow', False), setup, reasons) # Pass reasons to log compression
+        if toxic_veto:
+             vetoes.append(toxic_veto)
+             # We return immediately to save processing power on dead trades
+             return LaplacePrediction(execute=False, direction="HOLD", confidence=0.0, strength=SignalStrength.VETO, reasons=reasons, vetoes=vetoes, primary_signal=f"VETO: {toxic_veto}")
+
+        
         # Extract Chaos variables for Vetos
         chaos_data = details.get('Chaos', {})
         if not isinstance(chaos_data, dict): chaos_data = {}
@@ -446,20 +499,6 @@ class LaplaceDemonCore:
         
         if setup:
             reasons.append(f"Legacy V1 Setup: {setup} (Base Score: {score:.1f})")
-            
-        # --- RECURSIVE DEBATE ENFORCEMENT ---
-        # If the debate explicitly vetoed the Legacy logic, we must respect it.
-        # This fixes the issue where "Veto Entry" result was ignored by Synthesis.
-        legacy_details_dict = details if isinstance(details, dict) else {}
-        debate_res = legacy_details_dict.get('Debate')
-        if debate_res == "VETO":
-             # Debate said NO.
-             reasons.append("Recursive Debate Enforcer: VETOED Entry (Override Safe)")
-             vetoes.append("Debate Veto: Internal Critic blocked this trade.")
-             # We set a flag, but we let the loop continue to see if Swarm overrides (rare)
-             # Actually, Debate is usually final.
-             score = 0
-             setup = "VETOED_BY_DEBATE"
             
         # --- SWARM INTELLIGENCE INTEGRATION ---
         # 1. Specific Agent Confirmations (Micro-Boosts)
@@ -1315,21 +1354,6 @@ class LaplaceDemonCore:
                   vetoes.append(f"Chaos Veto: Market too chaotic for {setup}")
                   score = 0  
                   
-        # --- SURGICAL CHAOS VETO (Anti-Drift) ---
-        # Goal: Stop fading strong moves in Chaos, but allow pro-trend trades.
-        # Applies to VOID_FILLER and VOLATILITY_SQUEEZE
-        if setup in ["VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"] and lyapunov > 0.6:
-             # Check if we are fighting the drift
-             fighting_drift = False
-             if decision_dir == "BUY" and k_dir == -1 and k_angle > 30: fighting_drift = True
-             elif decision_dir == "SELL" and k_dir == 1 and k_angle > 30: fighting_drift = True
-             
-             if fighting_drift:
-                  reasons.append(f"CHAOS FADE VETO: Blocking {setup} (Chaos {lyapunov:.2f} + Anti-Kinematics {k_angle:.0f}°)")
-                  vetoes.append("Chaos Fade Veto: Cannot fade drift in High Chaos")
-                  score = 0
-                  execute = False  
-                  
         # --- GLOBAL SNIPER CONFLICT VETO (Trade #109 Fix) ---
         # If Sniper says one direction (>50) but we're going opposite, BLOCK.
         # THRESHOLD LOWERED from 70 to 50 (Trade #106 had Sniper 57.2)
@@ -1344,17 +1368,7 @@ class LaplaceDemonCore:
         # Sniper dir: +1 = BUY, -1 = SELL (THRESHOLD: 50)
         if decision_dir == "BUY" and sniper_dir == -1 and sniper_score > 50:
             # RELAXED VETO: If we have > 90% Confidence (e.g. Swarm + Legacy), we ignore Sniper.
-            # SURGICAL UPDATE: NO BYPASS for Squeeze/Filler if Sniper is Strong (>60)
-            
-            allow_bypass = False
-            if abs(score) >= 90: allow_bypass = True
-            
-            # Special Check for Squeeze/Filler (The "Trap" Setups)
-            if setup in ["VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"] and sniper_score > 60:
-                 allow_bypass = False # STRICT: Sniper > 60 kills Squeeze/Filler
-                 reasons.append("SNIPER SUPREMACY: Squeeze/Filler cannot override Strong Sniper.")
-
-            if allow_bypass:
+            if abs(score) >= 90 or setup == "GOLDEN_COIL_M8" or setup == "VOID_FILLER_FVG" or setup == "VOLATILITY_SQUEEZE":
                  reasons.append(f"SNIPER OVERRIDE: High Confidence ({score:.1f}) bypasses Sniper Veto.")
             else:
                 reasons.append(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
@@ -1364,18 +1378,7 @@ class LaplaceDemonCore:
                 logger.warning(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper SELL {sniper_score:.1f})")
             
         elif decision_dir == "SELL" and sniper_dir == 1 and sniper_score > 50:
-            # RELAXED VETO: If we have > 90% Confidence (e.g. Swarm + Legacy), we ignore Sniper.
-            # SURGICAL UPDATE: NO BYPASS for Squeeze/Filler if Sniper is Strong (>60)
-            
-            allow_bypass = False
-            if abs(score) >= 90: allow_bypass = True
-            
-            # Special Check for Squeeze/Filler (The "Trap" Setups)
-            if setup in ["VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"] and sniper_score > 60:
-                 allow_bypass = False # STRICT: Sniper > 60 kills Squeeze/Filler
-                 reasons.append("SNIPER SUPREMACY: Squeeze/Filler cannot override Strong Sniper.")
-
-            if allow_bypass:
+            if abs(score) >= 90 or setup == "GOLDEN_COIL_M8" or setup == "VOID_FILLER_FVG" or setup == "VOLATILITY_SQUEEZE":
                  reasons.append(f"SNIPER OVERRIDE: High Confidence ({score:.1f}) bypasses Sniper Veto.")
             else:
                 reasons.append(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper says BUY {sniper_score:.1f})")
