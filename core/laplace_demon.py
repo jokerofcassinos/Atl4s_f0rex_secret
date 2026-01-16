@@ -711,9 +711,16 @@ class LaplaceDemonCore:
                             if c_low <= fvg_top and c_close > fvg_bot: 
                                  if c_close < fvg_bot: continue
                                  
-                                 # SANITY CHECK: Don't fade a Strong Consensus TREND
-                                 # If Consensus says SELL (>50) and we try to BUY, BLOCK IT.
-                                 if score < -50:
+                                 # 1. KINEMATICS VETO (Crash Protection)
+                                 # Stricter: Block if crashing > 25 deg (Moderate Trend)
+                                 if k_dir == -1 and k_angle > 25:
+                                      reasons.append(f"VOID FILLER VETOED: Crashing ({k_angle}° > 25)")
+                                      continue
+
+                                 # 2. CONSENSUS VETO (Trend Alignment)
+                                 # Stricter: Block if Consensus is SELL (> -20)
+                                 if score < -20:
+                                      reasons.append(f"VOID FILLER VETOED: Consensus Sell ({score:.1f})")
                                       continue
 
                                  # PRIORITY CHECK: Only apply if Score 130 > Current Score
@@ -728,12 +735,16 @@ class LaplaceDemonCore:
                             if c_high >= fvg_bot and c_close < fvg_top:
                                  if c_close > fvg_top: continue
                                  
-                                 # 1. Consensus Veto
-                                 if score > 50: continue
-
-                                 # 2. Kinematics Veto (Don't fade Rocket UP)
-                                 if k_dir == 1 and k_angle > 45:
-                                      reasons.append(f"VOID FILLER VETOED: Kinematics UP ({k_angle}°)")
+                                 # 1. KINEMATICS VETO (Rocket Protection)
+                                 # Stricter: Block if rocketing > 25 deg
+                                 if k_dir == 1 and k_angle > 25:
+                                      reasons.append(f"VOID FILLER VETOED: Rocketing ({k_angle}° > 25)")
+                                      continue
+                                 
+                                 # 2. CONSENSUS VETO (Trend Alignment)
+                                 # Stricter: Block if Consensus is BUY (> 20)
+                                 if score > 20: 
+                                      reasons.append(f"VOID FILLER VETOED: Consensus Buy ({score:.1f})")
                                       continue
 
                                  # PRIORITY CHECK
@@ -1469,27 +1480,27 @@ class LaplaceDemonCore:
                        reasons.append("Adaptation: Market is Grinding DOWN. Don't Fill.")
         # GLOBAL KINEMATICS HARD VETO (The "Trend/Rocket Logic")
         # User Request: "Conflict of Decision: Selling when Price is Rising"
-        # Forensic Update: Lowered threshold to 25 deg to catch "Moderate Trends" vs just Rockets.
+        # We perform a final check on the INTENDED direction vs ACTUAL MOMENTUM.
         
-        # 1. Check SELL against RISING Trend
+        # 1. Check SELL against RISING Rocket
         if score < 0: # Intending to SELL
-             if k_dir == 1 and k_angle > 25:
+             if k_dir == 1 and k_angle > 45:
                   # Exception: Is this a "Top Fishing" setup like QUANTUM HARPOON?
-                  # Harpoon trades at Z-Score > 3.0. Even then, fighting a trend is risky.
-                  # For Zero Loss goal, we BLOCK EVERYTHING against > 25 deg.
+                  # Even Harpoon shouldn't fade a 80deg rocket, but maybe 45-60deg.
+                  # Let's be strict for now to stop the bleeding.
                   score = 0
                   execute = False # Redundant but safe
                   hard_veto = True
-                  vetoes.append(f"GLOBAL HARD VETO: Attempting to SELL into RISING TREND ({k_angle}° > 25°)")
+                  vetoes.append(f"GLOBAL HARD VETO: Attempting to SELL into RISING ROCKET ({k_angle}°)")
                   reasons.append(f"FATAL CONFLICT: Momentum is UP, Signal is SELL. Vetoing.")
 
-        # 2. Check BUY against CRASHING Trend
+        # 2. Check BUY against CRASHING Meteor
         elif score > 0: # Intending to BUY
-             if k_dir == -1 and k_angle > 25:
+             if k_dir == -1 and k_angle > 45:
                   score = 0
                   execute = False
                   hard_veto = True
-                  vetoes.append(f"GLOBAL HARD VETO: Attempting to BUY into CRASHING TREND ({k_angle}° > 25°)")
+                  vetoes.append(f"GLOBAL HARD VETO: Attempting to BUY into CRASHING METEOR ({k_angle}°)")
                   reasons.append(f"FATAL CONFLICT: Momentum is DOWN, Signal is BUY. Vetoing.")
 
         # --- DECISION THRESHOLD ---
