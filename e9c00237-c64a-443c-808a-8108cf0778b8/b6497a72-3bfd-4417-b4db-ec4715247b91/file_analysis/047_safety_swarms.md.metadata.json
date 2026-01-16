@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of critical safety/risk swarms: BlackSwanSwarm (VETO system for fat tail detection), ChaosSwarm (Lyapunov + Shannon Entropy for chaos detection). Documents the protective mechanisms preventing catastrophic losses.",
-  "updatedAt":  "2026-01-11T17:38:22.716333900Z"
-}

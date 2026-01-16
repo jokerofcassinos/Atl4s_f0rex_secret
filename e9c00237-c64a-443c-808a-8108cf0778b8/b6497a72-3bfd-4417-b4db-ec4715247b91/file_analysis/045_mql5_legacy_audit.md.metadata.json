@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Complete audit of MQL5 bridge files (4 files, 86KB) and Legacy codebase (Atl4s_f0rex_secret-main with 40+ files). Documents the MT5 Expert Advisor, data exporter, and compares legacy vs new architecture.",
-  "updatedAt":  "2026-01-11T17:36:15.884246200Z"
-}

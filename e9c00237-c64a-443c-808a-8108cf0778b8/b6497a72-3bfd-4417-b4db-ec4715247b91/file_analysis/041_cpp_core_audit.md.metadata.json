@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Complete audit of cpp_core folder with 6 C++ high-performance modules and 7 compiled DLLs. Documents the native acceleration layer including MCTS, HDC, Physics simulation, Memory systems, Learning algorithms, and Reasoning engines.",
-  "updatedAt":  "2026-01-11T17:34:14.374597500Z"
-}

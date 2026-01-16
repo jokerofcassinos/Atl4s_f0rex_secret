@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of fourth_eye.py showing major expansion from 78 to 243 lines. Adds Quantum Matrix, Iceberg detection, and 4 VETO conditions that may be over-filtering trades.",
-  "updatedAt":  "2026-01-11T16:46:39.279729100Z"
-}

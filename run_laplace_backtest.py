@@ -51,7 +51,7 @@ class LaplaceBacktestRunner:
     """
     
     def __init__(self,
-                 initial_capital: float = 5000.0,
+                 initial_capital: float = 30.0,
                  risk_per_trade: float = 2.0,
                  symbol: str = "GBPUSD",
                   spread_pips: float = 1.5):
@@ -218,6 +218,7 @@ class LaplaceBacktestRunner:
             else:
                  slice_m1 = None
             # Check active trades first
+            exits_this_candle = []
             for trade in self.engine.active_trades[:]:
                 exit_reason = self.engine.update_trade(trade, current_price, current_time)
                 
@@ -233,22 +234,26 @@ class LaplaceBacktestRunner:
                     
                     self.engine.close_trade(trade, exit_price, current_time, exit_reason)
                     
-                    # Notify Telegram
+                    # Batch exit data for telegram
                     if self.telegram.enabled:
-                        await self.telegram.notify_trade_exit(
-                            symbol=self.symbol,
-                            entry=trade.entry_price,
-                            exit=exit_price,
-                            pnl_dollars=trade.pnl_dollars,
-                            pnl_pips=trade.pnl_pips,
-                            reason=exit_reason,
-                            source=trade.signal_source,
-                            lot_size=trade.lot_size if hasattr(trade, 'lot_size') else 0.01,
-                            trade_number=trade.id
-                        )
+                        exits_this_candle.append({
+                            'id': trade.id,
+                            'symbol': self.symbol,
+                            'entry': trade.entry_price,
+                            'exit': exit_price,
+                            'pnl_dollars': trade.pnl_dollars,
+                            'pnl_pips': trade.pnl_pips,
+                            'reason': exit_reason,
+                            'source': trade.signal_source,
+                            'lot_size': trade.lots
+                        })
                     
                     logger.info(f"EXIT #{trade.id}: {exit_reason} | PnL: ${trade.pnl_dollars:.2f} | Setup: {trade.signal_source}")
             
+            # BATCH NOTIFY EXITS
+            if self.telegram.enabled and exits_this_candle:
+                await self.telegram.notify_batched_exits(exits_this_candle)
+
             # --------------------------------------------------------------------------
             # ADVANCED RISK: Time Decay Take Profit (Descending Staircase)
             # --------------------------------------------------------------------------
@@ -391,6 +396,8 @@ class LaplaceBacktestRunner:
                         continue  # Skip this trade
 
                     # Execute N times
+                    executed_trades = []
+                    total_volume = 0.0
                     for order_idx in range(num_orders):
                         trade = self.engine.open_trade(
                             direction=direction,
@@ -413,28 +420,35 @@ class LaplaceBacktestRunner:
                                 f"Conf: {prediction.confidence:.0f}% | SPLIT FIRE ({order_idx+1}/{num_orders})"
                             )
                             
-                            # Log Neural Decision if present (only once per candle to avoid noise? No, log it so it's clear)
+                            # Log Neural Decision if present (only once per candle to avoid noise)
                             if order_idx == 0:
                                 for reason in prediction.reasons:
                                     if "Neural" in reason:
                                         logger.info(f"  > {reason}")
                                 
                             if self.telegram.enabled:
-                                await self.telegram.notify_trade_entry(
-                                    direction=prediction.direction,
-                                    symbol=self.symbol,
-                                    entry=current_price,
-                                    sl=trade.sl_price,
-                                    tp=trade.tp_price,
-                                    confidence=prediction.confidence,
-                                    setup=f"{prediction.primary_signal} [{order_idx+1}/{num_orders}]",
-                                    lot_size=trade.lot_size if hasattr(trade, 'lot_size') else 0.01,
-                                    trade_number=trade.id
-                                )
+                                 executed_trades.append(trade.id)
+                                 total_volume += trade.lots
+
                         else:
                              # If one fails (margin/slots), likely all fail. Break.
                              logger.warning(f"SKIPPED SPLIT EXECUTION at {order_idx+1}/{num_orders}: Consensus said {prediction.direction} but execution failed (Max Slots/Margin?).")
                              break
+
+                    # BATCH NOTIFY SPLIT FIRE
+                    if self.telegram.enabled and executed_trades:
+                        await self.telegram.notify_split_fire_entry(
+                            direction=prediction.direction,
+                            symbol=self.symbol,
+                            entry_price=current_price,
+                            sl=prediction.sl_pips, # Using pips for cleaner display
+                            tp=prediction.tp_pips,
+                            confidence=prediction.confidence,
+                            setup=prediction.primary_signal,
+                            total_lots=total_volume,
+                            num_orders=len(executed_trades),
+                            trade_ids=executed_trades
+                        )
                                 
                 elif prediction.direction in ["BUY", "SELL"] and not prediction.execute:
                     # Logic Vetoed it (Nash, Neural, etc)
@@ -531,8 +545,8 @@ class LaplaceBacktestRunner:
         print(f"   Losing Trades:     {result.losing_trades}")
         print(f"   Win Rate:          {result.win_rate:.1f}%")
         
-        target_met = "✅" if result.win_rate >= 70 else "❌"
-        print(f"   Target (70%):      {target_met}")
+        target_met = "✅" if result.win_rate >= 90 else "❌"
+        print(f"   Target (90%):      {target_met}")
         
         print(f"\n💰 PROFIT/LOSS")
         print(f"   Net Profit:        ${result.net_profit:.2f}")
@@ -586,7 +600,7 @@ async def main():
     print("\n" + "═" * 60)
     print("  🔮 LAPLACE DEMON - DETERMINISTIC TRADING INTELLIGENCE 🔮")
     print("═" * 60)
-    print("\n  Target: 70% Win Rate | $100,000 Capital | GBPUSD\n")
+    print("\n  Target: 90% Win Rate | $30 Capital | GBPUSD\n")
     
     # Parse arguments
     import argparse

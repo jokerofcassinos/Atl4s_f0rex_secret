@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of main.py (895 lines). OmegaSystem class with 4 main methods. Run loop handles tick processing, VTP/VSL guards, AGI pre-tick, M8 Fibonacci validation, then Cortex decision. Well designed.",
-  "updatedAt":  "2026-01-11T16:57:54.718173Z"
-}

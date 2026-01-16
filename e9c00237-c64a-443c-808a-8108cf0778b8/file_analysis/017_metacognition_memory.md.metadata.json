@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of metacognition and memory modules. recursive_reflection.py implements 5-level introspection with blind spot detection. holographic.py uses FAISS with 4096 dimensions and temporal hierarchy. Both professional grade.",
-  "updatedAt":  "2026-01-11T17:02:18.691159800Z"
-}

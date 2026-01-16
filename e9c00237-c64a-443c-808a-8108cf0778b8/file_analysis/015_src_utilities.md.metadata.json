@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of src/ utility files. strategy_core.py has a typo bug ('undersold' instead of 'oversold'). quantum_math.py and macro_math.py are well designed with advanced mathematical models.",
-  "updatedAt":  "2026-01-11T17:00:48.017907700Z"
-}

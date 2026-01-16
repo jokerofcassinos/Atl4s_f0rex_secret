@@ -141,6 +141,70 @@ Result: `${pnl_dollars:+.2f}` ({pnl_pips:+.1f} pips)
 """
         await self.send_message(message)
 
+    async def notify_split_fire_entry(self, direction: str, symbol: str, entry_price: float,
+                                      sl: float, tp: float, confidence: float, setup: str,
+                                      total_lots: float, num_orders: int, trade_ids: List[int]):
+        """Notify consolidated SPLIT FIRE entry"""
+        emoji = "🟢" if direction == "BUY" else "🔴"
+        safe_symbol = str(symbol).replace("_", "\\_")
+        safe_setup = str(setup).replace("_", "\\_")
+        
+        # ID Range (e.g., #10-19)
+        id_range = f"#{trade_ids[0]}-{trade_ids[-1]}" if len(trade_ids) > 1 else f"#{trade_ids[0]}"
+        
+        message = f"""
+{emoji} *SPLIT FIRE ENTRY {id_range}*
+🚀 *{num_orders}x Orders Executed*
+
+📊 *{safe_symbol}* ({direction})
+Entry: `{entry_price:.5f}`
+SL: `{sl:.5f}`
+TP: `{tp:.5f}`
+
+📦 Total Volume: `{total_lots:.2f}` Lots
+({num_orders} x {total_lots/num_orders:.2f})
+
+🎯 Setup: `{safe_setup}`
+🔥 Conf: `{confidence:.1f}%`
+"""
+        await self.send_message(message)
+
+    async def notify_batched_exits(self, exits: List[Dict]):
+        """Notify multiple exits in one message"""
+        if not exits: return
+        
+        # Group by Result
+        wins = [e for e in exits if e['pnl_dollars'] > 0]
+        losses = [e for e in exits if e['pnl_dollars'] <= 0]
+        
+        total_pnl = sum(e['pnl_dollars'] for e in exits)
+        emoji = "💰" if total_pnl > 0 else "❌"
+        
+        # Header
+        message = f"{emoji} *BATCH EXIT REPORT ({len(exits)} Trades)*\n"
+        message += f"💵 *Net Result: ${total_pnl:+.2f}*\n\n"
+        
+        # Summary grouping
+        if wins:
+            message += f"✅ *Wins ({len(wins)}):* ${sum(e['pnl_dollars'] for e in wins):+.2f}\n"
+        if losses:
+            message += f"❌ *Losses ({len(losses)}):* ${sum(e['pnl_dollars'] for e in losses):+.2f}\n"
+            
+        message += "\n*Details:*\n"
+        
+        # Limit details if too many
+        max_details = 5
+        for i, exit in enumerate(exits[:max_details]):
+            reason = exit.get('reason', 'UNKNOWN')
+            pnl = exit.get('pnl_dollars', 0)
+            id_ = exit.get('id', 0)
+            message += f"• #{id_}: `{reason}` (${pnl:+.2f})\n"
+            
+        if len(exits) > max_details:
+            message += f"...and {len(exits) - max_details} more."
+
+        await self.send_message(message)
+
     async def notify_risk_alert(self, level: str, category: str, message: str):
         """Notify risk alert"""
         emoji = "🚨" if level == "CRITICAL" else "⚠️" if level == "WARNING" else "ℹ️"

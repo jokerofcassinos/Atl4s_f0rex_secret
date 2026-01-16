@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of the main backtest_engine.py (1139 lines, 52KB) - the Omega Protocol Backtest Engine v3.0. Documents all key methods including SMC detection, OTE zones, displacement analysis, and MT5 bridge integration.",
-  "updatedAt":  "2026-01-11T17:32:37.082330700Z"
-}

@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Master summary document for Phase 1+2 complete analysis. Documents all 12 previous analysis files, 240+ files analyzed, 3 critical bugs, dual architecture problem, ~200KB confirmed dead code (vs 314KB earlier estimate due to more modules being integrated than expected).",
-  "updatedAt":  "2026-01-11T17:22:33.518493200Z"
-}

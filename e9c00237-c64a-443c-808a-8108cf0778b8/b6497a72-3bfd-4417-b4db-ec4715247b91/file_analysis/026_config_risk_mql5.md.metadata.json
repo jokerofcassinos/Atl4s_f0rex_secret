@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of config.py, core/risk, MQL5 bridge, and zmq_bridge. Documents that TRADING_MODE is set to LAPLACE by default but main.py ignores this setting. MQL5 bridge (42KB) is the execution layer connecting to MetaTrader 5.",
-  "updatedAt":  "2026-01-11T17:20:40.451761300Z"
-}

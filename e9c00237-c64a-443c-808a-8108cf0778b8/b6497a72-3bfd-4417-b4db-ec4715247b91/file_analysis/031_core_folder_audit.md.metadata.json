@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Complete audit of core/ folder with 24 files and 8 subdirectories. Documents the main execution modules including execution_engine.py (45KB), swarm_orchestrator.py (72KB), genetics.py, mcts_planner.py.  Provides integration status and file size analysis.",
-  "updatedAt":  "2026-01-11T17:26:01.587490100Z"
-}

@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of root-level utility files including risk_manager.py (Kelly Criterion, Quantum Lots), optimizer.py (Genetic Algorithm), and other critical utilities. Documents the complete risk management and optimization infrastructure.",
-  "updatedAt":  "2026-01-11T17:30:59.628777700Z"
-}

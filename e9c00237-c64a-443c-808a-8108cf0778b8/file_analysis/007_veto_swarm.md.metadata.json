@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of veto_swarm.py showing 4 veto conditions with Meta-Critic suppression. File is reasonably designed, but combined with orchestrator layers creates over-filtering.",
-  "updatedAt":  "2026-01-11T16:48:50.578726700Z"
-}

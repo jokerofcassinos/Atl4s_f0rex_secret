@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Analysis of omega_agi_core.py (1269 lines). Contains AGI infrastructure: MetaExecutionLoop, StateMachine, PerformanceMonitor, 50+ subsystems. Adds latency but is well-structured. Not the root cause of performance issues.",
-  "updatedAt":  "2026-01-11T16:53:21.917927900Z"
-}

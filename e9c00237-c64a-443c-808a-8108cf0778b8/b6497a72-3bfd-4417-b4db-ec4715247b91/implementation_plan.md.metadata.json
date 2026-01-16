@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
-  "summary":  "Critical bug fix plan for Atl4s-Forex trading bot. Details 3 specific code changes to fix signal inversion, Gate 3 hard block, and threshold strictness that caused $8K→$30/day performance drop. Includes exact line numbers, before/after code, and backtest verification plan.",
-  "updatedAt":  "2026-01-11T17:07:48.612591600Z"
-}

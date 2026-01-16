@@ -1,5 +1,0 @@
-{
-  "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "Complete analysis of backtesting infrastructure: backtest/engine.py (704 lines professional engine), core/backtest (3 simulators). Documents the full testing infrastructure for the trading bot.",
-  "updatedAt":  "2026-01-11T17:27:53.238459800Z"
-}

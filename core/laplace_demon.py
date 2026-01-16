@@ -558,8 +558,8 @@ class LaplaceDemonCore:
              
              if b_dir == "BUY":
                   # Check for BULL TRAP (Breaking Resistance but Momentum is BEARISH)
-                  # If Momentum is effectively SELLING (score < -30) while we break UP, it's likely a liquidity grab.
-                  if score < -30:
+                  # If Momentum is effectively SELLING (score < -50) while we break UP, it's likely a liquidity grab.
+                  if score < -50:
                        reasons.append(f"BULL TRAP DETECTED: Fake Breakout vs Momentum ({score:.1f})")
                        score = -100 # Flip to SELL
                        setup = "BULL_TRAP_SNIPER"
@@ -570,8 +570,8 @@ class LaplaceDemonCore:
 
              elif b_dir == "SELL":
                   # Check for BEAR TRAP (Breaking Support but Momentum is BULLISH)
-                  # If Momentum is effectively BUYING (score > 30) while we break DOWN, it's likely a Spring.
-                  if score > 30:
+                  # If Momentum is effectively BUYING (score > 50) while we break DOWN, it's likely a Spring.
+                  if score > 50:
                        reasons.append(f"BEAR TRAP DETECTED: Fake Breakdown vs Momentum ({score:.1f})")
                        score = 100 # Flip to BUY
                        setup = "BEAR_TRAP_SNIPER"
@@ -1046,6 +1046,16 @@ class LaplaceDemonCore:
                     vetoes.append("Trend Veto: Expansion Buy")
                     score = 0
             
+            
+            # --- STRUCTURE VETO (Trade #46 Fix) ---
+            # If SMC Structure says BULLISH, we should NOT sell unless it's a Smart Money Reversal.
+            smc_struc = smc_res.get('structure', 'NEUTRAL')
+            if setup != "SMART_MONEY_REVERSAL":
+                 if smc_struc == "BULLISH" and setup != "STRUCTURE_TREND_RIDER": # Allow Rider to short pullbacks? No, Rider rides trend.
+                      reasons.append(f"STRUCTURE VETO: Blocking SELL (Structure is {smc_struc})")
+                      vetoes.append(f"Structure Veto: Cannot Sell in Bullish Structure")
+                      score = 0
+            
             # --- FINAL LION SANITY CHECK (SMC Alignment) ---
             if setup == "LION_BREAKOUT" and not score == 0:
                  smc_trend = smc_res.get('trend', 'NEUTRAL')
@@ -1057,6 +1067,15 @@ class LaplaceDemonCore:
                     reasons.append(f"GLOBAL VETO: Bullish Divergence ({div_type}) opposes SELL.")
                     vetoes.append("Divergence Veto: Bullish Conflict")
                     score = 0
+                    
+        # --- CHAOS VETO (Trade #75 Fix) ---
+        # Block Mean Reversion strategies in High Chaos
+        if "REVERSION" in str(setup) or "SNIPER" in str(setup):
+             if lyapunov > 0.5:
+                  reasons.append(f"CHAOS VETO: Blocking {setup} (Lyapunov {lyapunov:.2f} > 0.5)")
+                  vetoes.append(f"Chaos Veto: Market too chaotic for Reversion")
+                  score = 0  
+                  
         # --- GLOBAL SNIPER CONFLICT VETO (Trade #109 Fix) ---
         # If Sniper says one direction (>50) but we're going opposite, BLOCK.
         # THRESHOLD LOWERED from 70 to 50 (Trade #106 had Sniper 57.2)
@@ -1070,18 +1089,25 @@ class LaplaceDemonCore:
         
         # Sniper dir: +1 = BUY, -1 = SELL (THRESHOLD: 50)
         if decision_dir == "BUY" and sniper_dir == -1 and sniper_score > 50:
-            reasons.append(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
-            vetoes.append(f"Sniper Conflict: Sniper SELL {sniper_score:.0f}% opposes BUY")
-            execute = False
-            hard_veto = True
-            logger.warning(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper SELL {sniper_score:.1f})")
+            # RELAXED VETO: If we have > 90% Confidence (e.g. Swarm + Legacy), we ignore Sniper.
+            if abs(score) >= 90:
+                 reasons.append(f"SNIPER OVERRIDE: High Confidence ({score:.1f}) bypasses Sniper Veto.")
+            else:
+                reasons.append(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
+                vetoes.append(f"Sniper Conflict: Sniper SELL {sniper_score:.0f}% opposes BUY")
+                execute = False
+                hard_veto = True
+                logger.warning(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper SELL {sniper_score:.1f})")
             
         elif decision_dir == "SELL" and sniper_dir == 1 and sniper_score > 50:
-            reasons.append(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper says BUY {sniper_score:.1f})")
-            vetoes.append(f"Sniper Conflict: Sniper BUY {sniper_score:.0f}% opposes SELL")
-            execute = False
-            hard_veto = True
-            logger.warning(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper BUY {sniper_score:.1f})")
+            if abs(score) >= 90:
+                 reasons.append(f"SNIPER OVERRIDE: High Confidence ({score:.1f}) bypasses Sniper Veto.")
+            else:
+                reasons.append(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper says BUY {sniper_score:.1f})")
+                vetoes.append(f"Sniper Conflict: Sniper BUY {sniper_score:.0f}% opposes SELL")
+                execute = False
+                hard_veto = True
+                logger.warning(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper BUY {sniper_score:.1f})")
 
         # --- DIVERGENCE CONFLICT VETO (Trade #106 Fix) ---
         # If Bullish Divergence but decision is SELL, BLOCK (and vice versa)
