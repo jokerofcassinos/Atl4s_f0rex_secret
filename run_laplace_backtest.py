@@ -386,9 +386,22 @@ class LaplaceBacktestRunner:
                     lot_multiplier = getattr(prediction, 'lot_multiplier', 1.0)
                     
                     if lot_multiplier >= 2.0:
-                        # SMART SPLIT ADJUSTMENT (Small Account Optimization)
-                        # Identify target aggression (Cap at 10x Risk to prevent Margin Call on $30)
-                        target_total_multiplier = min(lot_multiplier, 10.0) 
+                        # SMART SPLIT ADJUSTMENT (Wealth Preservation Logic)
+                        # As account grows, we MUST reduce relative risk to avoid catastrophic drawdown.
+                        # $30 account -> 10x Risk (Grow Fast).
+                        # $5000 account -> 2x Risk (Protect Wealth).
+                        
+                        current_balance = self.engine.get_balance() if hasattr(self.engine, 'get_balance') else 1000
+                        
+                        max_aggression = 10.0
+                        if current_balance > 500:
+                             # Linear decay or simple tiers
+                             if current_balance > 2000:
+                                  max_aggression = 2.0 # Conservative Cap for Big Money
+                             else:
+                                  max_aggression = 5.0 # Medium Aggression
+                        
+                        target_total_multiplier = min(lot_multiplier, max_aggression) 
                         
                         # Cap max splits to 5 to avoid "Min Lot" errors
                         num_orders = min(int(lot_multiplier), 5)
