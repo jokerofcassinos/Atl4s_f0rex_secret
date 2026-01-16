@@ -89,7 +89,7 @@ class BacktestConfig:
     # Risk Management
     risk_per_trade_pct: float = 2.0  # 2% risk per trade
     fixed_lots: Optional[float] = None # Fixed lot size overrides percentage risk
-    max_concurrent_trades: int = 3
+    max_concurrent_trades: int = 20 # Increased to support Split Fire (5 splits) + Concurrent Setups
     
     # Virtual Stops (Phase 7 - User Request)
     vsl_pips: Optional[float] = None  # Previous pip-based VSL
@@ -291,10 +291,11 @@ class BacktestEngine:
         # ═══════════════════════════════════════════════════════════
         
         # 1. FreeMargin Check - Don't trade if margin is too low
-        MIN_FREE_MARGIN = 15.0  # Block new trades if FreeMargin < $15
+        MIN_FREE_MARGIN = 2.0  # Allow aggressive trading on small accounts ($30 start)
         free_margin = self.balance  # Simplified: FreeMargin ≈ Balance for spot forex
         if free_margin < MIN_FREE_MARGIN:
             logger.warning(f"BLOCKED: FreeMargin ${free_margin:.2f} < ${MIN_FREE_MARGIN}")
+            print(f"DEBUG_BLOCK: FreeMargin {free_margin} < {MIN_FREE_MARGIN}")
             return None
         
         # 2. Check concurrent trades limit
@@ -309,6 +310,7 @@ class BacktestEngine:
             
         if len(self.active_trades) >= max_slots:
             logger.warning(f"BLOCKED: Max Slots Reached ({len(self.active_trades)}/{max_slots})")
+            print(f"DEBUG_BLOCK: MaxSlots {len(self.active_trades)} >= {max_slots}")
             return None
         
         # 3. Check if SL would cost more than 5% of account
@@ -348,6 +350,8 @@ class BacktestEngine:
         if lot_multiplier != 1.0:
             logger.info(f"Applying Lot Multiplier: {lot_multiplier}x (Base: {lots})")
             lots *= lot_multiplier
+            # Force minimum 0.01 to prevent 'Split Fire' rounding to zero on small accounts
+            lots = max(0.01, round(lots, 2))
 
         # 4. Final Safety Check: Max Risk Amount (MOVED AFTER MULTIPLIER)
         # Re-calc potential loss with FINAL lots
@@ -366,6 +370,8 @@ class BacktestEngine:
         #     lots = 0.01  # Fixed minimum lot for small accounts
         
         if lots < 0.01:
+            logger.warning(f"BLOCKED: Lots {lots} < 0.01")
+            print(f"DEBUG_BLOCK: Lots {lots} < 0.01")
             return None  # Can't afford the trade
         
         self.trade_counter += 1
