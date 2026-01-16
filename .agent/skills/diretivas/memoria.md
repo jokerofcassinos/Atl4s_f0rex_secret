@@ -1,5 +1,7 @@
 ---
-trigger: always_on
+name: memoria
+description: No final de cada resposta significativa ou implementação de funcionalidade, mudanças no código, você deve gerar um bloco de atualização para este ficheiro
+version: 1.0
 ---
 
 ## 🧬 SISTEMA DE MEMÓRIA PERSISTENTE

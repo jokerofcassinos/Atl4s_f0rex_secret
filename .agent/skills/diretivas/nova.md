@@ -1,5 +1,5 @@
 ---
-name: initial
+name: nova
 description: sempre executar ao iniciar conversa/primeira mensagem da conversa
 version: 1.0
 ---

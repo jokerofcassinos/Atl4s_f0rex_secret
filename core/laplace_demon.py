@@ -589,19 +589,89 @@ class LaplaceDemonCore:
         k_dir = k_data.get('direction', 0)  # +1=UP, -1=DOWN
         k_angle = abs(k_data.get('angle', 0))
         
-        if liq_signal:
-             # KINEMATICS VETO: Don't fight strong acceleration
-             liq_vetoed = False
-             if "BUY" in liq_signal:
-                  # If Kinematics is strongly ACCELERATING DOWN, don't buy
-                  if k_dir == -1 and k_angle > 45:
-                       reasons.append(f"LIQUIDATOR VETOED: Kinematics DOWN ({k_angle}°)")
+                  if not liq_vetoed:
+                       reasons.append(f"LIQUIDATOR: Sweep of {liq_signal} + Kinematics Match")
+                       score = -100 if "BUY" in liq_signal else 100 # Invert signal (Sweep Buy = Sell)
+                       setup = "LIQUIDATOR_SWEEP"
+
+             elif "SELL" in liq_signal:
+                  # If Kinematics is strongly ACCELERATING UP, don't sell
+                  if k_dir == 1 and k_angle > 45:
+                       reasons.append(f"LIQUIDATOR VETOED: Kinematics UP ({k_angle}°)")
                        liq_vetoed = True
                   if not liq_vetoed:
                        reasons.append(f"THE LIQUIDATOR: {liq_signal}")
-                       if score < 0: score = 50
-                       else: score += 50
+                       if score > 0: score = -50
+                       else: score -= 50
                        if not setup: setup = "LIQUIDATOR_SWEEP"
+
+        # --- NEW SETUPS (AGI BRAINSTORM 1.1) ---
+        
+        # 1. THE GOLDEN COIL (M8 Fibonacci Retracement)
+        # Logic: 
+        #   - Resample M1 -> M8
+        #   - Identify Trend (High > PrevHigh)
+        #   - Check Pullback to 50-61.8% Zone of Last M8 Impulse
+        if df_m1 is not None and len(df_m1) >= 16: # Need at least 2x M8 candles
+             try:
+                  # Resample M1 to M8
+                  m8_res = df_m1.resample('8T').agg({
+                       'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
+                  }).dropna()
+                  
+                  if len(m8_res) >= 3:
+                       last_m8 = m8_res.iloc[-2] # Completed candle
+                       prev_m8 = m8_res.iloc[-3] # Previous reference
+                       curr_price = df_m1['close'].iloc[-1]
+                       
+                       # Bullish Coil
+                       # 1. Strong Bullish Impulse (Body > 50% of Range)
+                       m8_range = last_m8['high'] - last_m8['low']
+                       m8_body = abs(last_m8['close'] - last_m8['open'])
+                       is_impulse = (m8_body / m8_range) > 0.5 if m8_range > 0 else False
+                       
+                       if last_m8['close'] > last_m8['open'] and is_impulse:
+                            # 2. Fibonacci Zone (50% - 61.8%)
+                            fib_50 = last_m8['low'] + (0.50 * m8_range)
+                            fib_618 = last_m8['low'] + (0.382 * m8_range) # Deep pullback (inverted fib logic relative to low)
+                            # Wait, standard pullback: High - (Range * 0.5) or Low + (Range * 0.5)?
+                            # Retracement from High down to Low.
+                            # Zone is between 61.8% Retracement Price and 50% Retracement Price.
+                            # Price at 50% = Low + 0.5 * Range
+                            # Price at 61.8% Retracement = High - 0.618 * Range = Low + 0.382 * Range
+                            
+                            zone_top = last_m8['low'] + (0.5 * m8_range)
+                            zone_bottom = last_m8['low'] + (0.382 * m8_range)
+                            
+                            if zone_bottom <= curr_price <= zone_top:
+                                 # 3. Check for Rejection (Micro-Wick in M1?)
+                                 # For now, just level tap + Trend Confluence
+                                 if score > 0 or details.get('Trend', {}).get('H1_hurst', 0) > 0.6: 
+                                      reasons.append(f"THE GOLDEN COIL: M8 Pullback to Golden Zone ({curr_price:.5f})")
+                                      setup = "GOLDEN_COIL_M8"
+                                      score = 150 # High Priority
+                                      
+                       # Bearish Coil
+                       elif last_m8['close'] < last_m8['open'] and is_impulse:
+                            # Retracement UP from Low.
+                            # Price at 50% = High - 0.5 * Range
+                            # Price at 61.8% Retracement = Low + 0.618 * Range = High - 0.382 * Range
+                            
+                            zone_bottom = last_m8['high'] - (0.5 * m8_range)
+                            zone_top = last_m8['high'] - (0.382 * m8_range)
+                            
+                            if zone_bottom <= curr_price <= zone_top:
+                                 if score < 0 or details.get('Trend', {}).get('H1_hurst', 0) > 0.6:
+                                      reasons.append(f"THE GOLDEN COIL: M8 Pullback to Golden Zone ({curr_price:.5f})")
+                                      setup = "GOLDEN_COIL_M8"
+                                      score = -150 # High Priority
+                                      
+             except Exception as e:
+                  logger.warning(f"Golden Coil Error: {e}")
+        
+        # 2. VOID FILLER (FVG Reversion) - Placeholder for next cycle
+        
+        # ----------------------------------------
              elif "SELL" in liq_signal:
                   # If Kinematics is strongly ACCELERATING UP, don't sell
                   if k_dir == 1 and k_angle > 45:
@@ -1068,12 +1138,18 @@ class LaplaceDemonCore:
                     vetoes.append("Divergence Veto: Bullish Conflict")
                     score = 0
                     
-        # --- CHAOS VETO (Trade #75 Fix) ---
-        # Block Mean Reversion strategies in High Chaos
-        if "REVERSION" in str(setup) or "SNIPER" in str(setup):
+        # --- CHAOS VETO (Trade #75 & #78-105 Fix) ---
+        # 1. Extreme Chaos Hard Veto (Safety First)
+        if lyapunov > 0.9:
+             reasons.append(f"EXTREME CHAOS VETO: Blocking ALL trades (Lyapunov {lyapunov:.2f} > 0.9)")
+             vetoes.append(f"Chaos Veto: Market is too unpredictable (Lyapunov {lyapunov:.2f})")
+             score = 0
+             
+        # 2. Reversion/Structure Block in High Chaos
+        elif "REVERSION" in str(setup) or "SNIPER" in str(setup) or "RIDER" in str(setup):
              if lyapunov > 0.5:
                   reasons.append(f"CHAOS VETO: Blocking {setup} (Lyapunov {lyapunov:.2f} > 0.5)")
-                  vetoes.append(f"Chaos Veto: Market too chaotic for Reversion")
+                  vetoes.append(f"Chaos Veto: Market too chaotic for {setup}")
                   score = 0  
                   
         # --- GLOBAL SNIPER CONFLICT VETO (Trade #109 Fix) ---

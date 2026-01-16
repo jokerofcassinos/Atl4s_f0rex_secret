@@ -387,7 +387,11 @@ class LaplaceBacktestRunner:
                     
                     if lot_multiplier >= 2.0:
                         num_orders = int(lot_multiplier)
-                        lot_multiplier = 1.0 # Reset to base unit per order
+                        # CRITICAL FIX: Divide risk per order to maintain constant total risk!
+                        # Previous bug: lot_multiplier = 1.0 meant 30 trades * 20% risk = 600% risk.
+                        # New logic: Total Cluster Risk = 1.0 * Base Risk (20%).
+                        # Each order gets 1/N of the risk.
+                        lot_multiplier = 1.0 / num_orders 
 
                     # --- SL/TP VALIDATION (Order #1 Fix) ---
                     # Block trades with invalid SL/TP (0.0p = no protection)
