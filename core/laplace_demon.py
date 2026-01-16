@@ -654,7 +654,7 @@ class LaplaceDemonCore:
                             if zone_bottom <= curr_price <= zone_top:
                                  # 3. Check for Rejection (Micro-Wick in M1?)
                                  # For now, just level tap + Trend Confluence
-                                 if score > 0 or details.get('Trend', {}).get('H1_hurst', 0) > 0.6: 
+                                 if (score > 0 or details.get('Trend', {}).get('H1_hurst', 0) > 0.6) and 150 > abs(score): 
                                       reasons.append(f"THE GOLDEN COIL: M8 Pullback to Golden Zone ({curr_price:.5f})")
                                       setup = "GOLDEN_COIL_M8"
                                       score = 150 # High Priority
@@ -669,7 +669,7 @@ class LaplaceDemonCore:
                             zone_top = last_m8['high'] - (0.382 * m8_range)
                             
                             if zone_bottom <= curr_price <= zone_top:
-                                 if score < 0 or details.get('Trend', {}).get('H1_hurst', 0) > 0.6:
+                                 if (score < 0 or details.get('Trend', {}).get('H1_hurst', 0) > 0.6) and 150 > abs(score):
                                       reasons.append(f"THE GOLDEN COIL: M8 Pullback to Golden Zone ({curr_price:.5f})")
                                       setup = "GOLDEN_COIL_M8"
                                       score = -150 # High Priority
@@ -677,7 +677,99 @@ class LaplaceDemonCore:
              except Exception as e:
                   logger.warning(f"Golden Coil Error: {e}")
         
-        # 2. VOID FILLER (FVG Reversion) - Placeholder for next cycle
+        # 2. THE VOID FILLER (FVG Reversion)
+        # Logic: Touch and Reject FVG Zone
+        active_fvgs = details.get('SMC', {}).get('active_fvgs', [])
+        if active_fvgs and len(active_fvgs) > 0:
+             curr_candle = df_m5.iloc[-1]
+             c_high = curr_candle['high']
+             c_low = curr_candle['low']
+             c_close = curr_candle['close']
+             c_open = curr_candle['open']
+             
+             for fvg in active_fvgs:
+                  # ... (Access logic same) ...
+                  
+                  try:
+                       fvg_top = getattr(fvg, 'top', 0)
+                       fvg_bot = getattr(fvg, 'bottom', 0)
+                       fvg_type = getattr(fvg, 'type', 'NEUTRAL')
+                       
+                       # Bullish FVG
+                       if fvg_type == "BULLISH":
+                            if c_low <= fvg_top and c_close > fvg_bot: 
+                                 if c_close < fvg_bot: continue
+                                 
+                                 # PRIORITY CHECK: Only apply if Score 130 > Current Score
+                                 if 130 > abs(score):
+                                     reasons.append(f"THE VOID FILLER: Bullish FVG Rejection @ {fvg_top:.5f}")
+                                     setup = "VOID_FILLER_FVG"
+                                     score = 130
+                                     break
+                                 
+                       # Bearish FVG
+                       elif fvg_type == "BEARISH":
+                            if c_high >= fvg_bot and c_close < fvg_top:
+                                 if c_close > fvg_top: continue
+                                 
+                                 # PRIORITY CHECK
+                                 if 130 > abs(score):
+                                     reasons.append(f"THE VOID FILLER: Bearish FVG Rejection @ {fvg_bot:.5f}")
+                                     setup = "VOID_FILLER_FVG"
+                                     score = -130
+                                     break
+                  except Exception as e:
+                       pass 
+                       
+        # 3. VOLATILITY SQUEEZE HUNTER (TTM Squeeze Logic)
+        if df_m5 is not None and len(df_m5) >= 20: 
+             try:
+                  # 1. Calculate Bollinger Bands (20, 2.0)
+                  df_sqz = df_m5.iloc[-25:].copy() 
+                  df_sqz['ma20'] = df_sqz['close'].rolling(window=20).mean()
+                  df_sqz['std'] = df_sqz['close'].rolling(window=20).std()
+                  df_sqz['bb_upper'] = df_sqz['ma20'] + (2.0 * df_sqz['std'])
+                  df_sqz['bb_lower'] = df_sqz['ma20'] - (2.0 * df_sqz['std'])
+                  
+                  # 2. Calculate Keltner Channels (20, 1.5 ATR)
+                  df_sqz['tr0'] = abs(df_sqz['high'] - df_sqz['low'])
+                  df_sqz['tr1'] = abs(df_sqz['high'] - df_sqz['close'].shift())
+                  df_sqz['tr2'] = abs(df_sqz['low'] - df_sqz['close'].shift())
+                  df_sqz['tr'] = df_sqz[['tr0', 'tr1', 'tr2']].max(axis=1)
+                  df_sqz['atr'] = df_sqz['tr'].rolling(window=20).mean()
+                  
+                  df_sqz['kc_upper'] = df_sqz['ma20'] + (1.5 * df_sqz['atr'])
+                  df_sqz['kc_lower'] = df_sqz['ma20'] - (1.5 * df_sqz['atr'])
+                  
+                  # 3. Check Squeeze Condition (Previous Candle)
+                  prev_candle = df_sqz.iloc[-2]
+                  squeeze_on = (prev_candle['bb_upper'] < prev_candle['kc_upper']) and \
+                               (prev_candle['bb_lower'] > prev_candle['kc_lower'])
+                               
+                  # 4. Check Breakout (Current Candle)
+                  curr_candle = df_sqz.iloc[-1]
+                  
+                  if squeeze_on:
+                       # Breakout UP
+                       if curr_candle['close'] > curr_candle['bb_upper']:
+                            if 140 > abs(score): # PRIORITY CHECK
+                                if score > -50: 
+                                    reasons.append(f"SQUEEZE HUNTER: Volatility Expansion UP (Breakout)")
+                                    setup = "VOLATILITY_SQUEEZE"
+                                    score = 140
+                                
+                       # Breakout DOWN
+                       elif curr_candle['close'] < curr_candle['bb_lower']:
+                            if 140 > abs(score): # PRIORITY CHECK
+                                if score < 50:
+                                    reasons.append(f"SQUEEZE HUNTER: Volatility Expansion DOWN (Breakout)")
+                                    setup = "VOLATILITY_SQUEEZE"
+                                    score = -140
+                                
+             except Exception as e:
+                  pass # Math errors
+
+
         
         # ----------------------------------------
 
@@ -1075,7 +1167,7 @@ class LaplaceDemonCore:
                     vetoes.append("Trend Veto: Expansion Sell")
                     score = 0
             elif "bearish" in str(div_type).lower():
-                if setup != "STRUCTURE_TREND_RIDER": # Protect Rider
+                if setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8" and setup != "VOID_FILLER_FVG" and setup != "VOLATILITY_SQUEEZE": # Protect Rider, Coil, Filler, Squeeze
                     reasons.append(f"GLOBAL VETO: Bearish Divergence ({div_type}) opposes BUY.")
                     vetoes.append("Divergence Veto: Bearish Conflict")
                     score = 0
@@ -1120,7 +1212,7 @@ class LaplaceDemonCore:
             # If SMC Structure says BULLISH, we should NOT sell unless it's a Smart Money Reversal.
             smc_struc = smc_res.get('structure', 'NEUTRAL')
             if setup != "SMART_MONEY_REVERSAL":
-                 if smc_struc == "BULLISH" and setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8": # Allow Rider and Coil
+                 if smc_struc == "BULLISH" and setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8" and setup != "VOID_FILLER_FVG" and setup != "VOLATILITY_SQUEEZE": # Allow Rider, Coil, Filler, Squeeze
                       reasons.append(f"STRUCTURE VETO: Blocking SELL (Structure is {smc_struc})")
                       vetoes.append(f"Structure Veto: Cannot Sell in Bullish Structure")
                       score = 0
@@ -1132,7 +1224,7 @@ class LaplaceDemonCore:
                       score = 0
                       vetoes.append(f"LION KILLER: SMC Trend Conflict ({smc_trend})")
             elif "bullish" in str(div_type).lower():
-                 if setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8":
+                 if setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8" and setup != "VOID_FILLER_FVG" and setup != "VOLATILITY_SQUEEZE":
                     reasons.append(f"GLOBAL VETO: Bullish Divergence ({div_type}) opposes SELL.")
                     vetoes.append("Divergence Veto: Bullish Conflict")
                     score = 0
@@ -1165,7 +1257,7 @@ class LaplaceDemonCore:
         # Sniper dir: +1 = BUY, -1 = SELL (THRESHOLD: 50)
         if decision_dir == "BUY" and sniper_dir == -1 and sniper_score > 50:
             # RELAXED VETO: If we have > 90% Confidence (e.g. Swarm + Legacy), we ignore Sniper.
-            if abs(score) >= 90 or setup == "GOLDEN_COIL_M8":
+            if abs(score) >= 90 or setup == "GOLDEN_COIL_M8" or setup == "VOID_FILLER_FVG" or setup == "VOLATILITY_SQUEEZE":
                  reasons.append(f"SNIPER OVERRIDE: High Confidence ({score:.1f}) bypasses Sniper Veto.")
             else:
                 reasons.append(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper says SELL {sniper_score:.1f})")
@@ -1175,7 +1267,7 @@ class LaplaceDemonCore:
                 logger.warning(f"SNIPER CONFLICT VETO: Blocking BUY (Sniper SELL {sniper_score:.1f})")
             
         elif decision_dir == "SELL" and sniper_dir == 1 and sniper_score > 50:
-            if abs(score) >= 90:
+            if abs(score) >= 90 or setup == "GOLDEN_COIL_M8" or setup == "VOID_FILLER_FVG" or setup == "VOLATILITY_SQUEEZE":
                  reasons.append(f"SNIPER OVERRIDE: High Confidence ({score:.1f}) bypasses Sniper Veto.")
             else:
                 reasons.append(f"SNIPER CONFLICT VETO: Blocking SELL (Sniper says BUY {sniper_score:.1f})")
@@ -1190,17 +1282,19 @@ class LaplaceDemonCore:
         if isinstance(divergence_data, dict):
             div_type = divergence_data.get('type', '')
             if decision_dir == "SELL" and 'bullish' in str(div_type).lower():
-                reasons.append("DIVERGENCE CONFLICT: Blocking SELL (Bullish Divergence)")
-                vetoes.append("Divergence Conflict: Bullish signal opposes SELL")
-                execute = False
-                hard_veto = True
-                logger.warning("DIVERGENCE CONFLICT VETO: Blocking SELL (Bullish Divergence detected)")
+                if setup not in ["GOLDEN_COIL_M8", "VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"]:
+                     reasons.append("DIVERGENCE CONFLICT: Blocking SELL (Bullish Divergence)")
+                     vetoes.append("Divergence Conflict: Bullish signal opposes SELL")
+                     execute = False
+                     hard_veto = True
+                     logger.warning("DIVERGENCE CONFLICT VETO: Blocking SELL (Bullish Divergence detected)")
             elif decision_dir == "BUY" and 'bearish' in str(div_type).lower():
-                reasons.append("DIVERGENCE CONFLICT: Blocking BUY (Bearish Divergence)")
-                vetoes.append("Divergence Conflict: Bearish signal opposes BUY")
-                execute = False
-                hard_veto = True
-                logger.warning("DIVERGENCE CONFLICT VETO: Blocking BUY (Bearish Divergence detected)")
+                if setup not in ["GOLDEN_COIL_M8", "VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"]:
+                     reasons.append("DIVERGENCE CONFLICT: Blocking BUY (Bearish Divergence)")
+                     vetoes.append("Divergence Conflict: Bearish signal opposes BUY")
+                     execute = False
+                     hard_veto = True
+                     logger.warning("DIVERGENCE CONFLICT VETO: Blocking BUY (Bearish Divergence detected)")
 
         # --- PATTERN CONFLICT VETO (Trade #106 Fix) ---
         # If Bullish Pattern (Hammer, Engulfing) but decision is SELL, BLOCK
@@ -1211,17 +1305,19 @@ class LaplaceDemonCore:
         pattern_lower = str(pattern_data).lower() if pattern_data else ''
         
         if decision_dir == "SELL" and any(bp in pattern_lower for bp in bullish_patterns):
-            reasons.append(f"PATTERN CONFLICT: Blocking SELL (Bullish pattern: {pattern_data})")
-            vetoes.append("Pattern Conflict: Bullish pattern opposes SELL")
-            execute = False
-            hard_veto = True
-            logger.warning(f"PATTERN CONFLICT VETO: Blocking SELL (Bullish pattern: {pattern_data})")
+            if setup not in ["GOLDEN_COIL_M8", "VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"]:
+                reasons.append(f"PATTERN CONFLICT: Blocking SELL (Bullish pattern: {pattern_data})")
+                vetoes.append("Pattern Conflict: Bullish pattern opposes SELL")
+                execute = False
+                hard_veto = True
+                logger.warning(f"PATTERN CONFLICT VETO: Blocking SELL (Bullish pattern: {pattern_data})")
         elif decision_dir == "BUY" and any(bp in pattern_lower for bp in bearish_patterns):
-            reasons.append(f"PATTERN CONFLICT: Blocking BUY (Bearish pattern: {pattern_data})")
-            vetoes.append("Pattern Conflict: Bearish pattern opposes BUY")
-            execute = False
-            hard_veto = True
-            logger.warning(f"PATTERN CONFLICT VETO: Blocking BUY (Bearish pattern: {pattern_data})")
+             if setup not in ["GOLDEN_COIL_M8", "VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"]:
+                reasons.append(f"PATTERN CONFLICT: Blocking BUY (Bearish pattern: {pattern_data})")
+                vetoes.append("Pattern Conflict: Bearish pattern opposes BUY")
+                execute = False
+                hard_veto = True
+                logger.warning(f"PATTERN CONFLICT VETO: Blocking BUY (Bearish pattern: {pattern_data})")
 
         # --- MONDAY CAUTION FILTER (Weekend Gap Fix) ---
         # Chart shows: Monday = 45% Win Rate, -$200 PnL (while other days = 90%+ WR)
@@ -1376,6 +1472,12 @@ class LaplaceDemonCore:
                 lot_multiplier = 10.0  # Upgraded for High Conviction
             elif setup == "STRUCTURE_TREND_RIDER":
                 lot_multiplier = 30.0 # User requested aggressive system ("turbinar")
+            elif setup == "VOID_FILLER_FVG":
+                lot_multiplier = 30.0 # SPLIT FIRE: Aggressive Filling
+                reasons.append("SPLIT FIRE ACTIVATED: Aggressive Void Filling")
+            elif setup in ["GOLDEN_COIL_M8", "VOLATILITY_SQUEEZE"]:
+                lot_multiplier = 20.0 # SPLIT FIRE: Trend/Momentum
+                reasons.append(f"SPLIT FIRE ACTIVATED: {setup}")
             elif setup == "NANO_SCALE_IN":
                 lot_multiplier = 3.0
             elif setup == "MOMENTUM_BREAKOUT" and confidence >= 95.0:

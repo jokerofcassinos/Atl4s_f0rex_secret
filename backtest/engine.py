@@ -422,10 +422,18 @@ class BacktestEngine:
             if current_pips <= -abs(self.config.vsl_pips):
                 return "VSL_HIT_PIPS"
         
-        # Check VSL Dollars (Phase 7 - User Request: -$20)
+        # Check VSL Dollars (DYNAMIC SCALING FIX)
         if self.config.vsl_dollars is not None:
-            if current_pnl <= -abs(self.config.vsl_dollars):
-                return "VSL_HIT"
+            # Fix: Scale VSL with account growth. Avoid stopping out large accounts with $20.
+            # Logic: Use greater of Configured VSL ($20) OR 10% of Current Balance.
+            
+            effective_vsl = self.config.vsl_dollars
+            if self.balance > 200:
+                 dynamic_thresh = self.balance * 0.10 # 10% Equity buffer
+                 effective_vsl = max(effective_vsl, dynamic_thresh)
+            
+            if current_pnl <= -abs(effective_vsl):
+                 return f"VSL_HIT_(${abs(effective_vsl):.1f})"
         
         return None
     

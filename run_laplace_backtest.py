@@ -386,12 +386,15 @@ class LaplaceBacktestRunner:
                     lot_multiplier = getattr(prediction, 'lot_multiplier', 1.0)
                     
                     if lot_multiplier >= 2.0:
-                        num_orders = int(lot_multiplier)
-                        # CRITICAL FIX: Divide risk per order to maintain constant total risk!
-                        # Previous bug: lot_multiplier = 1.0 meant 30 trades * 20% risk = 600% risk.
-                        # New logic: Total Cluster Risk = 1.0 * Base Risk (20%).
-                        # Each order gets 1/N of the risk.
-                        lot_multiplier = 1.0 / num_orders 
+                        # SMART SPLIT ADJUSTMENT (Small Account Optimization)
+                        # Identify target aggression (Cap at 10x Risk to prevent Margin Call on $30)
+                        target_total_multiplier = min(lot_multiplier, 10.0) 
+                        
+                        # Cap max splits to 5 to avoid "Min Lot" errors
+                        num_orders = min(int(lot_multiplier), 5)
+                        
+                        # Distribute risk across orders
+                        lot_multiplier = target_total_multiplier / num_orders 
 
                     # --- SL/TP VALIDATION (Order #1 Fix) ---
                     # Block trades with invalid SL/TP (0.0p = no protection)

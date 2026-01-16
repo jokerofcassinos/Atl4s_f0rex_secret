@@ -1,6 +1,6 @@
 ---
 name: venv
-description: sempre executar ao iniciar conversa/primeira mensagem da conversa
+description: sempre executar quando for iniciar algum arquivo do projeto
 version: 1.0
 ---
 
