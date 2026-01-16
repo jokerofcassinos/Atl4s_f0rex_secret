@@ -1422,29 +1422,74 @@ class LaplaceDemonCore:
              reasons.append(f"EXTREME CONFIDENCE: Neural Network agrees ({neural_conf*100:.1f}%)")
              score += 50 # Boost
 
-        # --- GLOBAL KINEMATICS HARD VETO (The "Rocket Logic") ---
-        # User Request: "Conflict of Decision: Selling when Price is Rising"
-        # We perform a final check on the INTENDED direction vs ACTUAL MOMENTUM.
+        # --- TREND PERSISTENCE (EMA DRIFT) CHECK ---
+        # Calculate EMA 50 and 200 for Drift Detection
+        ema50 = df_m5['close'].ewm(span=50, adjust=False).mean().iloc[-1]
+        ema200 = df_m5['close'].ewm(span=200, adjust=False).mean().iloc[-1]
         
-        # 1. Check SELL against RISING Rocket
-        if score < 0: # Intending to SELL
+        # Determine Market Structure (Slope)
+        ema50_prev = df_m5['close'].ewm(span=50, adjust=False).mean().iloc[-2]
+        ema_slope = ema50 - ema50_prev
+        
+        is_bullish_drift = ema_slope > 0 # Rising EMA
+        is_bearish_drift = ema_slope < 0 # Falling EMA
+
+        # GLOBAL KINEMATICS HARD VETO (Existing) ...
+        # ...
+
+        # --- DRIFT VETO (Zero Loss Adaptation) ---
+        # Prevent Fading a Grinding Trend (Angle < 45 but Persistent)
+        if score < 0 and is_bullish_drift:
+             # If we are trying to SELL against a Bullish Drift
+             # ONLY allow if it's a "Violent Reversal" (Kinematics Down strong)
+             # or a "God Mode" setup.
+             if k_dir == -1 and k_angle > 45:
+                  pass # Allow Meteor reversal
+             elif abs(score) > 130: 
+                  pass # Allow Special Setups (but checking conflict below)
+             else:
+                  # This catches Void Filler (Score 130) trying to fade a drift unique case
+                  # If Setup is Void Filler, BLOCK IT.
+                  if "VOID_FILLER" in str(reasons):
+                       score = 0
+                       execute = False
+                       vetoes.append("DRIFT VETO: Selling into Bullish Grind (>EMA50)")
+                       reasons.append("Adaptation: Market is Grinding UP. Don't Fill.")
+
+        elif score > 0 and is_bearish_drift:
              if k_dir == 1 and k_angle > 45:
+                  pass
+             elif abs(score) > 130:
+                  pass
+             else:
+                  if "VOID_FILLER" in str(reasons):
+                       score = 0
+                       execute = False
+                       vetoes.append("DRIFT VETO: Buying into Bearish Grind (<EMA50)")
+                       reasons.append("Adaptation: Market is Grinding DOWN. Don't Fill.")
+        # GLOBAL KINEMATICS HARD VETO (The "Trend/Rocket Logic")
+        # User Request: "Conflict of Decision: Selling when Price is Rising"
+        # Forensic Update: Lowered threshold to 25 deg to catch "Moderate Trends" vs just Rockets.
+        
+        # 1. Check SELL against RISING Trend
+        if score < 0: # Intending to SELL
+             if k_dir == 1 and k_angle > 25:
                   # Exception: Is this a "Top Fishing" setup like QUANTUM HARPOON?
-                  # Even Harpoon shouldn't fade a 80deg rocket, but maybe 45-60deg.
-                  # Let's be strict for now to stop the bleeding.
+                  # Harpoon trades at Z-Score > 3.0. Even then, fighting a trend is risky.
+                  # For Zero Loss goal, we BLOCK EVERYTHING against > 25 deg.
                   score = 0
                   execute = False # Redundant but safe
                   hard_veto = True
-                  vetoes.append(f"GLOBAL HARD VETO: Attempting to SELL into RISING ROCKET ({k_angle}°)")
+                  vetoes.append(f"GLOBAL HARD VETO: Attempting to SELL into RISING TREND ({k_angle}° > 25°)")
                   reasons.append(f"FATAL CONFLICT: Momentum is UP, Signal is SELL. Vetoing.")
 
-        # 2. Check BUY against CRASHING Meteor
+        # 2. Check BUY against CRASHING Trend
         elif score > 0: # Intending to BUY
-             if k_dir == -1 and k_angle > 45:
+             if k_dir == -1 and k_angle > 25:
                   score = 0
                   execute = False
                   hard_veto = True
-                  vetoes.append(f"GLOBAL HARD VETO: Attempting to BUY into CRASHING METEOR ({k_angle}°)")
+                  vetoes.append(f"GLOBAL HARD VETO: Attempting to BUY into CRASHING TREND ({k_angle}° > 25°)")
                   reasons.append(f"FATAL CONFLICT: Momentum is DOWN, Signal is BUY. Vetoing.")
 
         # --- DECISION THRESHOLD ---
