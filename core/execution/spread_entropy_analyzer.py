@@ -81,18 +81,24 @@ class SpreadEntropyAnalyzer:
         spreads = np.array(list(self.spread_history))
         
         # Normalize to probabilities
-        hist, _ = np.histogram(spreads, bins=10, density=True)
-        hist = hist + 1e-10  # Avoid log(0)
-        hist = hist / np.sum(hist)
-        
-        # Shannon entropy
-        entropy = -np.sum(hist * np.log2(hist))
-        
-        # Normalize to 0-1
-        max_entropy = np.log2(10)
-        normalized = entropy / max_entropy
-        
-        return float(np.clip(normalized, 0, 1))
+        try:
+            hist, _ = np.histogram(spreads, bins=10, density=True)
+            hist_sum = np.sum(hist)
+            if hist_sum > 0:
+                hist = (hist + 1e-10) / hist_sum  # Avoid log(0) and normalize
+            else:
+                 return 0.5
+            
+            # Shannon entropy
+            entropy = -np.sum(hist * np.log2(hist))
+            
+            # Normalize to 0-1
+            max_entropy = np.log2(10)
+            normalized = entropy / max_entropy
+            
+            return float(np.clip(normalized, 0, 1))
+        except Exception:
+            return 0.5
     
     def _determine_regime(self, current_spread: float) -> str:
         """Determine current spread regime."""

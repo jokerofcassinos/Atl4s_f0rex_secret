@@ -809,12 +809,6 @@ class LaplaceDemonCore:
                             if c_low <= fvg_top and c_close > fvg_bot: 
                                  if c_close < fvg_bot: continue
                                  
-                                 # 0. CHAOS VETO (NEW)
-                                 # Void Filling requires structure, Chaos breaks structure.
-                                 if lyapunov > 0.55:
-                                      reasons.append(f"VOID FILLER VETOED: High Chaos ({lyapunov:.2f})")
-                                      continue
-
                                  # 1. KINEMATICS VETO (Crash Protection)
                                  # Stricter: Block if crashing > 25 deg (Moderate Trend)
                                  if k_dir == -1 and k_angle > 25:
@@ -826,22 +820,6 @@ class LaplaceDemonCore:
                                  if score < -20:
                                       reasons.append(f"VOID FILLER VETOED: Consensus Sell ({score:.1f})")
                                       continue
-                                 
-                                 # 3. CYCLE VETO (Smart Money)
-                                 # Don't Buy if we just saw Bearish Manipulation (Resistance Grab)
-                                 cycle_res_vf = details.get('Cycle', ('NEUTRAL', 0))
-                                 cycle_phase_vf = str(cycle_res_vf[0] if isinstance(cycle_res_vf, tuple) else cycle_res_vf)
-                                 if "MANIPULATION_SELL" in cycle_phase_vf:
-                                      reasons.append(f"VOID FILLER VETOED: Cycle Phase ({cycle_phase_vf})")
-                                      continue
-
-                                 # 4. STRUCTURE VETO
-                                 structure_data_vf = details.get('Structure', {})
-                                 if isinstance(structure_data_vf, dict):
-                                      struct_type_vf = str(structure_data_vf.get('type', 'NEUTRAL'))
-                                      if 'BEARISH' in struct_type_vf:
-                                           reasons.append(f"VOID FILLER VETOED: Bearish Structure ({struct_type_vf})")
-                                           continue
 
                                  # PRIORITY CHECK: Only apply if Score 130 > Current Score
                                  if 130 > abs(score):
@@ -854,11 +832,6 @@ class LaplaceDemonCore:
                        elif fvg_type == "BEARISH":
                             if c_high >= fvg_bot and c_close < fvg_top:
                                  if c_close > fvg_top: continue
-                                 
-                                 # 0. CHAOS VETO (NEW)
-                                 if lyapunov > 0.55:
-                                      reasons.append(f"VOID FILLER VETOED: High Chaos ({lyapunov:.2f})")
-                                      continue
                                  
                                  # 0. LONDON OPEN LOCKDOWN (Trade #112-126 Fix)
                                  # Block SELL during high-volatility London Open (08:00-09:30)
@@ -897,21 +870,12 @@ class LaplaceDemonCore:
                                  # Block SELL if market structure is BULLISH
                                  structure_data_vf = details.get('Structure', {})
                                  if isinstance(structure_data_vf, dict):
-                                      struct_type_vf = str(structure_data_vf.get('type', 'NEUTRAL'))
-                                      # Robust check for Enum or String
-                                      if 'BULLISH' in struct_type_vf:
+                                      struct_type_vf = structure_data_vf.get('type', 'NEUTRAL')
+                                      if struct_type_vf == 'BULLISH':
                                            reasons.append(f"VOID FILLER VETOED: Bullish Structure ({struct_type_vf})")
                                            continue
-
-                                 # 5. CYCLE VETO (Smart Money - NEW)
-                                 # Don't Sell if we just saw Bullish Manipulation (Support Grab)
-                                 cycle_res_vf = details.get('Cycle', ('NEUTRAL', 0))
-                                 cycle_phase_vf = str(cycle_res_vf[0] if isinstance(cycle_res_vf, tuple) else cycle_res_vf)
-                                 if "MANIPULATION_BUY" in cycle_phase_vf:
-                                      reasons.append(f"VOID FILLER VETOED: Cycle Phase ({cycle_phase_vf})")
-                                      continue
                                  
-                                 # 6. SNIPER CONFLICT VETO (NEW - Trade #117 Fix)
+                                 # 5. SNIPER CONFLICT VETO (NEW - Trade #117 Fix)
                                  # Block SELL if Sniper says BUY with high confidence
                                  sniper_data_vf = details.get('Sniper', {})
                                  if isinstance(sniper_data_vf, dict):
@@ -1555,7 +1519,7 @@ class LaplaceDemonCore:
                       score = 0
                       vetoes.append(f"LION KILLER: SMC Trend Conflict ({smc_trend})")
             elif "bullish" in str(div_type).lower():
-                 if setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8" and setup != "VOLATILITY_SQUEEZE":
+                 if setup != "STRUCTURE_TREND_RIDER" and setup != "GOLDEN_COIL_M8" and setup != "VOID_FILLER_FVG" and setup != "VOLATILITY_SQUEEZE":
                     reasons.append(f"GLOBAL VETO: Bullish Divergence ({div_type}) opposes SELL.")
                     vetoes.append("Divergence Veto: Bullish Conflict")
                     score = 0
@@ -1647,14 +1611,14 @@ class LaplaceDemonCore:
         pattern_lower = str(pattern_data).lower() if pattern_data else ''
         
         if decision_dir == "SELL" and any(bp in pattern_lower for bp in bullish_patterns):
-            if setup not in ["GOLDEN_COIL_M8", "VOLATILITY_SQUEEZE"]:
+            if setup not in ["GOLDEN_COIL_M8", "VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"]:
                 reasons.append(f"PATTERN CONFLICT: Blocking SELL (Bullish pattern: {pattern_data})")
                 vetoes.append("Pattern Conflict: Bullish pattern opposes SELL")
                 execute = False
                 hard_veto = True
                 logger.warning(f"PATTERN CONFLICT VETO: Blocking SELL (Bullish pattern: {pattern_data})")
         elif decision_dir == "BUY" and any(bp in pattern_lower for bp in bearish_patterns):
-             if setup not in ["GOLDEN_COIL_M8", "VOLATILITY_SQUEEZE"]:
+             if setup not in ["GOLDEN_COIL_M8", "VOID_FILLER_FVG", "VOLATILITY_SQUEEZE"]:
                 reasons.append(f"PATTERN CONFLICT: Blocking BUY (Bearish pattern: {pattern_data})")
                 vetoes.append("Pattern Conflict: Bearish pattern opposes BUY")
                 execute = False

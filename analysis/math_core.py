@@ -79,10 +79,14 @@ class EntropyEngine:
         Lower entropy = More Order/structure.
         """
         try:
-            hist, _ = np.histogram(time_series, bins=num_bins, density=True)
-            # Remove zeros for log calculation
-            hist = hist[hist > 0]
-            return entropy(hist)
+            hist, _ = np.histogram(time_series, bins=num_bins, density=False)
+            hist_sum = np.sum(hist)
+            if hist_sum > 0:
+                probs = hist / hist_sum
+                probs = probs[probs > 0]
+                return entropy(probs)
+            else:
+                return 0.0
         except Exception:
             return 0.0
 

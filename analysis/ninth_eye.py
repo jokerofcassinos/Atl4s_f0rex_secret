@@ -52,9 +52,17 @@ class NinthEye:
         prices = df['close'].values
         volumes = df['volume'].values
         
-        hist, bin_edges = np.histogram(prices, bins=10, weights=volumes, density=True)
-        # Concentration = Peak value vs average value
-        concentration = np.max(hist) / (np.mean(hist) + 1e-9)
+        try:
+            hist, bin_edges = np.histogram(prices, bins=10, weights=volumes, density=False)
+            hist_sum = np.sum(hist)
+            if hist_sum > 0:
+                hist = hist / hist_sum
+                # Concentration = Peak value vs average value
+                concentration = np.max(hist) / (np.mean(hist) + 1e-9)
+            else:
+                concentration = 0.0
+        except Exception:
+            concentration = 0.0
         
         # Normalized concentrate (0 to 1)
         # Threshold: > 5.0 is extreme concentration

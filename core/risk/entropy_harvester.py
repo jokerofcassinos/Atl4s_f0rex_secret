@@ -42,21 +42,28 @@ class EntropyHarvester:
         # CRITICAL: Use fixed range (-0.5% to +0.5%) to prevent auto-zooming on tight trends
         # If we zoom in, a tight trend looks "Uniform" (High Entropy).
         # We want to measure "Spread relative to Global Expectation".
-        hist, _ = np.histogram(returns, bins=bins, range=(-0.005, 0.005), density=True)
-        
-        # 3. Normalize to get probabilities
-        probs = hist / np.sum(hist)
-        probs = probs[probs > 0] # Remove zeros for log
-        
-        # 4. Shannon Entropy Formula: H = -sum(p * log(p))
-        entropy = -np.sum(probs * np.log2(probs))
-        
-        # Normalize Entropy (0 to 1 scale roughly related to max entropy)
-        # Max entropy for N bins is log2(N)
-        max_entropy = np.log2(bins)
-        normalized_entropy = entropy / max_entropy
-        
-        return normalized_entropy
+        try:
+            hist, _ = np.histogram(returns, bins=bins, range=(-0.005, 0.005), density=True)
+            
+            # 3. Normalize to get probabilities
+            hist_sum = np.sum(hist)
+            if hist_sum > 0:
+                probs = hist / hist_sum
+                probs = probs[probs > 0] # Remove zeros for log
+                
+                # 4. Shannon Entropy Formula: H = -sum(p * log(p))
+                entropy_val = -np.sum(probs * np.log2(probs))
+            else:
+                entropy_val = 0.0
+            
+            # Normalize Entropy (0 to 1 scale roughly related to max entropy)
+            # Max entropy for N bins is log2(N)
+            max_entropy = np.log2(bins) if bins > 1 else 1.0
+            normalized_entropy = entropy_val / max_entropy
+            
+            return normalized_entropy
+        except Exception:
+            return 0.0
         
     async def harvest_lock(self, original_ticket: int, current_tick: Dict, agi_context: Dict):
         """

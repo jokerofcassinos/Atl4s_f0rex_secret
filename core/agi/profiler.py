@@ -108,7 +108,11 @@ class AGIProfiler:
         hist, _ = np.histogram(returns, bins=bins, density=False)
         
         # Calculate Probabilities
-        p_probs = hist / np.sum(hist)
+        hist_sum = np.sum(hist)
+        if hist_sum == 0:
+            return 0.5
+            
+        p_probs = hist / hist_sum
         
         # Filter zeros to avoid log(0)
         p_probs = p_probs[p_probs > 0]

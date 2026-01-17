@@ -1,0 +1,260 @@
+15:13:07 | INFO | Atl4s-Patterns | Pattern Detected: Shooting Star
+15:13:07 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:07 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 14.1)
+15:13:07 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.33)
+15:13:07 | INFO | Atl4s-Consensus | CONFLUENCE: Fractal Structure confirms Trend.
+15:13:07 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:07 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.9328). Unpredictable.
+15:13:07 | INFO | Atl4s-Consensus | [MOMENTUM] SILENCED by Extreme Chaos (Lyapunov 0.93, Entropy 2.14)
+15:13:07 | INFO | Atl4s-Consensus | [LION] SILENCED by Chaos (Lyapunov 0.93 > 0.35, Entropy 2.14)
+15:13:07 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): BUY | Reason: CONSENSUS_VOTE | Conf: 99.9%
+15:13:07 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: Path confirms direction. | Iter 1: Path confirms direction. | Iter 2: Path confirms direction.
+15:13:07 | INFO | Atl4s-Consensus | Consensus Reached: BUY (Score: 100.00)
+15:13:08 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3380789756774902 | Legacy: 100.0 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [VETOED] (Logic: 0.0)
+15:13:08 | INFO | Atl4s-Cycle | Cycle: Bearish Manipulation Detected (Resistance 1.34 grabbed)
+15:13:08 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:08 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 14.1)
+15:13:08 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.32)
+15:13:08 | INFO | Atl4s-Consensus | CONFLUENCE: Fractal Structure confirms Trend.
+15:13:08 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:08 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.8939). Unpredictable.
+15:13:08 | INFO | Atl4s-Consensus | [MOMENTUM] SILENCED by Extreme Chaos (Lyapunov 0.89, Entropy 2.15)
+15:13:08 | INFO | Atl4s-Consensus | [REVERSION] SILENCED: Falling Knife (No Bullish Wick in Extreme Chaos)
+15:13:08 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): BUY | Reason: CONSENSUS_VOTE | Conf: 99.9%
+15:13:08 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: Path confirms direction. | Iter 1: Path confirms direction. | Iter 2: Path confirms direction.
+15:13:08 | INFO | Atl4s-Consensus | Consensus Reached: BUY (Score: 100.00)
+15:13:08 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3379895687103271 | Legacy: 100.0 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [VETOED] (Logic: 0.0)
+15:13:08 | INFO | Atl4s-Patterns | Pattern Detected: Bullish Engulfing
+15:13:08 | INFO | Atl4s-Cycle | Cycle: Bearish Manipulation Detected (Resistance 1.34 grabbed)
+15:13:08 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:08 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 14.0)
+15:13:08 | INFO | Atl4s-Quant | Quant: Z-Score 1.10 (Premium/Pullback Zone)
+15:13:09 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.32)
+15:13:09 | INFO | Atl4s-Consensus | CONFLUENCE: Trend DOWN + Quant Pullback (Rally Sell).
+15:13:09 | INFO | Atl4s-Consensus | CONFLUENCE: Fractal Structure confirms Trend.
+15:13:09 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:09 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.8616). Unpredictable.
+15:13:09 | INFO | Atl4s-Consensus | [MOMENTUM] SILENCED by Extreme Chaos (Lyapunov 0.86, Entropy 2.17)
+15:13:09 | INFO | Atl4s-Consensus | [REVERSION] SILENCED: Falling Knife (No Bullish Wick in Extreme Chaos)
+15:13:09 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): BUY | Reason: CONSENSUS_VOTE | Conf: 99.9%
+15:13:09 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: Path confirms direction. | Iter 1: Path confirms direction. | Iter 2: Path confirms direction.
+15:13:09 | INFO | Atl4s-Consensus | Consensus Reached: BUY (Score: 100.00)
+15:13:09 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3381328582763672 | Legacy: 100.0 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [VETOED] (Logic: 0.0)
+15:13:09 | INFO | Atl4s-Patterns | Pattern Detected: Inside Bar
+15:13:09 | INFO | Atl4s-Cycle | Cycle: Bearish Manipulation Detected (Resistance 1.34 grabbed)
+15:13:09 | INFO | Atl4s-Quant | Quant: Z-Score 1.14 (Premium/Pullback Zone)
+15:13:09 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:09 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 14.0)
+15:13:10 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.33)
+15:13:10 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:10 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.8549). Unpredictable.
+15:13:10 | INFO | Atl4s-Consensus | [MOMENTUM] SILENCED by Extreme Chaos (Lyapunov 0.85, Entropy 2.18)
+15:13:10 | INFO | Atl4s-Consensus | [REVERSION] SILENCED: Falling Knife (No Bullish Wick in Extreme Chaos)
+15:13:10 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): BUY | Reason: CONSENSUS_VOTE | Conf: 99.9%
+15:13:10 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: Path confirms direction. | Iter 1: Path confirms direction. | Iter 2: Path confirms direction.
+15:13:10 | INFO | Atl4s-Consensus | Consensus Reached: BUY (Score: 100.00)
+15:13:10 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.338114857673645 | Legacy: 100.0 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [VETOED] (Logic: 0.0)
+15:13:10 | INFO | Atl4s-Cycle | Cycle: Bearish Manipulation Detected (Resistance 1.34 grabbed)
+15:13:10 | INFO | Atl4s-Quant | Quant: Z-Score 1.46 (Premium/Pullback Zone)
+15:13:10 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:10 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 14.0)
+15:13:10 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.33)
+15:13:10 | INFO | Atl4s-Consensus | CONFLUENCE: Trend DOWN + Quant Pullback (Rally Sell).
+15:13:10 | INFO | Atl4s-Consensus | CONFLUENCE: Fractal Structure confirms Trend.
+15:13:10 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:10 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.8517). Unpredictable.
+15:13:10 | INFO | Atl4s-Consensus | [MOMENTUM] SILENCED by Extreme Chaos (Lyapunov 0.85, Entropy 2.18)
+15:13:10 | INFO | Atl4s-Consensus | [REVERSION] SILENCED: Falling Knife (No Bullish Wick in Extreme Chaos)
+15:13:10 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): BUY | Reason: CONSENSUS_VOTE | Conf: 99.9%
+15:13:10 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: Path confirms direction. | Iter 1: Path confirms direction. | Iter 2: Path confirms direction.
+15:13:11 | INFO | Atl4s-Consensus | Consensus Reached: BUY (Score: 100.00)
+15:13:11 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3381685018539429 | Legacy: 100.0 | Swarm: WAIT (0.0%) | Setup: Neutral [VETOED] (Logic: 0.0)
+15:13:11 | INFO | Atl4s-Cycle | Cycle: Bearish Manipulation Detected (Resistance 1.34 grabbed)
+15:13:11 | INFO | Atl4s-Quant | Quant: Z-Score -0.58 (Discount/Pullback Zone)
+15:13:11 | INFO | Laplace-Structure | Structure Veto: Blocking SELL. Structure=StructureType.BULLISH
+15:13:11 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:11 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 14.0)
+15:13:11 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.33)
+15:13:11 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:11 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.8363). Unpredictable.
+15:13:11 | INFO | Atl4s-Consensus | [MOMENTUM] SILENCED by Extreme Chaos (Lyapunov 0.84, Entropy 2.18)
+15:13:11 | INFO | Atl4s-Consensus | [REVERSION] SILENCED: Falling Knife (No Bullish Wick in Extreme Chaos)
+15:13:11 | INFO | Atl4s-Consensus | Consensus Reached: WAIT (Score: 12.32)
+15:13:11 | INFO | Atl4s-Consensus | Consensus Heartbeat: Trend=0 Sniper=30 Quant=20 Vector=-30.81
+15:13:11 | INFO | Laplace-Structure | Structure Veto: Blocking SELL. Structure=StructureType.BULLISH
+15:13:11 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3377567529678345 | Legacy: -30.8 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [VETOED] (Logic: 0.0)
+15:13:11 | INFO | Atl4s-Cycle | Cycle: Bullish Manipulation Detected (Support 1.34 grabbed)
+15:13:11 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:12 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 14.0)
+15:13:12 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.34)
+15:13:12 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:12 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.7491). Unpredictable.
+15:13:12 | INFO | Atl4s-Consensus | OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 10x.
+15:13:12 | INFO | Atl4s-Consensus | HOLOGRAPHIC VETO: Reason=REVERSION_SNIPER Conf=65.1% < 70%. Silencing.
+15:13:12 | INFO | Atl4s-Consensus | Consensus Reached: WAIT (Score: 0.00)
+15:13:12 | INFO | Atl4s-Consensus | Consensus Heartbeat: Trend=0 Sniper=30 Quant=0 Vector=-75.18
+15:13:12 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3379536867141724 | Legacy: -75.2 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [VETOED] (Logic: 0.0)
+15:13:12 | INFO | Atl4s-Patterns | Pattern Detected: Inside Bar
+15:13:12 | INFO | Atl4s-Cycle | Cycle: Bullish Manipulation Detected (Support 1.34 grabbed)
+15:13:12 | INFO | Atl4s-Quant | Quant: Z-Score 0.94 (Premium/Pullback Zone)
+15:13:12 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:12 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 13.9)
+15:13:13 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.34)
+15:13:13 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:13 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.7072). Unpredictable.
+15:13:13 | INFO | Atl4s-Consensus | OMEGA SNIPER LOGIC ACTIVATED (Reversion Vector). Multiplier 10x.
+15:13:13 | INFO | Atl4s-Consensus | HOLOGRAPHIC VETO: Reason=REVERSION_SNIPER Conf=69.1% < 70%. Silencing.
+15:13:13 | INFO | Atl4s-Consensus | Consensus Reached: WAIT (Score: 0.00)
+15:13:13 | INFO | Atl4s-Consensus | Consensus Heartbeat: Trend=0 Sniper=30 Quant=20 Vector=-85.16
+15:13:13 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3380789756774902 | Legacy: -85.2 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [VETOED] (Logic: 0.0)
+15:13:13 | INFO | Atl4s-Quant | Quant: Z-Score 0.86 (Premium/Pullback Zone)
+15:13:13 | INFO | Atl4s-SupplyDemand | Fortress: Demand Zone Weakened (Too many touches)
+15:13:13 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 13.9)
+15:13:14 | INFO | Atl4s-Consensus | Regime: MEAN REVERSION (Hurst 0.36)
+15:13:14 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:14 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.6945). Unpredictable.
+15:13:14 | INFO | Atl4s-Consensus | Consensus Reached: WAIT (Score: 11.14)
+15:13:14 | INFO | Atl4s-Consensus | Consensus Heartbeat: Trend=0 Sniper=30 Quant=20 Vector=-27.86
+15:13:14 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3380789756774902 | Legacy: -27.9 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [ACTIVE] (Conf: 99.0%)
+15:13:14 | INFO | LaplaceDemon | [SIGNAL GENERATED] SELL | Conf: 99.0% | Reasons: ['Toxic Flow: Compression Detected', 'Legacy V1 Setup: Neutral (Base Score: -27.9)', 'THE VOID FILLER: Bearish FVG Rejection @ 1.33803', 'Toxic Flow: Compression Detected (Capping Score to 80)', 'Toxic Flow Active: Raising Neural Threshold to 0.75', 'SPLIT FIRE ACTIVATED: Aggressive Void Filling', 'CHAOS DAMPENER: Halving Risk due to Chaos (0.69)']
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #311: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (1/14)
+15:13:14 | INFO | Laplace-Backtest |   > Toxic Flow Active: Raising Neural Threshold to 0.75
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #312: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (2/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #313: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (3/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #314: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (4/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #315: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (5/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #316: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (6/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #317: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (7/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #318: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (8/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #319: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (9/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #320: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (10/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #321: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (11/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #322: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (12/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #323: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (13/14)
+15:13:14 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:14 | INFO | Laplace-Backtest | TRADE #324: SELL @ 1.33808 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (14/14)
+15:13:14 | INFO | Atl4s-Patterns | Pattern Detected: Bearish Engulfing
+15:13:15 | INFO | Atl4s-Quant | Quant: Z-Score -0.89 (Discount/Pullback Zone)
+15:13:15 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 69.1)
+15:13:15 | INFO | Atl4s-Divergence | Bullish Divergence Detected (Confluence: 1)
+15:13:15 | INFO | Atl4s-Consensus | Regime: RANGING (Hurst 0.42)
+15:13:15 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:15 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.6585). Unpredictable.
+15:13:15 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): SELL | Reason: CONSENSUS_VOTE | Conf: 83.3%
+15:13:15 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: Path confirms direction. | Iter 1: Path confirms direction. | Iter 2: Path confirms direction.
+15:13:15 | INFO | Atl4s-Consensus | Consensus Reached: SELL (Score: 100.00)
+15:13:15 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3379000425338745 | Legacy: -100.0 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [ACTIVE] (Conf: 99.0%)
+15:13:15 | INFO | LaplaceDemon | [SIGNAL GENERATED] SELL | Conf: 99.0% | Reasons: ['Toxic Flow: Compression Detected', 'Legacy V1 Setup: Neutral (Base Score: -100.0)', 'THE VOID FILLER: Bearish FVG Rejection @ 1.33803', 'Toxic Flow: Compression Detected (Capping Score to 80)', 'Toxic Flow Active: Raising Neural Threshold to 0.75', 'SPLIT FIRE ACTIVATED: Aggressive Void Filling', 'CHAOS DAMPENER: Halving Risk due to Chaos (0.66)']
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #325: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (1/14)
+15:13:15 | INFO | Laplace-Backtest |   > Toxic Flow Active: Raising Neural Threshold to 0.75
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #326: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (2/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #327: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (3/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #328: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (4/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #329: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (5/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #330: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (6/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #331: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (7/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #332: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (8/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #333: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (9/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #334: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (10/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #335: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (11/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #336: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (12/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #337: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (13/14)
+15:13:15 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:15 | INFO | Laplace-Backtest | TRADE #338: SELL @ 1.33790 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (14/14)
+15:13:16 | INFO | Laplace-Backtest | Progress: 87.6% | Balance: $43997.33
+15:13:16 | INFO | Atl4s-Patterns | Pattern Detected: Shooting Star
+15:13:16 | INFO | Atl4s-Quant | Quant: Z-Score -0.55 (Discount/Pullback Zone)
+15:13:16 | INFO | Atl4s-SupplyDemand | Fortress: Supply Zone Weakened (16 touches)
+15:13:16 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 68.6)
+15:13:16 | INFO | Atl4s-Sniper | Sniper Signal: SELL (Score 56.1) | BEARISH OB + FVG confluence
+15:13:17 | INFO | Atl4s-Consensus | Regime: RANGING (Hurst 0.45)
+15:13:17 | INFO | Atl4s-Consensus | CONFLUENCE: Shooting Star + Sniper Level.
+15:13:17 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:17 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.5899). Unpredictable.
+15:13:17 | INFO | Atl4s-Consensus | [LION] SILENCED by Chaos (Lyapunov 0.59 > 0.35, Entropy 2.01)
+15:13:17 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): BUY | Reason: CONSENSUS_VOTE | Conf: 89.4%
+15:13:17 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: Path confirms direction. | Iter 1: Path confirms direction. | Iter 2: Path confirms direction.
+15:13:17 | INFO | Atl4s-Consensus | Consensus Reached: BUY (Score: 100.00)
+15:13:17 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3379716873168945 | Legacy: 100.0 | Swarm: WAIT (0.0%) | Setup: Neutral [VETOED] (Logic: 0.0)
+15:13:17 | INFO | Atl4s-SupplyDemand | Fortress: Supply Zone Weakened (16 touches)
+15:13:17 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 68.5)
+15:13:17 | INFO | Atl4s-Sniper | Sniper Signal: SELL (Score 55.0) | BEARISH OB + FVG confluence
+15:13:18 | INFO | Atl4s-Consensus | Regime: RANGING (Hurst 0.43)
+15:13:18 | INFO | Atl4s-Consensus | CONFLUENCE: Micro-Momentum (Bear) + Sniper Level.
+15:13:18 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:18 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.5826). Unpredictable.
+15:13:18 | INFO | Atl4s-Consensus | Consensus Reached: WAIT (Score: 9.26)
+15:13:18 | INFO | Atl4s-Consensus | Consensus Heartbeat: Trend=0 Sniper=55 Quant=0 Vector=-23.16
+15:13:18 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3379895687103271 | Legacy: -23.2 | Swarm: WAIT (0.0%) | Setup: Neutral [VETOED] (Logic: 0.0)
+15:13:18 | INFO | Atl4s-SupplyDemand | Fortress: Supply Zone Weakened (16 touches)
+15:13:18 | INFO | Atl4s-Sniper | Sniper Signal: SELL (Score 53.9) | BEARISH OB + FVG confluence
+15:13:18 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 68.4)
+15:13:18 | INFO | Atl4s-Consensus | Regime: RANGING (Hurst 0.42)
+15:13:18 | INFO | Atl4s-Consensus | CONFLUENCE: Micro-Momentum (Bear) + Sniper Level.
+15:13:18 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:18 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.6200). Unpredictable.
+15:13:18 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): BUY | Reason: CONSENSUS_VOTE | Conf: 76.9%
+15:13:18 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: MC Conflict (Future projection shows price decay.). Reducing confidence 30%. | Iter 1: MC Conflict (Future projection shows price decay.). Reducing confidence 30%. | Iter 2: MC Conflict (Future projection shows price decay.). Reducing confidence 30%.
+15:13:18 | INFO | Atl4s-Consensus | Consensus Reached: BUY (Score: 26.38)
+15:13:18 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3380074501037598 | Legacy: 26.4 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [VETOED] (Logic: 0.0)
+15:13:19 | INFO | Atl4s-Sniper | Sniper Signal: SELL (Score 56.1) | BEARISH OB + FVG confluence
+15:13:19 | INFO | Atl4s-SupplyDemand | Fortress: Supply Zone Weakened (16 touches)
+15:13:19 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 68.3)
+15:13:19 | INFO | Atl4s-Consensus | Regime: RANGING (Hurst 0.40)
+15:13:19 | INFO | Atl4s-Consensus | CONFLUENCE: Micro-Momentum (Bear) + Sniper Level.
+15:13:19 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:19 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.6097). Unpredictable.
+15:13:19 | INFO | Atl4s-Consensus | LEGACY CONSENSUS (Inverted): BUY | Reason: CONSENSUS_VOTE | Conf: 79.7%
+15:13:19 | INFO | Atl4s-Consensus | RECURSIVE DEBATE: Iter 0: Path confirms direction. | Iter 1: Path confirms direction. | Iter 2: Path confirms direction.
+15:13:19 | INFO | Atl4s-Consensus | Consensus Reached: BUY (Score: 100.00)
+15:13:19 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3379716873168945 | Legacy: 100.0 | Swarm: WAIT (0.0%) | Setup: Neutral [VETOED] (Logic: 0.0)
+15:13:19 | INFO | Atl4s-SupplyDemand | Fortress: Supply Zone Weakened (15 touches)
+15:13:19 | INFO | Atl4s-SupplyDemand | Fortress S&R: DEMAND at 1.3376137018203735-1.337667465209961 (Score: 68.2)
+15:13:19 | INFO | Atl4s-Sniper | Sniper Signal: SELL (Score 56.1) | BEARISH OB + FVG confluence
+15:13:20 | INFO | Atl4s-Consensus | Regime: RANGING (Hurst 0.40)
+15:13:20 | INFO | Atl4s-Consensus | CONFLUENCE: Quantum Tunneling Probability High (1.00).
+15:13:20 | WARNING | Atl4s-Consensus | CHAOS WARNING: High Lyapunov (0.4558). Unpredictable.
+15:13:20 | INFO | Atl4s-Consensus | Consensus Reached: WAIT (Score: 13.09)
+15:13:20 | INFO | Atl4s-Consensus | Consensus Heartbeat: Trend=0 Sniper=56 Quant=0 Vector=-32.73
+15:13:20 | DEBUG | LaplaceDemon | [THINKING] | Price: 1.3379716873168945 | Legacy: -32.7 | Swarm: WAIT (0.0%) | Setup: VOID_FILLER_FVG [ACTIVE] (Conf: 99.0%)
+15:13:20 | INFO | LaplaceDemon | [SIGNAL GENERATED] SELL | Conf: 99.0% | Reasons: ['Toxic Flow: Compression Detected', 'Legacy V1 Setup: Neutral (Base Score: -32.7)', 'THE VOID FILLER: Bearish FVG Rejection @ 1.33803', 'Toxic Flow: Compression Detected (Capping Score to 80)', 'Toxic Flow Active: Raising Neural Threshold to 0.75', 'SPLIT FIRE ACTIVATED: Aggressive Void Filling', 'CHAOS DAMPENER: Halving Risk due to Chaos (0.46)']
+15:13:20 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:20 | INFO | Laplace-Backtest | TRADE #339: SELL @ 1.33797 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (1/14)
+15:13:20 | INFO | Laplace-Backtest |   > Toxic Flow Active: Raising Neural Threshold to 0.75
+15:13:20 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:20 | INFO | Laplace-Backtest | TRADE #340: SELL @ 1.33797 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (2/14)
+15:13:20 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:20 | INFO | Laplace-Backtest | TRADE #341: SELL @ 1.33797 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (3/14)
+15:13:20 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:20 | INFO | Laplace-Backtest | TRADE #342: SELL @ 1.33797 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (4/14)
+15:13:20 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:20 | INFO | Laplace-Backtest | TRADE #343: SELL @ 1.33797 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (5/14)
+15:13:20 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)
+15:13:20 | INFO | Laplace-Backtest | TRADE #344: SELL @ 1.33797 | SL: 15.0p | TP: 20.0p | Conf: 99% | SPLIT FIRE (6/14)
+15:13:20 | INFO | Atl4s-Backtest | Applying Lot Multiplier: 0.14285714285714285x (Base: 58.66)

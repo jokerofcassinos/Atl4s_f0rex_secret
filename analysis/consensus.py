@@ -189,7 +189,6 @@ class ConsensusEngine:
             'Overlord': lambda: self.overlord.deliberate(data_map),
             'Sovereign': lambda: self.sovereign.deliberate(data_map),
             'Singularity': lambda: self.singularity.deliberate(data_map),
-            'Singularity': lambda: self.singularity.deliberate(data_map),
             'WeekendGap': lambda: self.weekend_gap.deliberate(data_map),
             'Akashic': lambda: self._consult_akashic(df_m5) 
         }

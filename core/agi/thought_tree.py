@@ -70,6 +70,7 @@ class ThoughtTree:
         self.root_nodes: List[str] = []  # IDs dos nós raiz
         self.node_order: List[str] = []  # Chronological order of node IDs
         self._max_depth_warned = False  # Flag to only warn once
+        self.is_dirty = False # Optimization: Track changes for indexing
         
     def create_node(self, question: str, parent_id: Optional[str] = None, 
                    context: Optional[Dict[str, Any]] = None,
@@ -118,6 +119,7 @@ class ThoughtTree:
             if parent_id in self.nodes:
                 self.nodes[parent_id].add_child(node_id)
         
+        self.is_dirty = True # Mark as needing indexing
         return node_id
     
     def answer_node(self, node_id: str, answer: str, confidence: float = 0.0):
@@ -232,11 +234,19 @@ class GlobalThoughtOrchestrator:
                 self.compressor.compress_all()
                 # Clear index mapping for removed nodes
                 self._cleanup_index()
+                
+        # Optimization: Only scan dirty trees
         for mod_name, tree in self.trees.items():
+            if not getattr(tree, 'is_dirty', False):
+                 continue
+                 
             for node_id, node in tree.nodes.items():
                 if node_id not in self.indexed_node_ids:
                     self._index_node(mod_name, node_id, node.question)
                     self.indexed_node_ids.add(node_id)
+            
+            # Reset dirty flag
+            tree.is_dirty = False
                     
     def _index_node(self, module_name: str, node_id: str, question: str):
         """Adds a single node's keywords to the global index."""

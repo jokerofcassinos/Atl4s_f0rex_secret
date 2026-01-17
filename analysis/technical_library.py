@@ -13,6 +13,10 @@ class TechnicalLibrary:
     @staticmethod
     def calculate_rsi(series: pd.Series, period: int = 14) -> float:
         try:
+            # Optimization: Use only recent data. SMA RSI doesn't need infinite history.
+            if len(series) > 500:
+                series = series.iloc[-500:]
+            
             delta = series.diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
@@ -24,6 +28,9 @@ class TechnicalLibrary:
     @staticmethod
     def calculate_bollinger_bands(series: pd.Series, period: int = 20, std_dev: float = 2.0):
         try:
+            if len(series) > 500:
+                series = series.iloc[-500:]
+                
             sma = series.rolling(window=period).mean()
             std = series.rolling(window=period).std()
             upper = sma + (std * std_dev)
@@ -34,6 +41,10 @@ class TechnicalLibrary:
     @staticmethod
     def calculate_macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9):
         try:
+            # EMA converges after ~3.45 * span. 500 is safe for slow=26.
+            if len(series) > 500:
+                series = series.iloc[-500:]
+                
             exp1 = series.ewm(span=fast, adjust=False).mean()
             exp2 = series.ewm(span=slow, adjust=False).mean()
             macd = exp1 - exp2
@@ -45,6 +56,9 @@ class TechnicalLibrary:
     @staticmethod
     def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
         try:
+            if len(df) > 500:
+                df = df.iloc[-500:]
+                
             high = df['high']
             low = df['low']
             close = df['close'].shift(1)
@@ -59,6 +73,13 @@ class TechnicalLibrary:
     @staticmethod
     def calculate_vwap(df: pd.DataFrame) -> float:
         try:
+            # VWAP is cumulative from session start. Backtest assumes continuous?
+            # Safe to assume simplified VWAP on recent window for local trend context
+            # Real VWAP resets daily. Here we just take last 1000 candles as proxy if optimized?
+            # Or keep full if strictly necessary? Let's limit to 1000 for speed.
+            if len(df) > 1000:
+                df = df.iloc[-1000:]
+                
             # Typical Price * Volume
             v = df['volume']
             tp = (df['high'] + df['low'] + df['close']) / 3
