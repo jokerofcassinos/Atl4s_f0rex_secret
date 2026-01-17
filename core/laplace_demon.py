@@ -266,7 +266,7 @@ class LaplaceDemonCore:
         """
         Hard Veto Logic based on Time of Day/Week.
         1. Friday Doomsday: Global Shutoff after 20:00.
-        2. Asian Hazard Zone: No Momentum/Squeeze 23:55-01:05.
+        2. Asian Hazard Zone: BLOCK ALL SETUPS 23:30-01:30 (Total Lockdown).
         """
         weekday = current_time.weekday() # 0=Mon, 4=Fri
         hour = current_time.hour
@@ -276,17 +276,16 @@ class LaplaceDemonCore:
         if weekday == 4 and hour >= 20:
              return f"FRIDAY_DOOMSDAY_PROTOCOL (Hour {hour}:00 > 20:00)"
 
-        # 2. Asian Hazard Zone (23:55 - 01:05)
+        # 2. Asian Hazard Zone (23:30 - 01:30) - TOTAL LOCKDOWN
         # Convert to minutes for easier range check
         time_minutes = hour * 60 + minute
-        # 23:55 = 1435, 01:05 = 65. Range crosses midnight.
-        is_hazard_time = (time_minutes >= 1435) or (time_minutes <= 65)
+        # 23:30 = 1410, 01:30 = 90. Range crosses midnight.
+        is_hazard_time = (time_minutes >= 1410) or (time_minutes <= 90)
         
         if is_hazard_time:
-             # Block Momentum & Squeeze Strategies
-             if setup in ["VOLATILITY_SQUEEZE", "MOMENTUM_BREAKOUT", "STRUCTURE_TREND_RIDER"]:
-                  return f"ASIAN_HAZARD_ZONE ({hour}:{minute:02d})"
-                  
+             # Block ALL setups during this period (late-night is casino)
+             return f"ASIAN_TOTAL_LOCKDOWN ({hour}:{minute:02d})"
+        
         return None
 
     def _check_toxic_flow_lock(self, is_compressed: bool, setup: str, reasons: list) -> Optional[str]:
@@ -834,10 +833,22 @@ class LaplaceDemonCore:
                             if c_high >= fvg_bot and c_close < fvg_top:
                                  if c_close > fvg_top: continue
                                  
+                                 # 0. LONDON OPEN LOCKDOWN (Trade #112-126 Fix)
+                                 # Block SELL during high-volatility London Open (08:00-09:30)
+                                 try:
+                                      current_hour = df_m5.index[-1].hour
+                                      current_minute = df_m5.index[-1].minute
+                                      time_mins = current_hour * 60 + current_minute
+                                      # 08:00 = 480, 09:30 = 570
+                                      if 480 <= time_mins <= 570:
+                                           reasons.append(f"VOID FILLER VETOED: London Open ({current_hour}:{current_minute:02d})")
+                                           continue
+                                 except: pass
+                                 
                                  # 1. KINEMATICS VETO (Rocket Protection)
-                                 # Stricter: Block if rocketing > 25 deg
-                                 if k_dir == 1 and k_angle > 25:
-                                      reasons.append(f"VOID FILLER VETOED: Rocketing ({k_angle}° > 25)")
+                                 # ULTRA-STRICT: Block if rocketing > 10 deg (even slow uptrend)
+                                 if k_dir == 1 and k_angle > 10:
+                                      reasons.append(f"VOID FILLER VETOED: Rocketing ({k_angle}° > 10)")
                                       continue
                                  
                                  # 2. CONSENSUS VETO (Trend Alignment)
@@ -845,6 +856,34 @@ class LaplaceDemonCore:
                                  if score > 20: 
                                       reasons.append(f"VOID FILLER VETOED: Consensus Buy ({score:.1f})")
                                       continue
+                                 
+                                 # 3. DIVERGENCE VETO (NEW - Trade #162 Fix)
+                                 # Block SELL if Bullish Divergence detected
+                                 div_data_vf = details.get('Divergence', {})
+                                 if isinstance(div_data_vf, dict):
+                                      div_type_vf = div_data_vf.get('type', '')
+                                      if 'bullish' in str(div_type_vf).lower():
+                                           reasons.append(f"VOID FILLER VETOED: Bullish Divergence ({div_type_vf})")
+                                           continue
+                                 
+                                 # 4. STRUCTURE VETO (NEW - Trade #119 Fix)
+                                 # Block SELL if market structure is BULLISH
+                                 structure_data_vf = details.get('Structure', {})
+                                 if isinstance(structure_data_vf, dict):
+                                      struct_type_vf = structure_data_vf.get('type', 'NEUTRAL')
+                                      if struct_type_vf == 'BULLISH':
+                                           reasons.append(f"VOID FILLER VETOED: Bullish Structure ({struct_type_vf})")
+                                           continue
+                                 
+                                 # 5. SNIPER CONFLICT VETO (NEW - Trade #117 Fix)
+                                 # Block SELL if Sniper says BUY with high confidence
+                                 sniper_data_vf = details.get('Sniper', {})
+                                 if isinstance(sniper_data_vf, dict):
+                                      sniper_dir_vf = sniper_data_vf.get('dir', 0)
+                                      sniper_score_vf = sniper_data_vf.get('score', 0)
+                                      if sniper_dir_vf == 1 and sniper_score_vf > 50:
+                                           reasons.append(f"VOID FILLER VETOED: Sniper BUY ({sniper_score_vf:.1f})")
+                                           continue
 
                                  # PRIORITY CHECK
                                  if 130 > abs(score):
@@ -902,6 +941,93 @@ class LaplaceDemonCore:
                                 
              except Exception as e:
                   pass # Math errors
+
+         # 4. SNIPER SCALP (High-Confidence Sniper Entries)
+         # Logic: When Sniper gives a very high score (>85) and EMA confirms, take the trade
+         sniper_data = details.get('Sniper', {})
+         if isinstance(sniper_data, dict):
+              sniper_dir = sniper_data.get('dir', 0)
+              sniper_score = sniper_data.get('score', 0)
+              
+              if sniper_score > 85:  # Very high confidence
+                   # Calculate EMA20 slope for confirmation
+                   if df_m5 is not None and len(df_m5) >= 25:
+                        try:
+                             ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
+                             ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
+                             
+                             # BUY Scalp: Sniper BUY + EMA Rising
+                             if sniper_dir == 1 and ema_slope > 0.00005:
+                                  if score < 80 and 120 > abs(score):  # Don't override stronger setups
+                                       reasons.append(f"SNIPER SCALP: High-Confidence BUY ({sniper_score:.1f}%) + EMA Rising")
+                                       setup = "SNIPER_SCALP"
+                                       score = 120
+                             
+                             # SELL Scalp: Sniper SELL + EMA Falling
+                             elif sniper_dir == -1 and ema_slope < -0.00005:
+                                  # Block SELL during London Open
+                                  try:
+                                       current_hour = df_m5.index[-1].hour
+                                       current_minute = df_m5.index[-1].minute
+                                       time_mins = current_hour * 60 + current_minute
+                                       if 480 <= time_mins <= 570:
+                                            reasons.append(f"SNIPER SCALP VETOED: London Open ({current_hour}:{current_minute:02d})")
+                                       elif score > -80 and 120 > abs(score):
+                                            reasons.append(f"SNIPER SCALP: High-Confidence SELL ({sniper_score:.1f}%) + EMA Falling")
+                                            setup = "SNIPER_SCALP"
+                                            score = -120
+                                  except: pass
+                        except: pass
+
+         # 5. DIVERGENCE RIDER (Triple Divergence Entries)
+         # Logic: When Triple Divergence is detected, ride the reversal
+         div_data = details.get('Divergence', {})
+         if isinstance(div_data, dict):
+              div_type = div_data.get('type', '')
+              div_conf = div_data.get('confluence', 0)
+              
+              if div_conf >= 3:  # Triple Divergence (strong signal)
+                   if 'bullish' in str(div_type).lower():
+                        # Check EMA is not strongly falling
+                        ema_veto = False
+                        if df_m5 is not None and len(df_m5) >= 25:
+                             try:
+                                  ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
+                                  ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
+                                  if ema_slope < -0.00020:  # Strong downtrend
+                                       ema_veto = True
+                                       reasons.append(f"DIVERGENCE RIDER VETOED: Strong Downtrend")
+                             except: pass
+                        
+                        if not ema_veto and score < 100 and 110 > abs(score):
+                             reasons.append(f"DIVERGENCE RIDER: Triple Bullish Divergence (Conf: {div_conf})")
+                             setup = "DIVERGENCE_RIDER"
+                             score = 110
+                             
+                   elif 'bearish' in str(div_type).lower():
+                        # Check EMA is not strongly rising + London Open protection
+                        ema_veto = False
+                        if df_m5 is not None and len(df_m5) >= 25:
+                             try:
+                                  ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
+                                  ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
+                                  if ema_slope > 0.00020:
+                                       ema_veto = True
+                                       reasons.append(f"DIVERGENCE RIDER VETOED: Strong Uptrend")
+                                  
+                                  # London Open block for SELL
+                                  current_hour = df_m5.index[-1].hour
+                                  current_minute = df_m5.index[-1].minute
+                                  time_mins = current_hour * 60 + current_minute
+                                  if 480 <= time_mins <= 570:
+                                       ema_veto = True
+                                       reasons.append(f"DIVERGENCE RIDER VETOED: London Open")
+                             except: pass
+                        
+                        if not ema_veto and score > -100 and 110 > abs(score):
+                             reasons.append(f"DIVERGENCE RIDER: Triple Bearish Divergence (Conf: {div_conf})")
+                             setup = "DIVERGENCE_RIDER"
+                             score = -110
 
 
         
@@ -1410,6 +1536,17 @@ class LaplaceDemonCore:
         sniper_score = sniper_data.get('score', 0)
         
         decision_dir = "BUY" if score > 0 else "SELL" if score < 0 else "WAIT"
+        
+        # --- EMA SLOPE VETO (SLOW GRINDING TREND PROTECTION) ---
+        # If EMA20 is rising and we're trying to SELL, block it.
+        # If EMA20 is falling and we're trying to BUY, block it.
+        if decision_dir in ["BUY", "SELL"]:
+             ema_veto = self._check_ema_slope_veto(df_m5, decision_dir, reasons)
+             if ema_veto:
+                  vetoes.append(ema_veto)
+                  execute = False
+                  hard_veto = True
+                  logger.warning(f"EMA SLOPE VETO: Blocking {decision_dir} ({ema_veto})")
         
         # Sniper dir: +1 = BUY, -1 = SELL (THRESHOLD: 50)
         if decision_dir == "BUY" and sniper_dir == -1 and sniper_score > 50:
