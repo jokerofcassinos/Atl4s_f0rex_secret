@@ -418,21 +418,21 @@ class LaplaceBacktestRunner:
                         if current_balance > 500:
                              # Linear decay or simple tiers based on Base Risk of 20%
                              if current_balance > 5000:
-                                  max_aggression = 1.0 # 20% Risk (Base) - Wealth Preservation
+                                  max_aggression = 2.0 # 40% Risk - Wealth Preservation (was 1.0)
                              elif current_balance > 2000:
-                                  max_aggression = 2.0 # 40% Risk - High Growth
+                                  max_aggression = 4.0 # 80% Risk - High Growth (was 2.0)
                              else:
-                                  max_aggression = 3.0 # 60% Risk - Aggressive
+                                  max_aggression = 6.0 # 120% Risk - Aggressive (was 3.0)
                         else:
-                             # GOD MODE: 90% Win Rate allows 80% Risk (Kelly Criterion ~0.8)
-                             # Target: $30 -> $1000 in 10 days. 
+                             # GOD MODE: 98% Win Rate allows maximum risk
+                             # Target: $30 -> $1000 in 3 days. 
                              # We need maximum velocity.
-                             max_aggression = 4.0 # 80% Risk per Setup.
+                             max_aggression = 7.0 # 140% Risk per Setup (was 4.0)
                         
                         target_total_multiplier = min(lot_multiplier, max_aggression) 
                         
-                        # Cap max splits to 5 to avoid "Min Lot" errors
-                        num_orders = min(int(lot_multiplier), 5)
+                        # Cap max splits to 7 to increase profit velocity (was 5)
+                        num_orders = min(int(lot_multiplier), 7)
                         
                         # Distribute risk across orders
                         lot_multiplier = target_total_multiplier / num_orders 

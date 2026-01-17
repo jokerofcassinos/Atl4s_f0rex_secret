@@ -942,93 +942,92 @@ class LaplaceDemonCore:
              except Exception as e:
                   pass # Math errors
 
-         # 4. SNIPER SCALP (High-Confidence Sniper Entries)
-         # Logic: When Sniper gives a very high score (>85) and EMA confirms, take the trade
-         sniper_data = details.get('Sniper', {})
-         if isinstance(sniper_data, dict):
-              sniper_dir = sniper_data.get('dir', 0)
-              sniper_score = sniper_data.get('score', 0)
-              
-              if sniper_score > 85:  # Very high confidence
-                   # Calculate EMA20 slope for confirmation
-                   if df_m5 is not None and len(df_m5) >= 25:
-                        try:
-                             ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
-                             ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
-                             
-                             # BUY Scalp: Sniper BUY + EMA Rising
-                             if sniper_dir == 1 and ema_slope > 0.00005:
-                                  if score < 80 and 120 > abs(score):  # Don't override stronger setups
-                                       reasons.append(f"SNIPER SCALP: High-Confidence BUY ({sniper_score:.1f}%) + EMA Rising")
-                                       setup = "SNIPER_SCALP"
-                                       score = 120
-                             
-                             # SELL Scalp: Sniper SELL + EMA Falling
-                             elif sniper_dir == -1 and ema_slope < -0.00005:
-                                  # Block SELL during London Open
-                                  try:
-                                       current_hour = df_m5.index[-1].hour
-                                       current_minute = df_m5.index[-1].minute
-                                       time_mins = current_hour * 60 + current_minute
-                                       if 480 <= time_mins <= 570:
-                                            reasons.append(f"SNIPER SCALP VETOED: London Open ({current_hour}:{current_minute:02d})")
-                                       elif score > -80 and 120 > abs(score):
-                                            reasons.append(f"SNIPER SCALP: High-Confidence SELL ({sniper_score:.1f}%) + EMA Falling")
-                                            setup = "SNIPER_SCALP"
-                                            score = -120
-                                  except: pass
-                        except: pass
+        # 4. SNIPER SCALP (High-Confidence Sniper Entries)
+        # Logic: When Sniper gives a very high score (>85) and EMA confirms, take the trade
+        sniper_data = details.get('Sniper', {})
+        if isinstance(sniper_data, dict):
+             sniper_dir = sniper_data.get('dir', 0)
+             sniper_score = sniper_data.get('score', 0)
+             
+             if sniper_score > 80:  # High confidence (relaxed from 85)
+                  # Calculate EMA20 slope for confirmation
+                  if df_m5 is not None and len(df_m5) >= 25:
+                       try:
+                            ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
+                            ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
+                            
+                            # BUY Scalp: Sniper BUY + EMA Rising
+                            if sniper_dir == 1 and ema_slope > 0.00005:
+                                 if score < 80 and 120 > abs(score):  # Don't override stronger setups
+                                      reasons.append(f"SNIPER SCALP: High-Confidence BUY ({sniper_score:.1f}%) + EMA Rising")
+                                      setup = "SNIPER_SCALP"
+                                      score = 120
+                            
+                            # SELL Scalp: Sniper SELL + EMA Falling
+                            elif sniper_dir == -1 and ema_slope < -0.00005:
+                                 # Block SELL during London Open
+                                 try:
+                                      current_hour = df_m5.index[-1].hour
+                                      current_minute = df_m5.index[-1].minute
+                                      time_mins = current_hour * 60 + current_minute
+                                      if 480 <= time_mins <= 570:
+                                           reasons.append(f"SNIPER SCALP VETOED: London Open ({current_hour}:{current_minute:02d})")
+                                      elif score > -80 and 120 > abs(score):
+                                           reasons.append(f"SNIPER SCALP: High-Confidence SELL ({sniper_score:.1f}%) + EMA Falling")
+                                           setup = "SNIPER_SCALP"
+                                           score = -120
+                                 except: pass
+                       except: pass
 
-         # 5. DIVERGENCE RIDER (Triple Divergence Entries)
-         # Logic: When Triple Divergence is detected, ride the reversal
-         div_data = details.get('Divergence', {})
-         if isinstance(div_data, dict):
-              div_type = div_data.get('type', '')
-              div_conf = div_data.get('confluence', 0)
-              
-              if div_conf >= 3:  # Triple Divergence (strong signal)
-                   if 'bullish' in str(div_type).lower():
-                        # Check EMA is not strongly falling
-                        ema_veto = False
-                        if df_m5 is not None and len(df_m5) >= 25:
-                             try:
-                                  ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
-                                  ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
-                                  if ema_slope < -0.00020:  # Strong downtrend
-                                       ema_veto = True
-                                       reasons.append(f"DIVERGENCE RIDER VETOED: Strong Downtrend")
-                             except: pass
-                        
-                        if not ema_veto and score < 100 and 110 > abs(score):
-                             reasons.append(f"DIVERGENCE RIDER: Triple Bullish Divergence (Conf: {div_conf})")
-                             setup = "DIVERGENCE_RIDER"
-                             score = 110
-                             
-                   elif 'bearish' in str(div_type).lower():
-                        # Check EMA is not strongly rising + London Open protection
-                        ema_veto = False
-                        if df_m5 is not None and len(df_m5) >= 25:
-                             try:
-                                  ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
-                                  ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
-                                  if ema_slope > 0.00020:
-                                       ema_veto = True
-                                       reasons.append(f"DIVERGENCE RIDER VETOED: Strong Uptrend")
-                                  
-                                  # London Open block for SELL
-                                  current_hour = df_m5.index[-1].hour
-                                  current_minute = df_m5.index[-1].minute
-                                  time_mins = current_hour * 60 + current_minute
-                                  if 480 <= time_mins <= 570:
-                                       ema_veto = True
-                                       reasons.append(f"DIVERGENCE RIDER VETOED: London Open")
-                             except: pass
-                        
-                        if not ema_veto and score > -100 and 110 > abs(score):
-                             reasons.append(f"DIVERGENCE RIDER: Triple Bearish Divergence (Conf: {div_conf})")
-                             setup = "DIVERGENCE_RIDER"
-                             score = -110
-
+        # 5. DIVERGENCE RIDER (Triple Divergence Entries)
+        # Logic: When Triple Divergence is detected, ride the reversal
+        div_data = details.get('Divergence', {})
+        if isinstance(div_data, dict):
+             div_type = div_data.get('type', '')
+             div_conf = div_data.get('confluence', 0)
+             
+             if div_conf >= 2:  # Double Divergence (relaxed from 3)
+                  if 'bullish' in str(div_type).lower():
+                       # Check EMA is not strongly falling
+                       ema_veto = False
+                       if df_m5 is not None and len(df_m5) >= 25:
+                            try:
+                                 ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
+                                 ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
+                                 if ema_slope < -0.00020:  # Strong downtrend
+                                      ema_veto = True
+                                      reasons.append(f"DIVERGENCE RIDER VETOED: Strong Downtrend")
+                            except: pass
+                       
+                       if not ema_veto and score < 100 and 110 > abs(score):
+                            reasons.append(f"DIVERGENCE RIDER: Triple Bullish Divergence (Conf: {div_conf})")
+                            setup = "DIVERGENCE_RIDER"
+                            score = 110
+                            
+                  elif 'bearish' in str(div_type).lower():
+                       # Check EMA is not strongly rising + London Open protection
+                       ema_veto = False
+                       if df_m5 is not None and len(df_m5) >= 25:
+                            try:
+                                 ema20 = df_m5['close'].ewm(span=20, adjust=False).mean()
+                                 ema_slope = ema20.iloc[-1] - ema20.iloc[-5]
+                                 if ema_slope > 0.00020:
+                                      ema_veto = True
+                                      reasons.append(f"DIVERGENCE RIDER VETOED: Strong Uptrend")
+                                 
+                                 # London Open block for SELL
+                                 current_hour = df_m5.index[-1].hour
+                                 current_minute = df_m5.index[-1].minute
+                                 time_mins = current_hour * 60 + current_minute
+                                 if 480 <= time_mins <= 570:
+                                      ema_veto = True
+                                      reasons.append(f"DIVERGENCE RIDER VETOED: London Open")
+                            except: pass
+                       
+                       if not ema_veto and score > -100 and 110 > abs(score):
+                            reasons.append(f"DIVERGENCE RIDER: Triple Bearish Divergence (Conf: {div_conf})")
+                            setup = "DIVERGENCE_RIDER"
+                            score = -110
 
         
         # ----------------------------------------
