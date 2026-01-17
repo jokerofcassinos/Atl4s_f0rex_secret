@@ -180,8 +180,10 @@ class ChartGenerator:
         ax.set_facecolor(COLORS['bg'])
         
         bins = 30
-        ax.hist(wins, bins=bins, color=COLORS['profit'], alpha=0.7, label=f'Wins ({len(wins)})')
-        ax.hist(losses, bins=bins, color=COLORS['loss'], alpha=0.7, label=f'Losses ({len(losses)})')
+        if wins:
+            ax.hist(wins, bins=bins, color=COLORS['profit'], alpha=0.7, label=f'Wins ({len(wins)})')
+        if losses:
+            ax.hist(losses, bins=bins, color=COLORS['loss'], alpha=0.7, label=f'Losses ({len(losses)})')
         
         ax.axvline(x=0, color='white', linestyle='-', linewidth=2)
         ax.axvline(x=result.avg_win, color=COLORS['profit'], linestyle='--', 
@@ -202,12 +204,29 @@ class ChartGenerator:
         ax2.set_facecolor(COLORS['bg'])
         
         sizes = [len(wins), len(losses)]
-        colors = [COLORS['profit'], COLORS['loss']]
-        explode = (0.05, 0)
+        # Filter out zero slices to avoid matplotlib warnings
+        pie_sizes = []
+        pie_labels = []
+        pie_colors = []
+        explode = []
         
-        ax2.pie(sizes, explode=explode, labels=['Wins', 'Losses'], 
-                colors=colors, autopct='%1.1f%%', startangle=90,
-                textprops={'color': 'white', 'fontweight': 'bold'})
+        if len(wins) > 0:
+            pie_sizes.append(len(wins))
+            pie_labels.append('Wins')
+            pie_colors.append(COLORS['profit'])
+            explode.append(0.05)
+            
+        if len(losses) > 0:
+            pie_sizes.append(len(losses))
+            pie_labels.append('Losses')
+            pie_colors.append(COLORS['loss'])
+            explode.append(0)
+            
+        if pie_sizes:
+            ax2.pie(pie_sizes, explode=explode, labels=pie_labels, 
+                    colors=pie_colors, autopct='%1.1f%%', startangle=90,
+                    textprops={'color': 'white', 'fontweight': 'bold'})
+            
         ax2.set_title(f"Win/Loss Ratio | {len(wins)}W / {len(losses)}L", 
                       fontsize=12, fontweight='bold', color='white')
         

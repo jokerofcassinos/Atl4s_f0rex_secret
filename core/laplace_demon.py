@@ -476,8 +476,8 @@ class LaplaceDemonCore:
              else:
                   log_msg += f" (Conf: {prediction.confidence:.1f}%)"
                     
-        # Log at INFO level so it shows up in console
-        logger.info(log_msg)
+        # Log at DEBUG level so it doesn't clutter console but is preserved in logs
+        logger.debug(log_msg)
 
         if prediction.execute:
             logger.info(f"[SIGNAL GENERATED] {prediction.direction} | Conf: {prediction.confidence:.1f}% | Reasons: {prediction.reasons}")
@@ -732,7 +732,7 @@ class LaplaceDemonCore:
         if df_m1 is not None and len(df_m1) >= 16: # Need at least 2x M8 candles
              try:
                   # Resample M1 to M8
-                  m8_res = df_m1.resample('8T').agg({
+                  m8_res = df_m1.resample('8min').agg({
                        'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
                   }).dropna()
                   

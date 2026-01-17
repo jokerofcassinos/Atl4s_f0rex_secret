@@ -866,6 +866,24 @@ class ConsensusEngine:
 
         # --- HOLOGRAPHIC VECTOR LOGIC (v3.0) ---
         
+        # Phase X: Akashic Memory Soft Integration (The "Subconscious Nudge")
+        # AGGRESSIVE MODE: Memory is barely positive (>55%)? Use it.
+        akashic_boost_val = 0.0
+        if akashic_res and akashic_res['status'] == 'SUCCESS':
+             ak_conf = akashic_res.get('confidence', 0.0)
+             if ak_conf > 0.55: # Lowered from 0.60
+                 ak_dir_str = akashic_res.get('direction', 'NEUTRAL')
+                 if ak_dir_str != 'NEUTRAL':
+                     ak_dir_val = 1 if ak_dir_str == 'BUY' else -1
+                     # Boost: (Conf - 0.5) * 100. (Double Aggression)
+                     # 0.55 -> 5pts
+                     # 0.60 -> 10pts
+                     # 0.80 -> 30pts
+                     # 0.90 -> 40pts
+                     base_boost = (ak_conf - 0.5) * 100.0 
+                     akashic_boost_val = base_boost * ak_dir_val
+                     logger.info(f"AKASHIC AGGRESSIVE: Memory Nudge {ak_dir_str} (Conf {ak_conf:.2f}) -> Vector Boost {akashic_boost_val:.1f}")
+
         # 1. Momentum Vector (The "Push")
         # Components: Trend, Kinematics, Fractal, Volatility(if Expansion), SupplyChain, WeekendGap
         # Weights normalized for this vector
@@ -888,12 +906,13 @@ class ConsensusEngine:
         )
         
         # 3. Structure Vector (The "Map")
-        # Components: Sniper (FVG), SupplyDemand, Patterns, Fortress (Levels)
+        # Components: Sniper (FVG), SupplyDemand, Patterns, Fortress (Levels), Akashic(Memory)
         # Note: Structure dictates WHERE trade is valid
         v_structure = (
             (s_score * s_dir * 1.2) + # Sniper is King
             (sd_score * sd_dir * 0.8) +
-            (p_score * p_dir * 0.6)
+            (p_score * p_dir * 0.6) +
+            (akashic_boost_val * 2.0) # Memory Validated (2.0x Weight)
         )
         
         # --- HOLOGRAPHIC DECISION MATRIX ---

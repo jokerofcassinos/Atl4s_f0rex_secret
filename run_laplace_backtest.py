@@ -22,15 +22,31 @@ from typing import Optional, Dict, Tuple
 import sys # Added for logging handlers
 
 # Setup logging
+# Setup logging
+# Create handlers
+c_handler = logging.StreamHandler(sys.stdout)
+f_handler = logging.FileHandler("laplace_backtest.log")
+
+# Set levels for handlers
+c_handler.setLevel(logging.INFO)   # Console: Only INFO and above
+f_handler.setLevel(logging.DEBUG)  # File: Capture DEBUG (Thinking)
+
+# Create formatters
+formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(name)s | %(message)s', datefmt='%H:%M:%S')
+c_handler.setFormatter(formatter)
+f_handler.setFormatter(formatter)
+
+# Configure Root Logger
+# Start with INFO to suppress external libraries (matplotlib, etc.)
 logging.basicConfig(
-    level=logging.INFO, # Phase 5: Production Mode
-    format='%(asctime)s | %(levelname)s | %(name)s | %(message)s',
-    datefmt='%H:%M:%S',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("laplace_backtest.log")
-    ]
+    level=logging.INFO, 
+    handlers=[c_handler, f_handler]
 )
+
+# Enable DEBUG for specific project loggers to capture [THINKING] in file
+logging.getLogger("LaplaceDemon").setLevel(logging.DEBUG)
+logging.getLogger("Laplace-Backtest").setLevel(logging.DEBUG)
+
 logger = logging.getLogger("Laplace-Backtest")
 
 # Import backtest engine
@@ -431,8 +447,8 @@ class LaplaceBacktestRunner:
                         
                         target_total_multiplier = min(lot_multiplier, max_aggression) 
                         
-                        # Cap max splits to 7 to increase profit velocity (was 5)
-                        num_orders = min(int(lot_multiplier), 7)
+                        # Cap max splits to 14 to increase profit velocity (was 7)
+                        num_orders = min(int(lot_multiplier), 14)
                         
                         # Distribute risk across orders
                         lot_multiplier = target_total_multiplier / num_orders 

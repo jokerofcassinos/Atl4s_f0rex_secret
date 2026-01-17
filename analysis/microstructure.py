@@ -153,9 +153,12 @@ class MicroStructure:
             recent_times = [self.ticks[i]['time'] for i in range(len(self.ticks)-count, len(self.ticks))]
             intervals = np.diff(recent_times)
             try:
-                hist, _ = np.histogram(intervals, bins=5, density=True)
-                hist = hist[hist > 0]
-                tick_entropy = entropy(hist)
+                if len(intervals) > 1 and np.sum(intervals) > 0:
+                    hist, _ = np.histogram(intervals, bins=5, density=True)
+                    hist = hist[hist > 0]
+                    tick_entropy = entropy(hist)
+                else:
+                    tick_entropy = 0
             except:
                 tick_entropy = 0
             
