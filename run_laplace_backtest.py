@@ -93,7 +93,7 @@ class LaplaceBacktestRunner:
         
         # Initialize components
         self.engine = BacktestEngine(self.config)
-        self.laplace = LaplaceDemonCore(symbol)
+        self.laplace = LaplaceDemonCore(symbol, backtest_mode=True)  # Speed optimization: skip heavy AGI meta-thinking
         self.charts = ChartGenerator("reports")
         
         # Phase 7: Dynamic VSL (Protects against volatility, but scales with capital)

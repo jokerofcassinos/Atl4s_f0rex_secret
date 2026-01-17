@@ -137,10 +137,11 @@ class ConsensusEngine:
             logger.error(f"Akashic Error: {e}")
             return None
 
-    def deliberate(self, data_map, parallel=True, verbose=True):
+    def deliberate(self, data_map, parallel=True, verbose=True, backtest_mode=False):
         """
         Aggregates votes from all sub-modules using Dynamic Regime Weights.
         data_map: {'M5': df_m5, 'H1': df_h1, 'M8': df_m8 (Optional)}
+        backtest_mode: If True, skip heavy AGI meta-thinking for speed optimization
         """
         df_m5 = data_map['M5']
         df_h1 = data_map.get('H1')
@@ -219,126 +220,133 @@ class ConsensusEngine:
         if not parallel:
              pass # Optimization: return early? No, we need holographic logic.
 
-        # Phase 6: Recursive Thinking - Each module thinks about its decision
-        # Pergunta recursiva: "Por que pensei assim?", "Foi correto?", "Como agir agora?"
-        for module_name, result in results.items():
-            if result is None:
-                continue
-            
-            # Obtém ou cria árvore de pensamento para o módulo
-            tree = self.thought_orchestrator.get_or_create_tree(module_name)
-            
-            # Obtém ou cria memória de decisões
-            memory = self.decision_memory.get_or_create_memory(module_name)
-            
-            # Extrai decisão e score
-            decision = result.get('decision', 'WAIT') if isinstance(result, dict) else 'WAIT'
-            score = result.get('score', 0.0) if isinstance(result, dict) else 0.0
-            reasoning = result.get('reason', '') if isinstance(result, dict) else ''
-            
-            # Phase 6 Optimization: Semantic De-Duplication
-            # If the module's decision state (Decision + Score) hasn't changed,
-            # we skip the expensive Thought Tree generation.
-            # We include the first 50 chars of reasoning to catch subtle changes.
-            state_key = f"{decision}:{score:.2f}:{str(reasoning)[:50]}"
-            last_state = self.last_module_states.get(module_name)
-            
-            if state_key == last_state:
-                # Nothing changed, skip expensive Thought Tree operations
-                continue
-                
-            self.last_module_states[module_name] = state_key
-            
-            # Cria nó de pensamento raiz
-            root_node_id = tree.create_node(
-                question=f"Why did I decide {decision}?",
-                context={'result': result, 'data_map_keys': list(data_map.keys())},
-                confidence=abs(score) / 100.0 if score != 0 else 0.0
-            )
-            
-            # Responde o nó raiz
-            tree.answer_node(root_node_id, reasoning or f"Based on analysis: {decision}")
-            
-            # Perguntas recursivas adicionais
-            if decision != 'WAIT':
-                # Pergunta 1: "Foi correto?"
-                child1_id = tree.create_node(
-                    question="Was this decision correct?",
-                    parent_id=root_node_id,
-                    context={'parent_decision': decision}
-                )
-                # Busca decisões similares no passado
-                similar_decisions = memory.find_similar_decisions(
-                    {'decision': decision, 'score': score}, limit=5
-                )
-                if similar_decisions:
-                    success_rate = len([d for d in similar_decisions if d.result == "WIN"]) / len(similar_decisions)
-                    answer1 = f"Similar past decisions had {success_rate:.1%} success rate"
-                    tree.answer_node(child1_id, answer1, confidence=success_rate)
-                else:
-                    tree.answer_node(child1_id, "No similar past decisions found", confidence=0.0)
-                
-                # Pergunta 2: "Como agir agora?"
-                child2_id = tree.create_node(
-                    question="How should I act now?",
-                    parent_id=root_node_id,
-                    context={'current_decision': decision}
-                )
-                recommendation = memory.get_recommendation({'decision': decision, 'score': score})
-                tree.answer_node(child2_id, recommendation.get('reason', ''), 
-                               confidence=recommendation.get('confidence', 0.0))
-            
-            # Registra decisão na memória
-            decision_id = memory.record_decision(
-                decision=decision,
-                score=score,
-                context={'result': result, 'data_map_keys': list(data_map.keys())},
-                reasoning=reasoning,
-                confidence=abs(score) / 100.0 if score != 0 else 0.0
-            )
-            
-            # Adiciona perguntas recursivas à memória
-            if decision != 'WAIT':
-                memory.add_recursive_question(decision_id, "Why did I decide this?")
-                memory.add_recursive_question(decision_id, "Was this correct?", 
-                                            "Based on similar past decisions")
-                memory.add_recursive_question(decision_id, "How should I act now?", 
-                                            recommendation.get('reason', '') if decision != 'WAIT' else '')
-
-        # Phase 6: Meta-Thinking - Analyze other modules' thoughts
-        # Sistema de meta-pensamento: análise do pensamento de outros módulos
+        # Initialize meta_insights to empty dict (used later in details)
+        # This must be outside the backtest_mode conditional
         meta_insights = {}
-        for module_name in results.keys():
-            if module_name not in meta_insights:
-                meta_insights[module_name] = {}
-            
-            # Analisa o que outros módulos pensaram
-            for other_module in results.keys():
-                if other_module == module_name:
-                    continue
-                
-                insights = self.decision_memory.get_cross_module_insights(module_name, other_module)
-                meta_insights[module_name][other_module] = insights
         
-        # Conecta pensamentos similares entre módulos
-        for module1 in results.keys():
-            tree1 = self.thought_orchestrator.get_or_create_tree(module1)
-            for module2 in results.keys():
-                if module1 == module2:
+        # Phase 6: Recursive Thinking - SKIP IN BACKTEST MODE for 4x speed boost
+        # This O(N) loop + O(N²) cross-module analysis is the main bottleneck
+        if not backtest_mode:
+            # Phase 6: Recursive Thinking - Each module thinks about its decision
+            # Pergunta recursiva: "Por que pensei assim?", "Foi correto?", "Como agir agora?"
+            for module_name, result in results.items():
+                if result is None:
                     continue
                 
-                # Busca pensamentos similares
-                similar = self.thought_orchestrator.find_similar_thoughts(
-                    module1, f"Decision analysis for {module1}", threshold=0.5
+                # Obtém ou cria árvore de pensamento para o módulo
+                tree = self.thought_orchestrator.get_or_create_tree(module_name)
+                
+                # Obtém ou cria memória de decisões
+                memory = self.decision_memory.get_or_create_memory(module_name)
+                
+                # Extrai decisão e score
+                decision = result.get('decision', 'WAIT') if isinstance(result, dict) else 'WAIT'
+                score = result.get('score', 0.0) if isinstance(result, dict) else 0.0
+                reasoning = result.get('reason', '') if isinstance(result, dict) else ''
+                
+                # Phase 6 Optimization: Semantic De-Duplication
+                # If the module's decision state (Decision + Score) hasn't changed,
+                # we skip the expensive Thought Tree generation.
+                # We include the first 50 chars of reasoning to catch subtle changes.
+                state_key = f"{decision}:{score:.2f}:{str(reasoning)[:50]}"
+                last_state = self.last_module_states.get(module_name)
+                
+                if state_key == last_state:
+                    # Nothing changed, skip expensive Thought Tree operations
+                    continue
+                    
+                self.last_module_states[module_name] = state_key
+                
+                # Cria nó de pensamento raiz
+                root_node_id = tree.create_node(
+                    question=f"Why did I decide {decision}?",
+                    context={'result': result, 'data_map_keys': list(data_map.keys())},
+                    confidence=abs(score) / 100.0 if score != 0 else 0.0
                 )
-                for mod_name, node_id, similarity in similar[:3]:  # Top 3
-                    if mod_name == module2:
-                        tree2 = self.thought_orchestrator.get_or_create_tree(module2)
-                        # Conecta nós similares
-                        self.thought_orchestrator.connect_cross_module(
-                            module1, tree1.root_nodes[-1] if tree1.root_nodes else "",
-                            module2, node_id
-                        )
+                
+                # Responde o nó raiz
+                tree.answer_node(root_node_id, reasoning or f"Based on analysis: {decision}")
+                
+                # Perguntas recursivas adicionais
+                if decision != 'WAIT':
+                    # Pergunta 1: "Foi correto?"
+                    child1_id = tree.create_node(
+                        question="Was this decision correct?",
+                        parent_id=root_node_id,
+                        context={'parent_decision': decision}
+                    )
+                    # Busca decisões similares no passado
+                    similar_decisions = memory.find_similar_decisions(
+                        {'decision': decision, 'score': score}, limit=5
+                    )
+                    if similar_decisions:
+                        success_rate = len([d for d in similar_decisions if d.result == "WIN"]) / len(similar_decisions)
+                        answer1 = f"Similar past decisions had {success_rate:.1%} success rate"
+                        tree.answer_node(child1_id, answer1, confidence=success_rate)
+                    else:
+                        tree.answer_node(child1_id, "No similar past decisions found", confidence=0.0)
+                    
+                    # Pergunta 2: "Como agir agora?"
+                    child2_id = tree.create_node(
+                        question="How should I act now?",
+                        parent_id=root_node_id,
+                        context={'current_decision': decision}
+                    )
+                    recommendation = memory.get_recommendation({'decision': decision, 'score': score})
+                    tree.answer_node(child2_id, recommendation.get('reason', ''), 
+                                   confidence=recommendation.get('confidence', 0.0))
+                
+                # Registra decisão na memória
+                decision_id = memory.record_decision(
+                    decision=decision,
+                    score=score,
+                    context={'result': result, 'data_map_keys': list(data_map.keys())},
+                    reasoning=reasoning,
+                    confidence=abs(score) / 100.0 if score != 0 else 0.0
+                )
+                
+                # Adiciona perguntas recursivas à memória
+                if decision != 'WAIT':
+                    memory.add_recursive_question(decision_id, "Why did I decide this?")
+                    memory.add_recursive_question(decision_id, "Was this correct?", 
+                                                "Based on similar past decisions")
+                    memory.add_recursive_question(decision_id, "How should I act now?", 
+                                                recommendation.get('reason', '') if decision != 'WAIT' else '')
+
+            # Phase 6: Meta-Thinking - Analyze other modules' thoughts
+            # Sistema de meta-pensamento: análise do pensamento de outros módulos
+            meta_insights = {}
+            for module_name in results.keys():
+                if module_name not in meta_insights:
+                    meta_insights[module_name] = {}
+                
+                # Analisa o que outros módulos pensaram
+                for other_module in results.keys():
+                    if other_module == module_name:
+                        continue
+                    
+                    insights = self.decision_memory.get_cross_module_insights(module_name, other_module)
+                    meta_insights[module_name][other_module] = insights
+            
+            # Conecta pensamentos similares entre módulos
+            for module1 in results.keys():
+                tree1 = self.thought_orchestrator.get_or_create_tree(module1)
+                for module2 in results.keys():
+                    if module1 == module2:
+                        continue
+                    
+                    # Busca pensamentos similares
+                    similar = self.thought_orchestrator.find_similar_thoughts(
+                        module1, f"Decision analysis for {module1}", threshold=0.5
+                    )
+                    for mod_name, node_id, similarity in similar[:3]:  # Top 3
+                        if mod_name == module2:
+                            tree2 = self.thought_orchestrator.get_or_create_tree(module2)
+                            # Conecta nós similares
+                            self.thought_orchestrator.connect_cross_module(
+                                module1, tree1.root_nodes[-1] if tree1.root_nodes else "",
+                                module2, node_id
+                            )
 
         # Unpack Results
         # Trend

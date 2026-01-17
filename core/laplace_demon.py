@@ -109,8 +109,9 @@ class LaplaceDemonCore:
     """
     ALLOWED_HOURS_SET = {7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17} 
 
-    def __init__(self, symbol: str = "GBPUSD", contrarian_mode: bool = False):
+    def __init__(self, symbol: str = "GBPUSD", contrarian_mode: bool = False, backtest_mode: bool = False):
         self.symbol = symbol
+        self.backtest_mode = backtest_mode  # Speed optimization: skip heavy AGI meta-thinking
         self.daily_trades = {'date': None, 'count': 0}
         
         # --- 1. THE BUGATTI ENGINE (Legacy V1 Core) ---
@@ -490,7 +491,7 @@ class LaplaceDemonCore:
         Returns the 'Preliminary Vector' and detailed analysis.
         """
         # Delegate to the Single Source of Truth
-        decision, legacy_vector, details = self.consensus.deliberate(data_map)
+        decision, legacy_vector, details = self.consensus.deliberate(data_map, backtest_mode=self.backtest_mode)
         
         # Adapt output format to match what _synthesize expects
         # ConsensusEngine returns: (decision_str, vector_float, details_dict)
@@ -833,6 +834,37 @@ class LaplaceDemonCore:
                             if c_high >= fvg_bot and c_close < fvg_top:
                                  if c_close > fvg_top: continue
                                  
+                                 # === COMPRESSION TRAP REVERSAL (Trade #311-352 Fix) ===
+                                 # When Compression + Bullish Structure detected:
+                                 # Market is ACCUMULATING for bullish breakout, NOT breaking down.
+                                 # REVERSE the signal: SELL → BUY
+                                 # NOTE: SMCAnalyzer returns structure in 'trend' key, NOT 'structure'
+                                 smc_structure = smc_res.get('trend', 'NEUTRAL')
+                                 
+                                 # Extract compression status (toxic_flow can be bool or dict)
+                                 is_compressed = False
+                                 if isinstance(toxic_flow, dict):
+                                      is_compressed = toxic_flow.get('detected', False)
+                                 elif isinstance(toxic_flow, bool):
+                                      is_compressed = toxic_flow
+                                 
+                                 # DEBUG: Log values to diagnose why reversal isn't triggering
+                                 logger.debug(f"VOID_FILLER DEBUG: is_compressed={is_compressed}, smc_structure={smc_structure}, fvg_type={fvg_type}")
+
+                                 
+                                 if is_compressed and smc_structure == 'BULLISH':
+                                      # SIGNAL REVERSAL: Instead of SELL, execute BUY
+                                      if 130 > abs(score):
+                                           reasons.append(f"COMPRESSION TRAP REVERSAL: Bearish FVG @ {fvg_bot:.5f} in Bullish Structure")
+                                           reasons.append("Signal Inverted: SELL -> BUY (Accumulation Breakout)")
+                                           setup = "COMPRESSION_TRAP_REVERSAL"
+                                           score = 130  # Positive = BUY (instead of -130 SELL)
+                                           logger.info(f"COMPRESSION TRAP REVERSAL ACTIVATED: BUY @ {fvg_bot:.5f}")
+                                           break
+                                 
+
+
+
                                  # 0. LONDON OPEN LOCKDOWN (Trade #112-126 Fix)
                                  # Block SELL during high-volatility London Open (08:00-09:30)
                                  try:
@@ -843,7 +875,16 @@ class LaplaceDemonCore:
                                       if 480 <= time_mins <= 570:
                                            reasons.append(f"VOID FILLER VETOED: London Open ({current_hour}:{current_minute:02d})")
                                            continue
+                                      
+                                      # LATE SESSION RANGING VETO (Trades #41-54 Fix)
+                                      # Block SELL after 22:00 in RANGING structure (low liquidity period)
+                                      # 22:00 = 1320
+                                      if time_mins >= 1320 and smc_structure == 'RANGING':
+                                           reasons.append(f"VOID FILLER VETOED: Late Session Ranging ({current_hour}:{current_minute:02d})")
+                                           continue
                                  except: pass
+
+
                                  
                                  # 1. KINEMATICS VETO (Rocket Protection)
                                  # ULTRA-STRICT: Block if rocketing > 10 deg (even slow uptrend)
@@ -866,15 +907,23 @@ class LaplaceDemonCore:
                                            reasons.append(f"VOID FILLER VETOED: Bullish Divergence ({div_type_vf})")
                                            continue
                                  
-                                 # 4. STRUCTURE VETO (NEW - Trade #119 Fix)
+                                 # 4. STRUCTURE VETO (NEW - Trade #119 Fix + Cluster 1 Fix)
                                  # Block SELL if market structure is BULLISH
-                                 structure_data_vf = details.get('Structure', {})
-                                 if isinstance(structure_data_vf, dict):
-                                      struct_type_vf = structure_data_vf.get('type', 'NEUTRAL')
-                                      if struct_type_vf == 'BULLISH':
-                                           reasons.append(f"VOID FILLER VETOED: Bullish Structure ({struct_type_vf})")
-                                           continue
+                                 # NOTE: smc_res.get('trend') returns 'BULLISH'/'BEARISH'/'RANGING'
+                                 # (details['Structure'] is a float score, not usable here)
+                                 if smc_structure == 'BULLISH':
+                                      reasons.append(f"VOID FILLER VETOED: Bullish Structure ({smc_structure})")
+                                      continue
                                  
+                                 # 4b. COMPRESSION RANGING VETO (Trades #41-54 Fix)
+                                 # Block SELL in RANGING if compression detected
+                                 # Rationale: If compressed in RANGING, could break either direction
+                                 # Selling here is dangerous because COMPRESSION_TRAP may have just triggered BUY
+                                 if smc_structure == 'RANGING' and is_compressed:
+                                      reasons.append(f"VOID FILLER VETOED: Ranging + Compression (Unsafe)")
+                                      continue
+
+
                                  # 5. SNIPER CONFLICT VETO (NEW - Trade #117 Fix)
                                  # Block SELL if Sniper says BUY with high confidence
                                  sniper_data_vf = details.get('Sniper', {})
@@ -1302,11 +1351,13 @@ class LaplaceDemonCore:
         #      hard_veto = True
               
         # Keep only score capping (mild, not veto)
-        if toxic_flow:
+        # EXCEPTION: COMPRESSION_TRAP_REVERSAL needs full score to bypass Neural Oracle
+        if toxic_flow and setup != "COMPRESSION_TRAP_REVERSAL":
              # For Snipers, we caution but DO NOT VETO immediately.
              reasons.append(f"Toxic Flow: Compression Detected (Capping Score to 80)")
              if abs(score) > 80:
                   score = 80.0 if score > 0 else -80.0
+
               
              # DISABLED: Regime Lock
              # momentum_strategies = ["MOMENTUM_BREAKOUT", "CONSENSUS_VOTE", "KINETIC_BOOM", "LION_PROTOCOL", "QUANTUM_HARMONY"]
@@ -1913,7 +1964,11 @@ class LaplaceDemonCore:
              consensus_score = float(raw_consensus)
              
              # Tolerance: 10.0 (Block meaningful conflict)
-             if decision_dir == "SELL" and consensus_score > 10.0:
+             # EXCEPTION: COMPRESSION_TRAP_REVERSAL is designed to fight the consensus (reversal)
+             if setup == "COMPRESSION_TRAP_REVERSAL":
+                  reasons.append("COMPRESSION_TRAP exempt from Global Consensus Veto (by design)")
+                  pass  # Allow execution despite consensus conflict
+             elif decision_dir == "SELL" and consensus_score > 10.0:
                   execute = False
                   vetoes.append(f"Global Consensus Veto: Fighting Buy Trend ({consensus_score:.1f} > 10.0)")
                   reasons.append(f"Trend Alignment: FAILED (Consensus says BUY)")
@@ -1922,6 +1977,7 @@ class LaplaceDemonCore:
                   execute = False
                   vetoes.append(f"Global Consensus Veto: Fighting Sell Trend ({consensus_score:.1f} < -10.0)")
                   reasons.append(f"Trend Alignment: FAILED (Consensus says SELL)")
+
 
         prediction = LaplacePrediction(
             execute=execute,
