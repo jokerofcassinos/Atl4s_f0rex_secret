@@ -223,7 +223,26 @@ class LaplaceBacktestRunner:
             
             is_weekend_or_monday = current_time.weekday() in [5, 6, 0]
             
-            if is_weekend_or_monday:
+            # BANK HOLIDAY SKIP (Performance Optimization)
+            # Skip candles on days with extremely low liquidity
+            month = current_time.month
+            day = current_time.day
+            is_bank_holiday = (month, day) in [
+                (12, 23), (12, 24), (12, 25), (12, 26),  # Christmas period
+                (12, 27), (12, 28), (12, 29), (12, 30),  # Post-Christmas
+                (12, 31), (1, 1), (1, 2)  # New Year period
+            ]
+
+            # TIME-BASED SKIP (Performance Optimization)
+            # Skip Asian Session (23:30-05:00) and Pre-London (05:00-07:30)
+            # Total Skip: 23:30 - 07:30
+            hour = current_time.hour
+            minute = current_time.minute
+            time_mins = hour * 60 + minute
+            # 23:30 = 1410, 07:30 = 450
+            is_skip_time = (time_mins >= 1410) or (time_mins < 450)
+
+            if is_weekend_or_monday or is_bank_holiday or is_skip_time:
                  if not self.engine.active_trades:
                       continue # SKIP LOOP (Hyper Speed)
                  else:
@@ -231,6 +250,7 @@ class LaplaceBacktestRunner:
                       skip_analysis = True
             else:
                  skip_analysis = False
+
             
             # Progress logging
             if i % 1000 == 0:

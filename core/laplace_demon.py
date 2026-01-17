@@ -266,28 +266,54 @@ class LaplaceDemonCore:
     def _check_temporal_hazards(self, current_time: datetime, setup: str) -> Optional[str]:
         """
         Hard Veto Logic based on Time of Day/Week.
+        0. Bank Holiday Veto: BLOCK ALL SETUPS during major bank holidays (low liquidity).
         1. Friday Doomsday: Global Shutoff after 20:00.
         2. Asian Hazard Zone: BLOCK ALL SETUPS 23:30-01:30 (Total Lockdown).
         """
         weekday = current_time.weekday() # 0=Mon, 4=Fri
         hour = current_time.hour
         minute = current_time.minute
+        month = current_time.month
+        day = current_time.day
+        
+        # 0. BANK HOLIDAY VETO (53 losses on 2025-12-23 Fix + 14 losses on 2025-12-30 Fix)
+        # Block trades on days with extremely low liquidity
+        # Entire Christmas-New Year period has erratic, low-volume markets
+        bank_holidays = [
+            (12, 23),  # Christmas Eve Eve
+            (12, 24),  # Christmas Eve
+            (12, 25),  # Christmas Day
+            (12, 26),  # Boxing Day
+            (12, 27),  # Post-Boxing Day
+            (12, 28),  # Weekend typically
+            (12, 29),  # Pre-New Year
+            (12, 30),  # Pre-New Year Eve
+            (12, 31),  # New Year's Eve
+            (1, 1),    # New Year's Day
+            (1, 2),    # New Year's Day +1
+        ]
+
+        if (month, day) in bank_holidays:
+            return f"BANK_HOLIDAY_LOCKDOWN ({month:02d}-{day:02d})"
         
         # 1. Friday Doomsday Protocol
         if weekday == 4 and hour >= 20:
              return f"FRIDAY_DOOMSDAY_PROTOCOL (Hour {hour}:00 > 20:00)"
 
-        # 2. Asian Hazard Zone (23:30 - 01:30) - TOTAL LOCKDOWN
+        # 2. Asian Hazard Zone (23:30 - 05:00) - TOTAL LOCKDOWN (Expanded)
         # Convert to minutes for easier range check
         time_minutes = hour * 60 + minute
-        # 23:30 = 1410, 01:30 = 90. Range crosses midnight.
-        is_hazard_time = (time_minutes >= 1410) or (time_minutes <= 90)
+        # 23:30 = 1410, 05:00 = 300. Range crosses midnight.
+        # Previous: 01:30 = 90 min. New: 05:00 = 300 min (covers entire Asian session)
+        is_hazard_time = (time_minutes >= 1410) or (time_minutes < 300)
         
         if is_hazard_time:
-             # Block ALL setups during this period (late-night is casino)
-             return f"ASIAN_TOTAL_LOCKDOWN ({hour}:{minute:02d})"
+             # Block ALL setups during this period (Asian session has low liquidity)
+             return f"ASIAN_SESSION_LOCKDOWN ({hour}:{minute:02d})"
+
         
         return None
+
 
     def _check_toxic_flow_lock(self, is_compressed: bool, setup: str, reasons: list) -> Optional[str]:
         """
@@ -871,6 +897,14 @@ class LaplaceDemonCore:
                                       current_hour = df_m5.index[-1].hour
                                       current_minute = df_m5.index[-1].minute
                                       time_mins = current_hour * 60 + current_minute
+                                      
+                                      # PRE-LONDON VETO (Trades #59-72 Fix - 30-day backtest)
+                                      # Block SELL during low-liquidity pre-London (05:00-07:30)
+                                      # 05:00 = 300, 07:30 = 450
+                                      if 300 <= time_mins < 450:
+                                           reasons.append(f"VOID FILLER VETOED: Pre-London Low Liquidity ({current_hour}:{current_minute:02d})")
+                                           continue
+                                      
                                       # 08:00 = 480, 09:30 = 570
                                       if 480 <= time_mins <= 570:
                                            reasons.append(f"VOID FILLER VETOED: London Open ({current_hour}:{current_minute:02d})")
@@ -883,6 +917,7 @@ class LaplaceDemonCore:
                                            reasons.append(f"VOID FILLER VETOED: Late Session Ranging ({current_hour}:{current_minute:02d})")
                                            continue
                                  except: pass
+
 
 
                                  
