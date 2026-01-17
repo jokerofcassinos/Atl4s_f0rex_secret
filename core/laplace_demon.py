@@ -1455,6 +1455,19 @@ class LaplaceDemonCore:
                     score = 0
                 
         elif score < 0: # We want to SELL
+            # --- GLOBAL LONDON LOCKDOWN (08:00 - 09:30) ---
+            # Total ban on SELL trades during London Open volatility injection to prevent "Neutral/Fallback" losses
+            if df_m5 is not None:
+                current_hour = df_m5.index[-1].hour
+                current_minute = df_m5.index[-1].minute
+                time_mins = current_hour * 60 + current_minute
+                
+                if 480 <= time_mins <= 570:
+                     if setup != "SNIPER_SCALP": # Only allow Sniper Scalp (it has own checks)
+                          reasons.append(f"GLOBAL LOCKDOWN: London Open (08:00-09:30) blocks SELL")
+                          vetoes.append(f"London Lockdown: {current_hour}:{current_minute:02d}")
+                          score = 0
+
             # --- BYPASS: STRUCTURE RIDER & SMR ---
             if setup == "STRUCTURE_TREND_RIDER":
                  reasons.append(f"GLOBAL BYPASS: Structure Rider overrides Cycle Veto.")
