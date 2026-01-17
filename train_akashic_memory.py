@@ -20,7 +20,49 @@ def train_mind(data_file_path: str = None, symbol: str = "GBPUSD", timeframe: st
         if data_file_path.endswith('.parquet'):
             df = pd.read_parquet(data_file_path)
         elif data_file_path.endswith('.csv'):
-            df = pd.read_csv(data_file_path)
+            # ROBUST PARSING (Same as Historical Runner)
+            try:
+                # Try default
+                df = pd.read_csv(data_file_path, parse_dates=False)
+                if len(df.columns) == 1:
+                    df = pd.read_csv(data_file_path, sep='\t', parse_dates=False)
+                    if len(df.columns) == 1:
+                        df = pd.read_csv(data_file_path, sep=';', parse_dates=False)
+                
+                # CHECK FOR HEADERLESS CSV (Ported from Historical Runner)
+                first_col = str(df.columns[0])
+                if first_col.startswith(('20', '19')) and len(first_col) >= 4:
+                    print("⚡ [TRAINER] Detected Headerless CSV. Reloading...")
+                    df = pd.read_csv(data_file_path, header=None, parse_dates=False)
+                    if len(df.columns) >= 7:
+                         cols = ['DATE', 'TIME', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME', 'VOL_REAL', 'SPREAD']
+                         df.columns = cols[:len(df.columns)]
+                
+                # Normalize Columns
+                df.columns = [c.upper().strip() for c in df.columns]
+                rename_map = {
+                    '<DATE>': 'DATE', '<TIME>': 'TIME', '<OPEN>': 'OPEN', '<HIGH>': 'HIGH', '<LOW>': 'LOW', '<CLOSE>': 'CLOSE', '<TICKVOL>': 'VOLUME', '<VOL>': 'VOLUME',
+                    'DATE': 'DATE', 'TIME': 'TIME', 'OPEN': 'OPEN', 'HIGH': 'HIGH', 'LOW': 'LOW', 'CLOSE': 'CLOSE', 'VOLUME': 'VOLUME', 'VOL': 'VOLUME'
+                }
+                df.rename(columns=rename_map, inplace=True)
+                
+                # Combine Date/Time
+                if 'DATE' in df.columns and 'TIME' in df.columns:
+                     try:
+                         df['info_date'] = pd.to_datetime(df['DATE'].astype(str) + ' ' + df['TIME'].astype(str))
+                     except:
+                         df['info_date'] = pd.to_datetime(df['DATE'].astype(str) + ' ' + df['TIME'].astype(str), format='%Y.%m.%d %H:%M:%S', errors='coerce')
+                     df.set_index('info_date', inplace=True, drop=False)
+                elif 'DATETIME' in df.columns:
+                     df['info_date'] = pd.to_datetime(df['DATETIME'])
+                     df.set_index('info_date', inplace=True, drop=False)
+                
+                # Lowercase columns for system compatibility
+                df.columns = [c.lower() for c in df.columns]
+                
+            except Exception as e:
+                print(f"❌ [TRAINER] CSV Parse Error: {e}")
+                return
     else:
         print(f"🌐 [TRAINER] connecting to Quantum Data Source (Yahoo Finance) for {symbol}...")
         loader = DataLoader()
@@ -112,6 +154,10 @@ def train_mind(data_file_path: str = None, symbol: str = "GBPUSD", timeframe: st
     except:
         pass
     
+    
+    # Remove duplicates in columns if any
+    df = df.loc[:, ~df.columns.duplicated()]
+
     # Initialize Core
     brain = AkashicCore()
     
@@ -119,71 +165,136 @@ def train_mind(data_file_path: str = None, symbol: str = "GBPUSD", timeframe: st
     # We need to look into the future for outcomes
     look_forward = 10 # 10 candles future
     
-    print(f"⏳ [TRAINER] Processing {len(df)} candles...")
+    print(f"⏳ [TRAINER] Processing {len(df)} candles (Vectorized)...")
+    
+    # 1. VECTORIZED PRE-CALCULATION (The Speed Force)
+    # Shift future close
+    df['future_close'] = df['close'].shift(-look_forward)
+    df['price_change'] = df['future_close'] - df['close']
+    
+    # Forward Rolling Window for Min/Max
+    # We use a reversed rolling trick to look forward or just shift back
+    # rolling(10) at index i gives statistics for i-9 to i.
+    # We want statistics for i+1 to i+10.
+    # So we calculate rolling(10), then shift it back by 'look_forward'.
+    # Actually, we need to shift by -look_forward.
+    # But wait, rolling(10) includes current candle. We want strict future?
+    # Usually "future window" implies uncertainty.
+    indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=look_forward)
+    df['future_max'] = df['high'].rolling(window=indexer).max()
+    df['future_min'] = df['low'].rolling(window=indexer).min()
+    
+    # Calculate Drawdown/Profit vectors
+    # Bullish Scenario (We went Long): Drawdown is (Entry - MinLow)
+    # Bearish Scenario (We went Short): Drawdown is (MaxHigh - Entry)
+    
+    # We define outcome based on DIRECTION of change
+    # If price went UP, we check if we survived the drawdown
+    # If price went DOWN, we check if we survived the "drawdown" (squeeze)
+    
+    outcomes = []
+    
+    # Vectorized extraction to Numpy for raw speed
+    closes = df['close'].values
+    opens = df['open'].values
+    highs = df['high'].values
+    lows = df['low'].values
+    volumes = df['tick_volume'].values if 'tick_volume' in df.columns else np.zeros(len(df))
+    
+    future_closes = df['future_close'].values
+    future_maxs = df['future_max'].values
+    future_mins = df['future_min'].values
+    
+    # Timestamps (Vectorized conversion)
+    # Force conversion to nanoseconds int64 then divide by 1e9 for float seconds
+    timestamps = df.index.view(np.int64) // 10**9 
+    
+    # Additional features
+    rsi = df['rsi_14'].fillna(50).values
+    atr = df['atr_14'].fillna(0.0001).values
     
     records_added = 0
     
-    for i in range(50, len(df) - look_forward):
-        current = df.iloc[i]
-        future = df.iloc[i + look_forward]
+    # Limit loop to valid data
+    limit = len(df) - look_forward
+    
+    # Batch processing list
+    snapshots = []
+    
+    for i in range(50, limit):
+        p_close = closes[i]
+        p_future = future_closes[i]
+        p_change = p_future - p_close
         
-        # Current State
-        price = current['close']
+        f_max = future_maxs[i]
+        f_min = future_mins[i]
         
-        # Future State
-        future_price = future['close']
-        price_change = future_price - price
-        
-        # Calculate Max Drawdown in the window
-        window = df.iloc[i+1 : i+look_forward+1]
-        min_in_window = window['low'].min()
-        max_in_window = window['high'].max()
-        
-        if price_change > 0:
-            # Bullish case
-            drawdown = price - min_in_window # How much it went against us
-            max_profit = max_in_window - price
-            outcome = "BULL_WIN" if max_profit > (drawdown * 1.5) else "NEUTRAL"
+        # Determine Outcome Label
+        if p_change > 0:
+            # Bullish Outcome
+            drawdown = p_close - f_min
+            profit = f_max - p_close
+            label = "BULL_WIN" if profit > (drawdown * 1.5) else "NEUTRAL"
+            max_dd = drawdown
+            max_prof = profit
         else:
-            # Bearish case
-            drawdown = max_in_window - price # How much it went against us (up)
-            max_profit = price - min_in_window
-            outcome = "BEAR_WIN" if max_profit > (drawdown * 1.5) else "NEUTRAL"
+            # Bearish Outcome
+            drawdown = f_max - p_close
+            profit = p_close - f_min
+            label = "BEAR_WIN" if profit > (drawdown * 1.5) else "NEUTRAL"
+            max_dd = drawdown
+            max_prof = profit
             
-        # Create Snapshot
-        snapshot = RealitySnapshot(
-            timestamp=current['info_date'].timestamp(),
-            price_open=current['open'],
-            price_high=current['high'],
-            price_low=current['low'],
-            price_close=current['close'],
-            volume=current.get('tick_volume', 0) if 'tick_volume' in current else current.get('volume', 0),
-            body_size=abs(current['close'] - current['open']),
-            upper_wick=current['high'] - max(current['open'], current['close']),
-            lower_wick=min(current['open'], current['close']) - current['low'],
-            total_range=current['high'] - current['low'],
-            rsi_14=current['rsi_14'],
-            atr_14=current.get('atr_14', 0.0001),
+        # Create Snapshot (Fast)
+        # Using raw numpy values
+        snap = RealitySnapshot(
+            timestamp=float(timestamps[i]),
+            price_open=float(opens[i]),
+            price_high=float(highs[i]),
+            price_low=float(lows[i]),
+            price_close=float(p_close),
+            volume=float(volumes[i]),
+            body_size=float(abs(p_close - opens[i])),
+            upper_wick=float(highs[i] - max(opens[i], p_close)),
+            lower_wick=float(min(opens[i], p_close) - lows[i]),
+            total_range=float(highs[i] - lows[i]),
+            rsi_14=float(rsi[i]),
+            atr_14=float(atr[i]),
             sma_200_dist=0.0,
-            hour=current['info_date'].hour,
-            minute=current['info_date'].minute,
-            day_of_week=current['info_date'].weekday(),
-            is_8min_cycle=(current['info_date'].minute % 8 == 0),
-            outcome_label=outcome,
-            future_10m_change=price_change,
-            future_max_drawdown=drawdown,
-            future_max_profit=max_profit
+            hour=int(pd.Timestamp(timestamps[i], unit='s').hour), # Fast enough locally or pre-calc
+            minute=int(pd.Timestamp(timestamps[i], unit='s').minute),
+            day_of_week=int(pd.Timestamp(timestamps[i], unit='s').dayofweek),
+            is_8min_cycle=(int(pd.Timestamp(timestamps[i], unit='s').minute) % 8 == 0),
+            outcome_label=label,
+            future_10m_change=float(p_change),
+            future_max_drawdown=float(max_dd),
+            future_max_profit=float(max_prof)
         )
+        snapshots.append(snap)
         
-        brain.record_moment(snapshot)
-        records_added += 1
-        
-        if i % 1000 == 0:
+        if len(snapshots) >= 10000:
+            for s in snapshots:
+                brain.record_moment(s)
+            records_added += len(snapshots)
+            snapshots = []
             print(f"   Processed {i} candles...")
+
+    # Flush remaining
+    for s in snapshots:
+        brain.record_moment(s)
+    records_added += len(snapshots)
 
     brain.save_memory()
     print(f"✅ [TRAINER] Training Complete. Added {records_added} new memories.")
 
 if __name__ == "__main__":
-    # If run directly
-    train_mind(symbol="GBPUSD")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('file', nargs='?', type=str, help='Path to historical CSV/Parquet file')
+    args = parser.parse_args()
+
+    if args.file:
+        train_mind(data_file_path=args.file)
+    else:
+        # Default behavior
+        train_mind(symbol="GBPUSD")

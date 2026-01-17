@@ -228,9 +228,26 @@ class LaplaceBacktestRunner:
             month = current_time.month
             day = current_time.day
             is_bank_holiday = (month, day) in [
-                (12, 23), (12, 24), (12, 25), (12, 26),  # Christmas period
-                (12, 27), (12, 28), (12, 29), (12, 30),  # Post-Christmas
-                (12, 31), (1, 1), (1, 2)  # New Year period
+                # --- Q1 2025 ---
+                (1, 1), (1, 2),    # New Year's
+                (1, 20),           # MLK Day (US)
+                (2, 17),           # Presidents Day (US)
+                # --- Q2 2025 ---
+                (4, 18),           # Good Friday (US/UK)
+                (4, 21),           # Easter Monday (UK)
+                (5, 5),            # Early May Bank Holiday (UK)
+                (5, 26),           # Spring Bank Holiday (UK) + Memorial Day (US)
+                (6, 19),           # Juneteenth (US)
+                # --- Q3 2025 ---
+                (7, 4),            # Independence Day (US)
+                (8, 25),           # Summer Bank Holiday (UK)
+                (9, 1),            # Labor Day (US)
+                # --- Q4 2025 ---
+                (10, 13),          # Columbus Day (US Bond Market Close)
+                (11, 11),          # Veterans Day (US)
+                (11, 26), (11, 27), (11, 28), # Thanksgiving Week (US)
+                (12, 4), (12, 5),  # NFP Week (Dec)
+                (12, 23), (12, 24), (12, 25), (12, 26), (12, 27), (12, 28), (12, 29), (12, 30), (12, 31) # Christmas/New Year
             ]
 
             # TIME-BASED SKIP (Performance Optimization)
@@ -441,6 +458,17 @@ class LaplaceBacktestRunner:
                     # This aligns with the "Swarm" concept and allows granular management.
                     num_orders = 1
                     lot_multiplier = getattr(prediction, 'lot_multiplier', 1.0)
+                    
+                    # NEUTRAL SNOWBALL BOOSTER (User Request)
+                    # "Bola de Neve" Aggression: Force High Multiplier for Neutral Setup
+                    # This turns small edge trades into massive volume via Split Fire.
+                    if "Neutral" in str(prediction.primary_signal) or "Legacy V1" in str(prediction.primary_signal):
+                         # Boost to 7.0x (Max Aggression) to force 7-14 split orders
+                         # This creates the "Safety in Numbers" swarm effect for neutral trades.
+                         if lot_multiplier < 5.0:
+                              lot_multiplier = 7.0
+                              logger.info(f"❄️ SNOWBALL: Neutral Setup Boosted to {lot_multiplier}x Aggression")
+
                     
                     if lot_multiplier >= 2.0:
                         # SMART SPLIT ADJUSTMENT (Wealth Preservation Logic)

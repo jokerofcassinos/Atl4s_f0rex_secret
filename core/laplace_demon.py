@@ -276,21 +276,29 @@ class LaplaceDemonCore:
         month = current_time.month
         day = current_time.day
         
-        # 0. BANK HOLIDAY VETO (53 losses on 2025-12-23 Fix + 14 losses on 2025-12-30 Fix)
-        # Block trades on days with extremely low liquidity
-        # Entire Christmas-New Year period has erratic, low-volume markets
+        # 0. BANK HOLIDAY VETO (Comprehensive US/UK 2025 Schedule)
+        # Block trades on days with extremely low liquidity or market closures.
         bank_holidays = [
-            (12, 23),  # Christmas Eve Eve
-            (12, 24),  # Christmas Eve
-            (12, 25),  # Christmas Day
-            (12, 26),  # Boxing Day
-            (12, 27),  # Post-Boxing Day
-            (12, 28),  # Weekend typically
-            (12, 29),  # Pre-New Year
-            (12, 30),  # Pre-New Year Eve
-            (12, 31),  # New Year's Eve
-            (1, 1),    # New Year's Day
-            (1, 2),    # New Year's Day +1
+            # --- Q1 2025 ---
+            (1, 1), (1, 2),    # New Year's
+            (1, 20),           # MLK Day (US)
+            (2, 17),           # Presidents Day (US)
+            # --- Q2 2025 ---
+            (4, 18),           # Good Friday (US/UK)
+            (4, 21),           # Easter Monday (UK)
+            (5, 5),            # Early May Bank Holiday (UK)
+            (5, 26),           # Spring Bank Holiday (UK) + Memorial Day (US)
+            (6, 19),           # Juneteenth (US)
+            # --- Q3 2025 ---
+            (7, 4),            # Independence Day (US)
+            (8, 25),           # Summer Bank Holiday (UK)
+            (9, 1),            # Labor Day (US)
+            # --- Q4 2025 ---
+            (10, 13),          # Columbus Day (US Bond Market Close)
+            (11, 11),          # Veterans Day (US)
+            (11, 26), (11, 27), (11, 28), # Thanksgiving Week (US)
+            (12, 4), (12, 5),  # NFP Week (Dec)
+            (12, 23), (12, 24), (12, 25), (12, 26), (12, 27), (12, 28), (12, 29), (12, 30), (12, 31) # Christmas/New Year
         ]
 
         if (month, day) in bank_holidays:
@@ -322,7 +330,8 @@ class LaplaceDemonCore:
         """
         if is_compressed:
              reasons.append("Toxic Flow: Compression Detected")
-             if setup in ["VOLATILITY_SQUEEZE", "MOMENTUM_BREAKOUT"]:
+             # Fix Trade #88: Neutral must NOT trade in Compression
+             if setup in ["VOLATILITY_SQUEEZE", "MOMENTUM_BREAKOUT", "Neutral", "Consensus", "WAIT"]:
                   return "TOXIC_FLOW_COMPRESSION_LOCK"
         return None
 
@@ -1472,18 +1481,33 @@ class LaplaceDemonCore:
 
         # --- GLOBAL VETOES & COUNTER-STRATEGIES ---
 
-        # 1. Chaos Veto for Neutral/Consensus (Trade #77 Fix)
-        # Neutral trades (Consensus Vote) must NOT trade in Extreme Chaos.
+        # 1. CHAOS VETO SYSTEM (Forensic Loss Fix #13 - Trade #17-30)
         chaos_details = details.get('Chaos', {})
         chaos_val = 0
         if isinstance(chaos_details, dict):
             chaos_val = chaos_details.get('lyapunov', 0)
-        elif isinstance(chaos_details, tuple) and len(chaos_details) > 0: chaos_val = chaos_details[0] # Assume Lyapunov is first
+        elif isinstance(chaos_details, tuple) and len(chaos_details) > 0: chaos_val = chaos_details[0]
         
-        if (setup == "Neutral" or "Consensus" in str(setup) or "WAIT" in str(setup)) and chaos_val > 0.9:
-             reasons.append(f"GLOBAL VETO: Extreme Chaos ({chaos_val:.2f}) kills Neutral setup.")
-             vetoes.append("Chaos Veto: Neutral in Storm")
+        # A. GLOBAL EXTREME CHAOS VETO (> 0.85)
+        # Blocks EVERYTHING. Market is fundamentally unpredictable. (Fixes Trade #17 @ 0.90)
+        if chaos_val > 0.85:
+             reasons.append(f"GLOBAL VETO: Extreme Chaos ({chaos_val:.2f}) > 0.85. UNTRADEABLE.")
+             vetoes.append(f"Chaos Veto: Extreme ({chaos_val:.2f})")
              score = 0
+             setup = "BLOCKED_BY_CHAOS"
+
+        # B. SENSITIVE SETUP CHAOS VETO (> 0.70)
+        # Blocks VOID_FILLER, Compression Trap, and Neutral. (Fixes Trade #18 @ 0.74, Trade #30 @ 0.69)
+        # These setups rely on structure, which dissolves in chaos.
+        # Added LIQUIDATOR_SWEEP (Fixes Trade #17-30 @ 0.75 in 20 Nov Cluster)
+        if chaos_val > 0.70:
+             sensitive_setups = ["Neutral", "Consensus", "WAIT", "VOID_FILLER_FVG", "COMPRESSION_TRAP_REVERSAL", "LIQUIDATOR_SWEEP"]
+             is_sensitive = any(s in str(setup) for s in sensitive_setups)
+             
+             if is_sensitive:
+                  reasons.append(f"GLOBAL VETO: High Chaos ({chaos_val:.2f}) kills Sensitive Setup.")
+                  vetoes.append(f"Chaos Veto: Sensitive Setup ({chaos_val:.2f})")
+                  score = 0
 
         # 2. Cycle & Divergence Logic & SMART MONEY REVERSAL
         cycle_res = details.get('Cycle', ('NEUTRAL', 0))
