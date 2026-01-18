@@ -1,0 +1,131 @@
+{
+  "config": {
+    "initial_capital": 1000.0,
+    "leverage": 1000000.0,
+    "symbol": "GBPUSD_HIST",
+    "risk_per_trade_pct": 20.0,
+    "spread_pips": 1.0
+  },
+  "summary": {
+    "total_trades": 5,
+    "winning_trades": 5,
+    "losing_trades": 0,
+    "win_rate": 100.0,
+    "net_profit": 231.77,
+    "profit_factor": Infinity,
+    "max_drawdown_pct": 47.53,
+    "sharpe_ratio": 0.0,
+    "expectancy": 46.35,
+    "avg_r_multiple": 0.23
+  },
+  "by_hour": {
+    "win_rate": {
+      "15": 100.0
+    },
+    "pnl": {
+      "15": 231.77
+    }
+  },
+  "by_day": {
+    "win_rate": {
+      "Monday": 0,
+      "Tuesday": 100.0,
+      "Wednesday": 0,
+      "Thursday": 0,
+      "Friday": 0,
+      "Saturday": 0,
+      "Sunday": 0
+    },
+    "pnl": {
+      "Monday": 0.0,
+      "Tuesday": 231.77,
+      "Wednesday": 0.0,
+      "Thursday": 0.0,
+      "Friday": 0.0,
+      "Saturday": 0.0,
+      "Sunday": 0.0
+    }
+  },
+  "trades": [
+    {
+      "id": 1,
+      "direction": "SELL",
+      "entry_time": "2022-01-04 15:35:00",
+      "entry_price": 1.3526638588486253,
+      "exit_time": "2022-01-05 00:00:00",
+      "exit_price": 1.35233,
+      "exit_reason": "END_OF_TEST",
+      "pnl_pips": 3.3385884862524584,
+      "pnl_dollars": 44.4032268671577,
+      "lots": 1.33,
+      "r_multiple": 0.22257256575015547,
+      "duration_minutes": 505,
+      "signal_source": "CONSENSUS_VOTE",
+      "confidence": 99.0
+    },
+    {
+      "id": 2,
+      "direction": "SELL",
+      "entry_time": "2022-01-04 15:35:00",
+      "entry_price": 1.3526874539079954,
+      "exit_time": "2022-01-05 00:00:00",
+      "exit_price": 1.35233,
+      "exit_reason": "END_OF_TEST",
+      "pnl_pips": 3.5745390799535315,
+      "pnl_dollars": 47.54136976338197,
+      "lots": 1.33,
+      "r_multiple": 0.2383026053302264,
+      "duration_minutes": 505,
+      "signal_source": "CONSENSUS_VOTE",
+      "confidence": 99.0
+    },
+    {
+      "id": 3,
+      "direction": "SELL",
+      "entry_time": "2022-01-04 15:35:00",
+      "entry_price": 1.3526958654760415,
+      "exit_time": "2022-01-05 00:00:00",
+      "exit_price": 1.35233,
+      "exit_reason": "END_OF_TEST",
+      "pnl_pips": 3.6586547604144926,
+      "pnl_dollars": 48.66010831351275,
+      "lots": 1.33,
+      "r_multiple": 0.24391031736095692,
+      "duration_minutes": 505,
+      "signal_source": "CONSENSUS_VOTE",
+      "confidence": 99.0
+    },
+    {
+      "id": 4,
+      "direction": "SELL",
+      "entry_time": "2022-01-04 15:35:00",
+      "entry_price": 1.352665595485419,
+      "exit_time": "2022-01-05 00:00:00",
+      "exit_price": 1.35233,
+      "exit_reason": "END_OF_TEST",
+      "pnl_pips": 3.3559548541894912,
+      "pnl_dollars": 44.63419956072023,
+      "lots": 1.33,
+      "r_multiple": 0.22373032361262427,
+      "duration_minutes": 505,
+      "signal_source": "CONSENSUS_VOTE",
+      "confidence": 99.0
+    },
+    {
+      "id": 5,
+      "direction": "SELL",
+      "entry_time": "2022-01-04 15:35:00",
+      "entry_price": 1.352679869846129,
+      "exit_time": "2022-01-05 00:00:00",
+      "exit_price": 1.35233,
+      "exit_reason": "END_OF_TEST",
+      "pnl_pips": 3.4986984612905836,
+      "pnl_dollars": 46.532689535164764,
+      "lots": 1.33,
+      "r_multiple": 0.23324656408603006,
+      "duration_minutes": 505,
+      "signal_source": "CONSENSUS_VOTE",
+      "confidence": 99.0
+    }
+  ]
+}

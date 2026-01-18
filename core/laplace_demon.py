@@ -888,14 +888,27 @@ class LaplaceDemonCore:
 
                                  
                                  if is_compressed and smc_structure == 'BULLISH':
-                                      # SIGNAL REVERSAL: Instead of SELL, execute BUY
-                                      if 130 > abs(score):
-                                           reasons.append(f"COMPRESSION TRAP REVERSAL: Bearish FVG @ {fvg_bot:.5f} in Bullish Structure")
-                                           reasons.append("Signal Inverted: SELL -> BUY (Accumulation Breakout)")
-                                           setup = "COMPRESSION_TRAP_REVERSAL"
-                                           score = 130  # Positive = BUY (instead of -130 SELL)
-                                           logger.info(f"COMPRESSION TRAP REVERSAL ACTIVATED: BUY @ {fvg_bot:.5f}")
-                                           break
+                                      # SAFEGUARD 1: Check Global Chaos (Don't play traps in Chaos)
+                                      chaos_check = details.get('Chaos', {})
+                                      lyapunov_val = chaos_check.get('lyapunov', 0) if isinstance(chaos_check, dict) else 0.0
+                                      
+                                      # SAFEGUARD 2: Check Momentum (Don't invert Strong Sells)
+                                      # If Consensus is already SELL < -50, Momentum is real. Don't fight it.
+                                      strong_momentum = score < -50
+                                      
+                                      if lyapunov_val > 0.6:
+                                           reasons.append(f"COMPRESSION TRAP VETOED: Too Chaotic ({lyapunov_val:.2f})")
+                                      elif strong_momentum:
+                                           reasons.append(f"COMPRESSION TRAP VETOED: Strong Momentum Opposes Reversal ({score:.1f})")
+                                      else:
+                                          # SIGNAL REVERSAL: Instead of SELL, execute BUY
+                                          if 130 > abs(score):
+                                               reasons.append(f"COMPRESSION TRAP REVERSAL: Bearish FVG @ {fvg_bot:.5f} in Bullish Structure")
+                                               reasons.append("Signal Inverted: SELL -> BUY (Accumulation Breakout)")
+                                               setup = "COMPRESSION_TRAP_REVERSAL"
+                                               score = 130  # Positive = BUY (instead of -130 SELL)
+                                               logger.info(f"COMPRESSION TRAP REVERSAL ACTIVATED: BUY @ {fvg_bot:.5f}")
+                                               break
                                  
 
 

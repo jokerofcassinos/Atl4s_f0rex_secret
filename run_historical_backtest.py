@@ -158,6 +158,9 @@ class HistoricalBacktestRunner(LaplaceBacktestRunner):
                 return False
 
             # Store M1
+            df.sort_index(inplace=True)
+            df = df[~df.index.duplicated(keep='first')]
+            
             self.df_m1 = df
             logger.info(f"M1 Data Loaded: {len(df)} rows. Range: {df.index[0]} to {df.index[-1]}")
 
@@ -217,16 +220,36 @@ async def main():
         logger.error("Failed to load or process data. Exiting.")
         return
 
-    # Run Backtest
-    # Note: We assume the file contains the full range we want to test.
-    # The runner.run_backtest loop iterates over whatever df_m5 has.
-    
-    print(f"\n🚀 Launching Simulation on {len(runner.df_m5)} M5 candles...")
-    result = await runner.run_backtest(use_m5=True)
-    
-    # Generate Report
-    runner.generate_report(result, prefix=f"history_{os.path.basename(args.file).split('.')[0]}")
-    print("\n✅ Historical Stress Test Complete.")
+    try:
+        # Run Backtest
+        # Note: We assume the file contains the full range we want to test.
+        # The runner.run_backtest loop iterates over whatever df_m5 has.
+        
+        print(f"\n🚀 Launching Simulation on {len(runner.df_m5)} M5 candles...")
+        result = await runner.run_backtest(use_m5=True)
+        
+        # Generate Report
+        runner.generate_report(result, prefix=f"history_{os.path.basename(args.file).split('.')[0]}")
+        print("\n✅ Historical Stress Test Complete.")
+        
+    except KeyboardInterrupt:
+        print("\n⚠️ Interrupted by user! Generating partial report...")
+        
+        # FIX: Generate a proper BacktestResult object from the engine
+        # runner.laplace should be initialized and have a backtest_engine
+        try:
+             # FIX: Access engine directly from runner
+             if hasattr(runner, 'engine'):
+                 partial_result = runner.engine._calculate_results()
+                 prefix = f"history_{os.path.basename(args.file).split('.')[0]}_PARTIAL"
+                 runner.generate_report(partial_result, prefix=prefix)
+                 print(f"\n✅ Partial Report Generated successfully: {prefix}")
+             else:
+                 print("⚠️ Could not access backtest engine for report.")
+        except Exception as e:
+             print(f"❌ Failed to generate partial report: {e}")
+             import traceback
+             traceback.print_exc()
 
 if __name__ == "__main__":
     asyncio.run(main())
