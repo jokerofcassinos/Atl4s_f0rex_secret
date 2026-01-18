@@ -840,6 +840,29 @@ class LaplaceDemonCore:
                        fvg_bot = getattr(fvg, 'bottom', 0)
                        fvg_type = getattr(fvg, 'type', 'NEUTRAL')
                        
+                       # --- GHOST FVG PROTECTION ---
+                       fvg_dist = abs(df_m5['close'].iloc[-1] - ((fvg_top + fvg_bot)/2))
+                       fvg_size = abs(fvg_top - fvg_bot)
+                       
+                       if fvg_dist > 0.0050: continue # > 50 Pips away
+                       if fvg_size > 0.0030: continue # > 30 Pips wide
+                       
+                       # --- VOLATILITY SHIELD (Flash Crash Protection) ---
+                       # If ATR is huge (>30 pips), FVG fills are suicide (Whipsaw Risk).
+                       # We need to calculate ATR locally or get it from Trend.
+                       tr_val = 0
+                       if df_m5 is not None and len(df_m5) > 1:
+                            h, l, c = df_m5['high'].iloc[-1], df_m5['low'].iloc[-1], df_m5['close'].iloc[-2]
+                            tr_val = max(h-l, abs(h-c), abs(l-c))
+                       
+                       # Get Trend ATR if available (more stable)
+                       trend_atr = details.get('Trend', {}).get('atr', 0)
+                       current_vol = max(tr_val, trend_atr)
+                       
+                       if current_vol > 0.0030: # > 30 Pips Volatility
+                            reasons.append(f"VOID FILLER VETOED: Extreme Volatility (ATR {current_vol:.5f}) - Flash Event Risk")
+                            continue
+
                        # Bullish FVG
                        if fvg_type == "BULLISH":
                             if c_low <= fvg_top and c_close > fvg_bot: 

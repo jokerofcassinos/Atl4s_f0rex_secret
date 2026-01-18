@@ -1,0 +1,131 @@
+{
+  "config": {
+    "initial_capital": 30.0,
+    "leverage": 1000000.0,
+    "symbol": "GBPUSD_HIST",
+    "risk_per_trade_pct": 20.0,
+    "spread_pips": 1.0
+  },
+  "summary": {
+    "total_trades": 5,
+    "winning_trades": 5,
+    "losing_trades": 0,
+    "win_rate": 100.0,
+    "net_profit": 40.0,
+    "profit_factor": Infinity,
+    "max_drawdown_pct": 43.26,
+    "sharpe_ratio": 0.0,
+    "expectancy": 8.0,
+    "avg_r_multiple": 1.33
+  },
+  "by_hour": {
+    "win_rate": {
+      "18": 100.0
+    },
+    "pnl": {
+      "18": 40.0
+    }
+  },
+  "by_day": {
+    "win_rate": {
+      "Monday": 0,
+      "Tuesday": 0,
+      "Wednesday": 0,
+      "Thursday": 100.0,
+      "Friday": 0,
+      "Saturday": 0,
+      "Sunday": 0
+    },
+    "pnl": {
+      "Monday": 0.0,
+      "Tuesday": 0.0,
+      "Wednesday": 0.0,
+      "Thursday": 40.0,
+      "Friday": 0.0,
+      "Saturday": 0.0,
+      "Sunday": 0.0
+    }
+  },
+  "trades": [
+    {
+      "id": 1,
+      "direction": "SELL",
+      "entry_time": "2016-10-06 18:10:00",
+      "entry_price": 1.2614386007023932,
+      "exit_time": "2016-10-06 19:05:00",
+      "exit_price": 1.2594386007023932,
+      "exit_reason": "TP_HIT",
+      "pnl_pips": 20.000000000000018,
+      "pnl_dollars": 8.000000000000007,
+      "lots": 0.04,
+      "r_multiple": 1.333333333333284,
+      "duration_minutes": 55,
+      "signal_source": "GOLDEN_COIL_M8",
+      "confidence": 99.0
+    },
+    {
+      "id": 2,
+      "direction": "SELL",
+      "entry_time": "2016-10-06 18:10:00",
+      "entry_price": 1.2614290791639209,
+      "exit_time": "2016-10-06 19:05:00",
+      "exit_price": 1.2594290791639209,
+      "exit_reason": "TP_HIT",
+      "pnl_pips": 20.000000000000018,
+      "pnl_dollars": 8.000000000000007,
+      "lots": 0.04,
+      "r_multiple": 1.333333333333284,
+      "duration_minutes": 55,
+      "signal_source": "GOLDEN_COIL_M8",
+      "confidence": 99.0
+    },
+    {
+      "id": 3,
+      "direction": "SELL",
+      "entry_time": "2016-10-06 18:10:00",
+      "entry_price": 1.2614512266228082,
+      "exit_time": "2016-10-06 19:05:00",
+      "exit_price": 1.2594512266228082,
+      "exit_reason": "TP_HIT",
+      "pnl_pips": 20.000000000000018,
+      "pnl_dollars": 8.000000000000007,
+      "lots": 0.04,
+      "r_multiple": 1.333333333333284,
+      "duration_minutes": 55,
+      "signal_source": "GOLDEN_COIL_M8",
+      "confidence": 99.0
+    },
+    {
+      "id": 4,
+      "direction": "SELL",
+      "entry_time": "2016-10-06 18:10:00",
+      "entry_price": 1.2614599532439028,
+      "exit_time": "2016-10-06 19:05:00",
+      "exit_price": 1.2594599532439028,
+      "exit_reason": "TP_HIT",
+      "pnl_pips": 20.000000000000018,
+      "pnl_dollars": 8.000000000000007,
+      "lots": 0.04,
+      "r_multiple": 1.333333333333284,
+      "duration_minutes": 55,
+      "signal_source": "GOLDEN_COIL_M8",
+      "confidence": 99.0
+    },
+    {
+      "id": 5,
+      "direction": "SELL",
+      "entry_time": "2016-10-06 18:10:00",
+      "entry_price": 1.2614394301296055,
+      "exit_time": "2016-10-06 19:05:00",
+      "exit_price": 1.2594394301296055,
+      "exit_reason": "TP_HIT",
+      "pnl_pips": 20.000000000000018,
+      "pnl_dollars": 8.000000000000007,
+      "lots": 0.04,
+      "r_multiple": 1.333333333333284,
+      "duration_minutes": 55,
+      "signal_source": "GOLDEN_COIL_M8",
+      "confidence": 99.0
+    }
+  ]
+}

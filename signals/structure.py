@@ -502,6 +502,18 @@ class SMCAnalyzer:
                     if fvg.filled_pct >= 100:
                         continue
                     
+                    # --- GHOST FVG PROTECTION ---
+                    # Reject FVGs that are massive (>30 pips) or too far away (>50 pips)
+                    # This prevents trading M1 price action against H4 structures that are irrelevant.
+                    fvg_dist = abs(current_price - fvg.midpoint)
+                    fvg_size = abs(fvg.top - fvg.bottom)
+                    
+                    if fvg_dist > 0.0050: # > 50 Pips away
+                         continue
+                    
+                    if fvg_size > 0.0030: # > 30 Pips wide (Too wide for M1 precision)
+                         continue
+
                     # Same direction FVG overlapping
                     if fvg.type == ob.type:
                         overlap = max(0, min(ob.top, fvg.top) - max(ob.bottom, fvg.bottom))
